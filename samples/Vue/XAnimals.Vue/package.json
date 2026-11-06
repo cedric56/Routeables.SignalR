@@ -1,0 +1,23 @@
+{
+  "name": "xanimals-vue",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "start": "vite",
+    "build": "vue-tsc --noEmit && vite build",
+    "check": "vue-tsc --noEmit"
+  },
+  "dependencies": {
+    "@microsoft/signalr": "^10.0.0",
+    "vue": "^3.5.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.20.5",
+    "@vitejs/plugin-vue": "^6.0.0",
+    "typescript": "~5.9.2",
+    "vite": "^7.0.0",
+    "vue-tsc": "^3.0.0"
+  }
+}

@@ -1,0 +1,2 @@
+.error { padding: .6rem .9rem; border-radius: 10px; border-left: 4px solid #c62828; background: color-mix(in srgb, #c62828 12%, transparent); }
+.empty { color: var(--an-muted); }

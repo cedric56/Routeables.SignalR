@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 680 160" width="680" height="160" role="img" aria-label="Routeables">
+  <!-- The logo of the repository (Images/logo.svg) with its light colours, written with presentation attributes because SharpVectors does not read its <style>. The views draw it on a white card, so it reads in the dark theme too. -->
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#7C5CFF"/>
+      <stop offset="1" stop-color="#4A22C8"/>
+    </linearGradient>
+  </defs>
+  <g transform="translate(16 16)">
+    <rect width="128" height="128" rx="28" fill="url(#bg)"/>
+    <g fill="none" stroke="#fff" stroke-width="9" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M44 98 V30 H70 C94 30 94 68 70 68 H44"/>
+      <path d="M68 68 L90 98"/>
+    </g>
+    <circle cx="44" cy="98" r="10" fill="#fff"/>
+    <circle cx="90" cy="98" r="10" fill="#4A22C8" stroke="#fff" stroke-width="7"/>
+  </g>
+  <text x="168" y="88" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="60" font-weight="700" fill="#1f2328" letter-spacing="-1">Route<tspan fill="#5B35E0">ables</tspan></text>
+  <text x="170" y="118" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="19" fill="#59636e">One routing layer for Blazor, MAUI, Avalonia, Uno &amp; WPF</text>
+</svg>

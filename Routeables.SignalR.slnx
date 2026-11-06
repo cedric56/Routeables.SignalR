@@ -1,0 +1,24 @@
+<Solution>
+  <Folder Name="/Solution Items/">
+    <File Path="Directory.Build.props" />
+    <File Path="Directory.Build.targets" />
+    <File Path="global.json" />
+    <File Path="README.md" />
+  </Folder>
+  <Folder Name="/clients/">
+    <File Path="clients/typescript/README.md" />
+  </Folder>
+  <Folder Name="/samples/">
+    <Project Path="samples/Angular/XAnimals.AngularServer/XAnimals.AngularServer.csproj" />
+    <Project Path="samples/SignalR/CounterServer/CounterServer.csproj" />
+    <File Path="samples/Angular/README.md" />
+    <File Path="samples/Vue/README.md" />
+  </Folder>
+  <Folder Name="/src/">
+    <Project Path="src/Routeables.SignalR/Routeables.SignalR.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/Routeables.SignalR.Test/Routeables.SignalR.Test.csproj" />
+    <Project Path="tests/Routeables.SignalR.Test.Angular/Routeables.SignalR.Test.Angular.csproj" />
+  </Folder>
+</Solution>

@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Counter</title>
+  <link rel="icon" href="data:,">
+</head>
+<body>
+  <h1>Count: <span id="count">…</span></h1>
+  <p>
+    <label>Step <input id="step" type="number" min="1" value="1"></label>
+    <button id="increment" type="button">Add</button>
+    <button id="reset" type="button">Reset</button>
+  </p>
+  <p id="error" role="alert"></p>
+
+  <!-- The page talks to the server with SignalR alone. A real application uses @routeables/client (clients/typescript). -->
+  <script src="https://cdn.jsdelivr.net/npm/@microsoft/signalr@10.0.0/dist/browser/signalr.min.js"></script>
+  <script>
+    const connection = new signalR.HubConnectionBuilder().withUrl('/routeables').withAutomaticReconnect().build();
+    const el = id => document.getElementById(id);
+    const show = state => { el('count').textContent = state.count; el('step').value = state.step; };
+
+    connection.on('Navigated', page => show(page.state));
+    connection.on('Changed', change => show({ count: el('count').textContent, step: el('step').value, [change.property]: change.value }));
+    connection.on('Failed', failure => { el('error').textContent = failure.message; });
+
+    el('increment').onclick = () => connection.invoke('Set', 'step', Number(el('step').value))
+      .then(() => connection.invoke('Invoke', 'increment', []));
+    el('reset').onclick = () => connection.invoke('Invoke', 'reset', []);
+
+    connection.start().then(() => connection.invoke('GoTo', '/counter'));
+  </script>
+</body>
+</html>

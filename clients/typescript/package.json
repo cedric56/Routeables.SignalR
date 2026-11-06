@@ -1,0 +1,30 @@
+{
+  "name": "@routeables/client",
+  "version": "0.1.0",
+  "description": "Client of Routeables.SignalR: shows the view models of a Routeables server in Angular, Vue or any JavaScript front end.",
+  "license": "MIT",
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "check": "tsc -p tsconfig.json --noEmit",
+    "test": "tsc -p tsconfig.test.json && node --test dist-test/test/client.test.js"
+  },
+  "peerDependencies": {
+    "@microsoft/signalr": ">=8.0.0"
+  },
+  "peerDependenciesMeta": {
+    "@microsoft/signalr": {
+      "optional": true
+    }
+  },
+  "devDependencies": {
+    "@microsoft/signalr": "^10.0.0",
+    "@types/node": "^22.20.5",
+    "typescript": "^5.9.0"
+  }
+}

@@ -1,0 +1,51 @@
+<header class="site-header">
+  <button type="button" class="drawer-toggle" aria-controls="drawer" [attr.aria-expanded]="!closed()"
+          aria-label="Show or hide the menu" (click)="routeables.toggleDrawer()">☰</button>
+  <a class="brand" href="/cats" (click)="open($event, '/cats')">Routeables Animals</a>
+  <!-- The theme is asked of the view model like on the other platforms; Default follows the browser. -->
+  <button type="button" class="drawer-toggle theme-form" [title]="'Theme: ' + theme() + ' (click for the next one)'"
+          [attr.aria-label]="'Change the theme, now ' + theme()" (click)="cycleTheme()">◐</button>
+</header>
+
+<main role="main">
+  <div class="shell" [class.drawer-closed]="closed()">
+    <!-- The side panel: one entry per entry of the main view model, as in the other samples. -->
+    <nav class="drawer" id="drawer" aria-label="Menu">
+      @for (entry of entries(); track entry.route) {
+        @if (entry.isLocked) {
+          <!-- A page published a lock (Features): the entry cannot be followed until it publishes the unlock. -->
+          <span class="drawer-link locked" title="Locked">
+            <span class="drawer-icon" aria-hidden="true">{{ entry.glyph }}</span>
+            <span class="drawer-name">{{ entry.name }}</span>
+          </span>
+        } @else {
+          <a class="drawer-link" [class.active]="isActive(entry)" [attr.aria-current]="isActive(entry) ? 'page' : null"
+             [href]="entry.route" (click)="open($event, entry.route)">
+            <span class="drawer-icon" aria-hidden="true">{{ entry.glyph }}</span>
+            <span class="drawer-text">
+              <span class="drawer-name">{{ entry.name }}</span>
+              @if (entry.description) { <span class="drawer-description">{{ entry.description }}</span> }
+            </span>
+          </a>
+        }
+      }
+    </nav>
+
+    <div class="shell-content">
+      <div style="padding: 20px;">
+        @if (routeables.error(); as error) {
+          <p class="error" role="alert">{{ error }}</p>
+        }
+        @if (page(); as p) {
+          <app-page [page]="p" />
+        } @else if (routeables.connected()) {
+          <p class="empty">Loading…</p>
+        } @else {
+          <p class="empty">Offline: the server is not reachable.</p>
+        }
+      </div>
+    </div>
+  </div>
+</main>
+
+<app-interactions />

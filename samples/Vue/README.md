@@ -1,0 +1,47 @@
+# Routeables with Vue
+
+The same view models and the same server as the [Angular sample](../Angular), drawn by a Vue 3 app. The server runs the view models; the browser receives their state and sends what the user does. Every page of the menu is there: the animal lists and details, History, Regions, Adopt a pet, Dialogs (messages, content and task dialogs, notifications, the note modal), Features (guard, lock, measures), Members, Tabs and About, with the same side panel and theme button as the other web samples.
+
+```
+Vue app (xanimals-vue)  ──SignalR──▶  XAnimals.AngularServer
+  shows page.state of each target       Routeables.SignalR: one router, one set of regions and one set of
+  goTo('/cats/Abyssinian')              view models per connection
+  run('', state.pushCommand)            the view models of XAnimals.ViewModels
+  answer(dialog, 0)
+```
+
+There is no second server: a front end only needs the hub `/routeables`, so the Vue app uses the one of the Angular sample.
+
+## Run it
+
+Two terminals. You need the .NET 10 SDK and Node 20.19, 22.12 or later.
+
+```bash
+# 1. the server, on http://localhost:5090
+dotnet run --project samples/Angular/XAnimals.AngularServer
+
+# 2. the app, on http://localhost:5173 (it proxies /routeables to the server)
+cd samples/Vue/XAnimals.Vue
+npm install
+npm start
+```
+
+Open http://localhost:5173. Use the side panel; reload on `/dogs/Afghan%20Hound` or `/tabs`: the address is a route. Open Features and press "Lock for 5 seconds": the menu locks, and unlocks by itself when the server says so.
+
+`npm run build` checks the types (`vue-tsc`) and builds the app into `dist`.
+
+## What is worth reading
+
+- `src/routeables.ts`: the connection as refs, the address bar that follows the page, the dialogs and the notifications. It is the file to compare with `routeables.ts` of the Angular sample: a `signal` is a `shallowRef`, the rest is the same.
+- `src/PageView.vue`: the view model decides which page it is; this chooses the component. The same component draws the page of the main router and the page a region shows.
+- `src/Region.vue`: a region zone, the way a `RouteableRegion` is on the other platforms. The `key` is the number of the page, so a page that arrives plays the transition again.
+- `src/pages/`: one component per view model. A button runs the `...Command` of the state it was sent.
+
+The app imports `@routeables/client` from `clients/typescript/src` (see `vite.config.ts` and `tsconfig.json`), so there is nothing to build or publish first. The look is the one of the Angular sample (`public/css`).
+
+## Limits
+
+- The photos come from the same web addresses as in the other samples.
+- A connection is a session: the server forgets the view models when it closes, and the app opens the page again after a reconnection.
+- With several servers, SignalR needs sticky sessions (or a backplane).
+- The Birds module has no page here, and the notification of the operating system ("System") is a notification of the page.

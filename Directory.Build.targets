@@ -1,0 +1,9 @@
+<Project>
+  <ItemGroup Condition="Exists('$(MSBuildProjectDirectory)/README.md') And '$(IsPackable)' != 'false' And '$(OutputType)' == 'Library'">
+    <None Remove="README.md" />
+    <None Include="README.md" Pack="true" PackagePath="" />
+  </ItemGroup>
+  <ItemGroup Condition="'$(IsPackable)' != 'false' And '$(OutputType)' == 'Library' And '$(PackageIcon)' != ''">
+    <None Include="$(MSBuildThisFileDirectory)images/icon.png" Pack="true" PackagePath="" Visible="false" />
+  </ItemGroup>
+</Project>
