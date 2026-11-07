@@ -1,19 +1,4 @@
 <Solution>
-  <Folder Name="/samples/Angular/">
-    <File Path="samples/Angular/README.md" />
-    <Project Path="samples/Angular/XAnimals.Angular/XAnimals.Angular.esproj">
-      <Build />
-      <Deploy />
-    </Project>
-    <Project Path="samples/Angular/XAnimals.AngularServer/XAnimals.AngularServer.csproj" />
-  </Folder>
-  <Folder Name="/samples/Vue/">
-    <File Path="samples/Vue/README.md" />
-    <Project Path="samples/Vue/XAnimals.Vue/XAnimals.Vue.esproj">
-      <Build />
-      <Deploy />
-    </Project>
-  </Folder>
   <Folder Name="/Solution Items/">
     <File Path="Directory.Build.props" />
     <File Path="Directory.Build.targets" />
@@ -35,7 +20,20 @@
       <Deploy />
     </Project>
   </Folder>
-  <Folder Name="/samples/" />
+  <Folder Name="/samples/">
+    <Project Path="samples/Angular/XAnimals.AngularServer/XAnimals.AngularServer.csproj" />
+    <!-- The front ends, for Visual Studio. Outside Visual Studio the projects run neither npm install nor their build: the CI builds them with npm. -->
+    <Project Path="samples/Angular/XAnimals.Angular/XAnimals.Angular.esproj">
+      <Build />
+      <Deploy />
+    </Project>
+    <Project Path="samples/Vue/XAnimals.Vue/XAnimals.Vue.esproj">
+      <Build />
+      <Deploy />
+    </Project>
+    <File Path="samples/Angular/README.md" />
+    <File Path="samples/Vue/README.md" />
+  </Folder>
   <Folder Name="/src/">
     <Project Path="src/Routeables.SignalR/Routeables.SignalR.csproj" />
   </Folder>
