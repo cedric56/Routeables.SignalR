@@ -1,0 +1,19 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "type": "edge",
+      "request": "launch",
+      "name": "Svelte (Edge)",
+      "url": "http://localhost:5175",
+      "webRoot": "${workspaceFolder}"
+    },
+    {
+      "type": "chrome",
+      "request": "launch",
+      "name": "Svelte (Chrome)",
+      "url": "http://localhost:5175",
+      "webRoot": "${workspaceFolder}"
+    }
+  ]
+}

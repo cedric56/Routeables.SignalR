@@ -32,7 +32,7 @@ Open http://localhost:5173. Use the side panel; reload on `/dogs/Afghan%20Hound`
 
 ## In Visual Studio
 
-Open `Routeables.SignalR.slnx`: the app is the project `XAnimals.Vue` (`XAnimals.Vue.esproj`, the JavaScript project system of Visual Studio). Choose the launch profile **Vue + server** in the toolbar (it comes from `Routeables.SignalR.slnLaunch`) and press F5: Visual Studio starts XAnimals.AngularServer on http://localhost:5090, runs `npm start` and opens http://localhost:5173 in Edge or Chrome with the debugger attached (`.vscode/launch.json`). It runs `npm install` when `node_modules` is missing. **Angular + Vue + server** starts both apps against the same server.
+Open `Routeables.SignalR.slnx`: the app is the project `XAnimals.Vue` (`XAnimals.Vue.esproj`, the JavaScript project system of Visual Studio). Choose the launch profile **Vue + server** in the toolbar (it comes from `Routeables.SignalR.slnLaunch`) and press F5: Visual Studio starts XAnimals.AngularServer on http://localhost:5090, runs `npm start` and opens http://localhost:5173 in Edge or Chrome with the debugger attached (`.vscode/launch.json`). It runs `npm install` when `node_modules` is missing. **All web apps + server** starts every web sample (Angular, Vue, React, Svelte, Solid, Lit, vanilla) against the same server.
 
 Visual Studio 2022 17.14 or later (or Visual Studio 2026) with the "Node.js development" or "ASP.NET and web development" workload, and Node.js 22.
 

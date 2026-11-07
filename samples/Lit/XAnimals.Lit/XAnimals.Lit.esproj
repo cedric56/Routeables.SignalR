@@ -1,0 +1,18 @@
+<Project Sdk="Microsoft.VisualStudio.JavaScript.Sdk/1.0.6578810">
+
+  <!--
+    Opens the Lit app in Visual Studio: Solution Explorer shows its files, F5 runs "npm start" and debugs it in the browser
+    (.vscode/launch.json), Visual Studio runs "npm install" when node_modules is missing.
+    The hub is answered by XAnimals.AngularServer (http://localhost:5090): start both with the launch profile "Lit + server"
+    (Routeables.SignalR.slnLaunch), or set them as startup projects.
+  -->
+  <PropertyGroup>
+    <StartupCommand>npm start</StartupCommand>
+    <BuildCommand>npm run build</BuildCommand>
+    <BuildOutputFolder>$(MSBuildProjectDirectory)\dist</BuildOutputFolder>
+    <!-- The app is built by the CI with npm. Visual Studio builds it on demand only: Build runs "npm run build". -->
+    <ShouldRunBuildScript Condition="'$(BuildingInsideVisualStudio)' != 'true'">false</ShouldRunBuildScript>
+    <ShouldRunNpmInstall Condition="'$(BuildingInsideVisualStudio)' != 'true'">false</ShouldRunNpmInstall>
+  </PropertyGroup>
+
+</Project>

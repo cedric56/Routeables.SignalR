@@ -12,9 +12,18 @@ var builder = WebApplication.CreateBuilder(args);
 // modal go to the browser too (Routeables.SignalR registers their services).
 builder.Services.AddRouteablesSignalR<MainViewModel>(services => services.AddAnimalsForAngular(), options => options.AddAnimalsExposure());
 
-// The Angular dev server (ng serve) runs on its own port and proxies /routeables here (see proxy.conf.json), so no CORS is needed.
+// The dev servers of the web samples (ng serve, vite) run on their own port and proxy /routeables here (proxy.conf.json, vite.config.ts):
+// for them no CORS is needed. Flutter web calls the hub from its own address: the pages of this machine may (a sample, not a policy
+// for production). A mobile app sends no origin and needs none.
+builder.Services.AddCors(cors => cors.AddDefaultPolicy(policy => policy
+    .SetIsOriginAllowed(origin => Uri.TryCreate(origin, UriKind.Absolute, out var uri) && uri.IsLoopback)
+    .AllowAnyHeader()
+    .AllowAnyMethod()
+    .AllowCredentials()));
+
 var app = builder.Build();
 
+app.UseCors();
 app.MapRouteables();   // the hub, at /routeables
 
 app.Run();

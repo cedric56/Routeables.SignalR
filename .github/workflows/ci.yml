@@ -142,15 +142,40 @@ jobs:
         run: node --test tests/e2e/e2e.test.mjs
         working-directory: Routeables.SignalR
 
-  # The Vue sample draws the view models of the Angular sample server: its types and its build are checked here.
-  vue-sample:
-    name: Vue sample
+  # The web samples draw the view models of the Angular sample server: their types and their builds are checked here, then each one is
+  # driven in Chrome against the real server (tests/samples/smoke.mjs).
+  web-samples:
+    name: Web sample (${{ matrix.sample.name }})
     runs-on: ubuntu-24.04
-    timeout-minutes: 10
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        sample:
+          - { name: Vue, path: samples/Vue/XAnimals.Vue, port: 5173 }
+          - { name: React, path: samples/React/XAnimals.React, port: 5174 }
+          - { name: Svelte, path: samples/Svelte/XAnimals.Svelte, port: 5175 }
+          - { name: Solid, path: samples/Solid/XAnimals.Solid, port: 5176 }
+          - { name: Lit, path: samples/Lit/XAnimals.Lit, port: 5177 }
+          - { name: Vanilla, path: samples/Vanilla/XAnimals.Vanilla, port: 5178 }
 
     steps:
-      - name: Checkout
+      - name: Checkout Routeables.SignalR
         uses: actions/checkout@v4
+        with:
+          path: Routeables.SignalR
+
+      - name: Checkout Routeables
+        uses: actions/checkout@v4
+        with:
+          repository: cedric56/Routeables
+          ref: ${{ env.ROUTEABLES_REF }}
+          path: Routeables
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
 
       - name: Setup Node
         uses: actions/setup-node@v4
@@ -159,11 +184,58 @@ jobs:
 
       - name: Install
         run: npm ci --no-audit --no-fund
-        working-directory: samples/Vue/XAnimals.Vue
+        working-directory: Routeables.SignalR/${{ matrix.sample.path }}
 
       - name: Build
         run: npm run build
-        working-directory: samples/Vue/XAnimals.Vue
+        working-directory: Routeables.SignalR/${{ matrix.sample.path }}
+
+      - name: Start the server and the app
+        run: |
+          dotnet build samples/Angular/XAnimals.AngularServer -c Release
+          nohup dotnet samples/Angular/XAnimals.AngularServer/bin/Release/net10.0/XAnimals.AngularServer.dll > "$RUNNER_TEMP/server.log" 2>&1 &
+          (cd ${{ matrix.sample.path }} && nohup npx vite preview --port ${{ matrix.sample.port }} --strictPort > "$RUNNER_TEMP/app.log" 2>&1 &)
+          for i in $(seq 60); do curl -sf http://localhost:5090/routeables/negotiate?negotiateVersion=1 -X POST > /dev/null && curl -sf http://localhost:${{ matrix.sample.port }} > /dev/null && exit 0; sleep 1; done
+          cat "$RUNNER_TEMP/server.log" "$RUNNER_TEMP/app.log"; exit 1
+        working-directory: Routeables.SignalR
+
+      - name: Drive it in Chrome
+        run: npm ci --no-audit --no-fund && node smoke.mjs http://localhost:${{ matrix.sample.port }}
+        working-directory: Routeables.SignalR/tests/samples
+        env:
+          CHROME_PATH: /usr/bin/google-chrome
+
+  # The Dart client and the Flutter sample: analysed and tested by Flutter, and the sample built for the web.
+  flutter:
+    name: Dart client and Flutter sample
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - name: Client
+        run: |
+          flutter pub get
+          flutter analyze --no-fatal-infos
+          flutter test
+        working-directory: clients/dart
+
+      - name: Sample
+        run: |
+          flutter pub get
+          dart run tool/setup.dart
+          flutter analyze --no-fatal-infos
+          flutter test
+          flutter build web
+        working-directory: samples/Flutter/xanimals_flutter
 
   angular-sample:
     name: Angular sample

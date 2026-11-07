@@ -1,0 +1,19 @@
+# Flutter and Dart
+.dart_tool/
+.flutter-plugins
+.flutter-plugins-dependencies
+.pub-cache/
+.pub/
+build/
+pubspec.lock
+
+# The platform folders are made by `flutter create .` (see the README): they are not kept here.
+android/
+ios/
+linux/
+macos/
+windows/
+web/
+.metadata
+*.iml
+.idea/

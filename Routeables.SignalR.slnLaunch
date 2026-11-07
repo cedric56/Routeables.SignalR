@@ -26,7 +26,72 @@
     ]
   },
   {
-    "Name": "Angular + Vue + server",
+    "Name": "React + server",
+    "Projects": [
+      {
+        "Path": "samples\\Angular\\XAnimals.AngularServer\\XAnimals.AngularServer.csproj",
+        "Action": "Start"
+      },
+      {
+        "Path": "samples\\React\\XAnimals.React\\XAnimals.React.esproj",
+        "Action": "Start"
+      }
+    ]
+  },
+  {
+    "Name": "Svelte + server",
+    "Projects": [
+      {
+        "Path": "samples\\Angular\\XAnimals.AngularServer\\XAnimals.AngularServer.csproj",
+        "Action": "Start"
+      },
+      {
+        "Path": "samples\\Svelte\\XAnimals.Svelte\\XAnimals.Svelte.esproj",
+        "Action": "Start"
+      }
+    ]
+  },
+  {
+    "Name": "Solid + server",
+    "Projects": [
+      {
+        "Path": "samples\\Angular\\XAnimals.AngularServer\\XAnimals.AngularServer.csproj",
+        "Action": "Start"
+      },
+      {
+        "Path": "samples\\Solid\\XAnimals.Solid\\XAnimals.Solid.esproj",
+        "Action": "Start"
+      }
+    ]
+  },
+  {
+    "Name": "Lit + server",
+    "Projects": [
+      {
+        "Path": "samples\\Angular\\XAnimals.AngularServer\\XAnimals.AngularServer.csproj",
+        "Action": "Start"
+      },
+      {
+        "Path": "samples\\Lit\\XAnimals.Lit\\XAnimals.Lit.esproj",
+        "Action": "Start"
+      }
+    ]
+  },
+  {
+    "Name": "Vanilla + server",
+    "Projects": [
+      {
+        "Path": "samples\\Angular\\XAnimals.AngularServer\\XAnimals.AngularServer.csproj",
+        "Action": "Start"
+      },
+      {
+        "Path": "samples\\Vanilla\\XAnimals.Vanilla\\XAnimals.Vanilla.esproj",
+        "Action": "Start"
+      }
+    ]
+  },
+  {
+    "Name": "All web apps + server",
     "Projects": [
       {
         "Path": "samples\\Angular\\XAnimals.AngularServer\\XAnimals.AngularServer.csproj",
@@ -38,6 +103,26 @@
       },
       {
         "Path": "samples\\Vue\\XAnimals.Vue\\XAnimals.Vue.esproj",
+        "Action": "Start"
+      },
+      {
+        "Path": "samples\\React\\XAnimals.React\\XAnimals.React.esproj",
+        "Action": "Start"
+      },
+      {
+        "Path": "samples\\Svelte\\XAnimals.Svelte\\XAnimals.Svelte.esproj",
+        "Action": "Start"
+      },
+      {
+        "Path": "samples\\Solid\\XAnimals.Solid\\XAnimals.Solid.esproj",
+        "Action": "Start"
+      },
+      {
+        "Path": "samples\\Lit\\XAnimals.Lit\\XAnimals.Lit.esproj",
+        "Action": "Start"
+      },
+      {
+        "Path": "samples\\Vanilla\\XAnimals.Vanilla\\XAnimals.Vanilla.esproj",
         "Action": "Start"
       }
     ]

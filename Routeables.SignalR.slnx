@@ -1,4 +1,53 @@
 <Solution>
+  <Folder Name="/samples/Angular/">
+    <File Path="samples/Angular/README.md" />
+    <Project Path="samples/Angular/XAnimals.Angular/XAnimals.Angular.esproj">
+      <Build />
+      <Deploy />
+    </Project>
+  </Folder>
+  <Folder Name="/samples/Lit/">
+    <File Path="samples/Lit/README.md" />
+    <Project Path="samples/Lit/XAnimals.Lit/XAnimals.Lit.esproj">
+      <Build />
+      <Deploy />
+    </Project>
+  </Folder>
+  <Folder Name="/samples/React/">
+    <File Path="samples/React/README.md" />
+    <Project Path="samples/React/XAnimals.React/XAnimals.React.esproj">
+      <Build />
+      <Deploy />
+    </Project>
+  </Folder>
+  <Folder Name="/samples/Solid/">
+    <File Path="samples/Solid/README.md" />
+    <Project Path="samples/Solid/XAnimals.Solid/XAnimals.Solid.esproj">
+      <Build />
+      <Deploy />
+    </Project>
+  </Folder>
+  <Folder Name="/samples/Svelte/">
+    <File Path="samples/Svelte/README.md" />
+    <Project Path="samples/Svelte/XAnimals.Svelte/XAnimals.Svelte.esproj">
+      <Build />
+      <Deploy />
+    </Project>
+  </Folder>
+  <Folder Name="/samples/Vanilla/">
+    <File Path="samples/Vanilla/README.md" />
+    <Project Path="samples/Vanilla/XAnimals.Vanilla/XAnimals.Vanilla.esproj">
+      <Build />
+      <Deploy />
+    </Project>
+  </Folder>
+  <Folder Name="/samples/Vue/">
+    <File Path="samples/Vue/README.md" />
+    <Project Path="samples/Vue/XAnimals.Vue/XAnimals.Vue.esproj">
+      <Build />
+      <Deploy />
+    </Project>
+  </Folder>
   <Folder Name="/Solution Items/">
     <File Path="Directory.Build.props" />
     <File Path="Directory.Build.targets" />
@@ -14,33 +63,28 @@
     <File Path=".github/workflows/release.yml" />
   </Folder>
   <Folder Name="/clients/">
-    <!-- @routeables/client, for Visual Studio. Outside Visual Studio the project runs neither npm install nor its build: the CI builds and tests it with npm. -->
+    <!-- routeables_client, the Dart client: built and tested by Flutter (flutter test), not by Visual Studio. -->
+    <File Path="clients/dart/README.md" />
+    <File Path="clients/dart/pubspec.yaml" />
     <Project Path="clients/typescript/Routeables.Client.esproj">
       <Build />
       <Deploy />
     </Project>
   </Folder>
   <Folder Name="/samples/">
+    <!-- The Flutter sample: opened by Visual Studio Code or Android Studio, run by Flutter. -->
+    <File Path="samples/Flutter/README.md" />
+    <File Path="samples/Flutter/xanimals_flutter/pubspec.yaml" />
     <Project Path="samples/Angular/XAnimals.AngularServer/XAnimals.AngularServer.csproj" />
-    <!-- The front ends, for Visual Studio. Outside Visual Studio the projects run neither npm install nor their build: the CI builds them with npm. -->
-    <Project Path="samples/Angular/XAnimals.Angular/XAnimals.Angular.esproj">
-      <Build />
-      <Deploy />
-    </Project>
-    <Project Path="samples/Vue/XAnimals.Vue/XAnimals.Vue.esproj">
-      <Build />
-      <Deploy />
-    </Project>
-    <File Path="samples/Angular/README.md" />
-    <File Path="samples/Vue/README.md" />
   </Folder>
   <Folder Name="/src/">
     <Project Path="src/Routeables.SignalR/Routeables.SignalR.csproj" />
   </Folder>
   <Folder Name="/tests/">
-    <Project Path="tests/Routeables.SignalR.Test/Routeables.SignalR.Test.csproj" />
-    <Project Path="tests/Routeables.SignalR.Test.Angular/Routeables.SignalR.Test.Angular.csproj" />
-    <Project Path="tests/Routeables.SignalR.E2E.Server/Routeables.SignalR.E2E.Server.csproj" />
     <File Path="tests/e2e/e2e.test.mjs" />
+    <File Path="tests/samples/smoke.mjs" />
+    <Project Path="tests/Routeables.SignalR.E2E.Server/Routeables.SignalR.E2E.Server.csproj" />
+    <Project Path="tests/Routeables.SignalR.Test.Angular/Routeables.SignalR.Test.Angular.csproj" />
+    <Project Path="tests/Routeables.SignalR.Test/Routeables.SignalR.Test.csproj" />
   </Folder>
 </Solution>

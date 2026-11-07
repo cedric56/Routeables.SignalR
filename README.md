@@ -50,9 +50,11 @@ await client.invoke('approveAsync', 42);   // resolves when the command has ende
 | --- | --- |
 | [src/Routeables.SignalR](src/Routeables.SignalR) | The server library (`AddRouteablesSignalR`, `MapRouteables`). |
 | [clients/typescript](clients/typescript) | `@routeables/client`, the client; it does not depend on Angular or Vue. |
+| [clients/dart](clients/dart) | `routeables_client`, the client for Dart and Flutter, with the same protocol and the same guarantees. |
 | [samples/Angular](samples/Angular) | The Angular application and its server, XAnimals.AngularServer. |
-| [samples/Vue](samples/Vue) | The Vue application, which talks to the same server. |
-| [tests](tests) | The tests of the sessions, the hub, the security, the protocol, the reconnection and the Angular sample server; [tests/e2e](tests/e2e) drives a real Kestrel and SignalR server from Node. |
+| [samples/Vue](samples/Vue), [samples/React](samples/React), [samples/Svelte](samples/Svelte), [samples/Solid](samples/Solid), [samples/Lit](samples/Lit), [samples/Vanilla](samples/Vanilla) | The same application in Vue, React, Svelte, SolidJS, Lit (Web Components) and TypeScript without a framework, against the same server. |
+| [samples/Flutter](samples/Flutter) | The same application in Flutter: web, desktop and mobile. |
+| [tests](tests) | The tests of the sessions, the hub, the security, the protocol, the reconnection and the Angular sample server; [tests/e2e](tests/e2e) drives a real Kestrel and SignalR server from Node; [tests/samples](tests/samples) drives every web sample in Chrome. |
 
 ## Build
 
@@ -71,15 +73,29 @@ The CI builds against one revision of Routeables (`ROUTEABLES_REF` in [.github/w
 
 ## Run the samples
 
+Every web sample is the same application (the XAnimals pages, the menu, the regions, the dialogs, the notifications, the modal) drawn by another front end, against one server:
+
+| Sample | Front end | Address |
+| --- | --- | --- |
+| [Angular](samples/Angular) | Angular 21 (signals) | http://localhost:4200 |
+| [Vue](samples/Vue) | Vue 3 | http://localhost:5173 |
+| [React](samples/React) | React 19 | http://localhost:5174 |
+| [Svelte](samples/Svelte) | Svelte 5 (runes) | http://localhost:5175 |
+| [Solid](samples/Solid) | SolidJS | http://localhost:5176 |
+| [Lit](samples/Lit) | Lit 3 (Web Components) | http://localhost:5177 |
+| [Vanilla](samples/Vanilla) | TypeScript and the DOM, no framework | http://localhost:5178 |
+| [Flutter](samples/Flutter) | Flutter (web, Windows, macOS, Linux, Android, iOS) | http://localhost:5179 on the web (`flutter run -d chrome --web-port 5179`) |
+
 ```
 dotnet run --project samples/Angular/XAnimals.AngularServer          # the server, on http://localhost:5090
-npm --prefix samples/Angular/XAnimals.Angular ci && npm --prefix samples/Angular/XAnimals.Angular start   # http://localhost:4200
-npm --prefix samples/Vue/XAnimals.Vue ci && npm --prefix samples/Vue/XAnimals.Vue start                   # http://localhost:5173
+cd samples/React/XAnimals.React && npm install && npm start          # or any other sample folder
 ```
+
+They can run at the same time: each one has its own port and its own sessions on the server.
 
 ## Visual Studio
 
-Open `Routeables.SignalR.slnx` (Visual Studio 2022 17.14 or later, with the "ASP.NET and web development" or "Node.js development" workload). The Angular app, the Vue app and the TypeScript client are JavaScript projects (`.esproj`) of the solution. The launch profiles of `Routeables.SignalR.slnLaunch` start the server and the apps together: choose **Angular + server**, **Vue + server** or **Angular + Vue + server** next to the Start button and press F5. Visual Studio runs `npm install` when `node_modules` is missing; outside Visual Studio the JavaScript projects run neither `npm install` nor their build (the CI uses npm).
+Open `Routeables.SignalR.slnx` (Visual Studio 2022 17.14 or later, with the "ASP.NET and web development" or "Node.js development" workload). The web samples and the TypeScript client are JavaScript projects (`.esproj`) of the solution. The launch profiles of `Routeables.SignalR.slnLaunch` start the server and the apps together: choose **Angular + server**, **Vue + server**, **React + server**, **Svelte + server**, **Solid + server**, **Lit + server**, **Vanilla + server** or **All web apps + server** next to the Start button and press F5. Visual Studio runs `npm install` when `node_modules` is missing; outside Visual Studio the JavaScript projects run neither `npm install` nor their build (the CI uses npm).
 
 ## Test
 
@@ -92,13 +108,20 @@ npm --prefix clients/typescript ci && npm --prefix clients/typescript test
 dotnet build tests/Routeables.SignalR.E2E.Server -c Release
 npm --prefix clients/typescript run build
 node --test tests/e2e/e2e.test.mjs
+
+# A web sample in Chrome, against the server (started as above, and the app built and served by `npm run preview`)
+npm --prefix tests/samples ci && node tests/samples/smoke.mjs http://localhost:5174
+
+# The Dart client and the Flutter sample
+(cd clients/dart && flutter test)
+(cd samples/Flutter/xanimals_flutter && dart run tool/setup.dart && flutter test)
 ```
 
 ## Documentation
 
 - [src/Routeables.SignalR/README.md](src/Routeables.SignalR/README.md): the server — what crosses the network, authorization, the session, the messages, the limits, the options, deployment.
-- [clients/typescript/README.md](clients/typescript/README.md): the client — order, answers, reconnection.
-- [samples/Angular/README.md](samples/Angular/README.md) and [samples/Vue/README.md](samples/Vue/README.md): the samples.
+- [clients/typescript/README.md](clients/typescript/README.md) and [clients/dart/README.md](clients/dart/README.md): the clients — order, answers, reconnection.
+- The README of each sample ([Angular](samples/Angular/README.md), [Vue](samples/Vue/README.md), [React](samples/React/README.md), [Svelte](samples/Svelte/README.md), [Solid](samples/Solid/README.md), [Lit](samples/Lit/README.md), [Vanilla](samples/Vanilla/README.md), [Flutter](samples/Flutter/README.md)).
 - [SECURITY.md](SECURITY.md): the security model and the checklist before production.
 - [VERSIONING.md](VERSIONING.md) and [CHANGELOG.md](CHANGELOG.md): versions, the protocol, releases.
 

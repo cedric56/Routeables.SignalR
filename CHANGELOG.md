@@ -41,14 +41,20 @@ The first version meant for production. It changes the protocol (2) and some def
 - `onError` for calls that did not reach the server and watches that were refused.
 - Keeps the pages while reconnecting, resumes the session, and recovers a lost one (`recover`, `onSessionLost`).
 
+### Client for Dart and Flutter (`routeables_client`)
+
+- A port of `@routeables/client` to Dart, on the SignalR client for Dart (signalr_netcore): the same protocol, the same guarantees, the same tests.
+- A Flutter sample (web, desktop, mobile) against the server of the Angular sample, which allows the pages of the machine (CORS) for Flutter web.
+
 ### Build and distribution
 
 - Builds against the current Routeables (`GetEntries` / `IMenuEntry`); the CI pins the revision of Routeables (`ROUTEABLES_REF`).
-- The CounterServer sample is removed: the Angular and Vue samples show the library.
+- The CounterServer sample is removed: the web samples show the library.
+- Web samples in React, Svelte, SolidJS, Lit and TypeScript without a framework, beside Angular and Vue: the same application against the same server, each built and driven in Chrome by the CI (`tests/samples/smoke.mjs`).
 - `-p:RouteablesVersion=…` builds and packs against the Routeables packages; a release workflow publishes the NuGet and npm packages from a tag, after installing the NuGet package in an empty application.
 - `npm ci` with lockfiles; the npm package is packed and installed in an empty project in the CI.
 - End-to-end tests over a real Kestrel and SignalR server, driven by the client from Node.
-- The Angular and Vue samples and the TypeScript client open in Visual Studio (`XAnimals.Angular.esproj`, `XAnimals.Vue.esproj`, `Routeables.Client.esproj`), with shared launch profiles that start the server and the apps (`Routeables.SignalR.slnLaunch`). Outside Visual Studio they run neither `npm install` nor their build.
+- The web samples and the TypeScript client open in Visual Studio (one `.esproj` each), with shared launch profiles that start the server and the apps (`Routeables.SignalR.slnLaunch`). Outside Visual Studio they run neither `npm install` nor their build.
 - The package is marked not trimmable; `AddRouteablesSignalR` carries `[RequiresUnreferencedCode]` and `[RequiresDynamicCode]`.
 
 ### Breaking changes

@@ -1,0 +1,20 @@
+name: routeables_client
+description: Client of Routeables.SignalR for Dart and Flutter. Shows the view models of a Routeables server in a Flutter app.
+version: 2.0.0
+repository: https://github.com/cedric56/Routeables.SignalR/tree/master/clients/dart
+publish_to: none
+
+environment:
+  sdk: ">=3.5.0 <4.0.0"
+  flutter: ">=3.24.0"
+
+dependencies:
+  flutter:
+    sdk: flutter
+  # The SignalR client for Dart (MIT): only signalr_transport.dart uses it; the protocol does not depend on it.
+  signalr_netcore: ^1.4.4
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^5.0.0
