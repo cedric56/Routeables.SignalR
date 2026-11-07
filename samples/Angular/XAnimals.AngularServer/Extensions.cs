@@ -11,6 +11,14 @@ namespace XAnimals.AngularServer;
 internal static class Extensions
 {
     /// <summary>
+    /// What crosses the network. The view models of the sample come from the XAnimals libraries, shared with the desktop samples, which
+    /// cannot carry <c>[RouteableState]</c>: their types are exposed by namespace, and the text boxes of the app may set them. The view models
+    /// written for this server (the shell, the pets) carry <c>[RouteableState]</c> themselves.
+    /// </summary>
+    public static RouteablesOptions AddAnimalsExposure(this RouteablesOptions options)
+        => options.ExposeTypes(type => type.Namespace is { } ns && ns.StartsWith("XAnimals.", StringComparison.Ordinal) && ns != "XAnimals.AngularServer", settable: true);
+
+    /// <summary>
     /// Everything the Angular app needs besides <c>AddRouteablesSignalR</c>: the view models of the sample, their routes (no view on
     /// this side), the note modal, the theme, and the shell (the menu) the app watches as <c>$shell</c>, and the pets of the Adopt page (<c>$pets</c>).
     /// </summary>

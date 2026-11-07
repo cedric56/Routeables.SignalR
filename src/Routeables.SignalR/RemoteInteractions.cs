@@ -6,17 +6,16 @@ namespace Routeables.SignalR;
 /// <summary>
 /// What the dialogs, the notifications and the modals of a connection share with its session. On a desktop a dialog is a window and the
 /// view model awaits it; here the view model awaits too, but the dialog is sent to the browser and the answer comes back by the hub
-/// (<c>Answer</c>). One per connection (scoped).
+/// (<c>Answer</c>). One per connection (scoped). A dialog that waits survives a reconnection: it is sent again when the session is resumed.
 /// </summary>
 public sealed class RemoteInteractions : IDisposable
 {
-    private sealed record Pending(RouteableDialog Dialog, TaskCompletionSource<int> Answer);
+    private sealed record Pending(RouteableDialog Dialog, TaskCompletionSource<int> Answer, long Order);
 
     private sealed record Toast(Action? OnClick, Action? OnClose);
 
     private readonly ConcurrentDictionary<string, Pending> _dialogs = new(StringComparer.Ordinal);
     private readonly ConcurrentDictionary<int, Toast> _toasts = new();
-    private TaskCompletionSource _asked = new(TaskCreationOptions.RunContinuationsAsynchronously);
     private int _nextDialog;
     private int _nextToast;
 
@@ -35,17 +34,23 @@ public sealed class RemoteInteractions : IDisposable
     /// <summary>How many dialogs wait for an answer.</summary>
     public int PendingCount => _dialogs.Count;
 
+    /// <summary>The dialogs that wait for an answer, in the order they were asked.</summary>
+    public IReadOnlyList<RouteableDialog> PendingDialogs => [.. _dialogs.Values.OrderBy(p => p.Order).Select(p => p.Dialog)];
+
     /// <summary>Shows a dialog and completes with the index of the button that was chosen.</summary>
     public async Task<int> AskAsync(string kind, string title, string? header, string? body, string? footer, bool showProgress, IReadOnlyList<string> buttons)
     {
-        var id = "d" + Interlocked.Increment(ref _nextDialog).ToString(System.Globalization.CultureInfo.InvariantCulture);
+        var order = Interlocked.Increment(ref _nextDialog);
+        var id = "d" + order.ToString(System.Globalization.CultureInfo.InvariantCulture);
         var dialog = new RouteableDialog(id, kind, title, header, body, footer, showProgress, buttons);
-        var pending = new Pending(dialog, new TaskCompletionSource<int>(TaskCreationOptions.RunContinuationsAsynchronously));
+        var pending = new Pending(dialog, new TaskCompletionSource<int>(TaskCreationOptions.RunContinuationsAsynchronously), order);
         _dialogs[id] = pending;
 
         DialogRequested?.Invoke(dialog);
-        _asked.TrySetResult();
-        try { return await pending.Answer.Task.ConfigureAwait(false); }
+        RouteableInvocation.Current?.Asked();
+
+        // No ConfigureAwait(false): the view model goes on where it asked, on the dispatcher of its session.
+        try { return await pending.Answer.Task; }
         finally { _dialogs.TryRemove(id, out _); }
     }
 
@@ -53,7 +58,7 @@ public sealed class RemoteInteractions : IDisposable
     /// <returns>Whether that dialog was waiting.</returns>
     public bool Answer(string id, int index)
     {
-        if (!_dialogs.TryGetValue(id, out var pending))
+        if (id is null || !_dialogs.TryGetValue(id, out var pending))
             return false;
 
         if (index < 0 || (pending.Dialog.Buttons.Count > 0 && index >= pending.Dialog.Buttons.Count))
@@ -61,6 +66,9 @@ public sealed class RemoteInteractions : IDisposable
 
         return pending.Answer.TrySetResult(index);
     }
+
+    /// <summary>Whether a dialog with this id waits for an answer.</summary>
+    public bool IsWaiting(string id) => id is not null && _dialogs.ContainsKey(id);
 
     /// <summary>Shows a notification.</summary>
     public void Notify(string title, string message, RouteableNotificationType type, TimeSpan? expiration, Action? onClick, Action? onClose)
@@ -85,24 +93,15 @@ public sealed class RemoteInteractions : IDisposable
     /// <summary>Shows <paramref name="viewModel"/> as the modal and completes with what it passes to <paramref name="subscribe"/>.</summary>
     public async Task<TResult?> ShowModalAsync<TResult>(object viewModel, Func<Action<TResult?>, IDisposable> subscribe)
     {
+        ArgumentNullException.ThrowIfNull(subscribe);
         var closed = new TaskCompletionSource<TResult?>(TaskCreationOptions.RunContinuationsAsynchronously);
 
         // Subscribe first: a view model that closes right away must not be missed.
         using var subscription = subscribe(value => closed.TrySetResult(value));
         ModalOpened?.Invoke(viewModel);
-        _asked.TrySetResult();
-        try { return await closed.Task.ConfigureAwait(false); }
+        RouteableInvocation.Current?.Asked();
+        try { return await closed.Task; }
         finally { ModalClosed?.Invoke(); }
-    }
-
-    /// <summary>
-    /// A task that completes the next time something asks the visitor (a dialog or a modal opens). A call that starts a command waits
-    /// for the command to end or for this, as a command that opens a dialog does not end before the visitor answered.
-    /// </summary>
-    internal Task Arm()
-    {
-        _asked = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
-        return _asked.Task;
     }
 
     /// <inheritdoc />
@@ -114,4 +113,25 @@ public sealed class RemoteInteractions : IDisposable
         _dialogs.Clear();
         _toasts.Clear();
     }
+}
+
+/// <summary>
+/// The call of a client that is running: what it does flows with it (an <see cref="AsyncLocal{T}"/>), so that a dialog it asks ends the wait of
+/// that call, and not of another one.
+/// </summary>
+internal sealed class RouteableInvocation
+{
+    private static readonly AsyncLocal<RouteableInvocation?> CurrentInvocation = new();
+    private readonly TaskCompletionSource _asked = new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+    public static RouteableInvocation? Current
+    {
+        get => CurrentInvocation.Value;
+        set => CurrentInvocation.Value = value;
+    }
+
+    /// <summary>Completes when the call asks the visitor something (a dialog, a modal).</summary>
+    public Task AskedTask => _asked.Task;
+
+    public void Asked() => _asked.TrySetResult();
 }

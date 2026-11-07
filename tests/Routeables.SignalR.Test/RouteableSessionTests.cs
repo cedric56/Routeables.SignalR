@@ -10,6 +10,7 @@ namespace Routeables.Tests.Remote;
 
 public sealed class CounterView;
 
+[RouteableState]
 public sealed record CounterItem(string Name, int Quantity);
 
 public sealed class CounterViewModel(IRouter? router = null) : INotifyPropertyChanged
@@ -19,14 +20,15 @@ public sealed class CounterViewModel(IRouter? router = null) : INotifyPropertyCh
 
     public event PropertyChangedEventHandler? PropertyChanged;
 
-    public int Count { get => _count; set { _count = value; Raise(); } }
-    public string Title { get => _title; set { _title = value; Raise(); } }
-    public List<CounterItem> Items { get; } = [];
+    [RouteableState(Settable = true)] public int Count { get => _count; set { _count = value; Raise(); } }
+    [RouteableState(Settable = true)] public string Title { get => _title; set { _title = value; Raise(); } }
+    [RouteableState] public List<CounterItem> Items { get; } = [];
 
-    // Not state: a service, a command object and an ignored property stay on the server.
-    public IRouter? Router => router;
-    public System.Windows.Input.ICommand? Command => null;
-    [System.Text.Json.Serialization.JsonIgnore] public string Hidden => "hidden";
+    // Not state: a service, a command object and an ignored property stay on the server; a property that is not exposed too.
+    [RouteableState] public IRouter? Router => router;
+    [RouteableState] public System.Windows.Input.ICommand? Command => null;
+    [RouteableState, System.Text.Json.Serialization.JsonIgnore] public string Hidden => "hidden";
+    public string Secret { get; set; } = "secret";
 
     [RouteableCommand] public void Increment() => Count++;
     [RouteableCommand] public void Add(int amount) => Count += amount;
@@ -56,21 +58,60 @@ internal sealed class Told<T> : IReadOnlyList<T>
     System.Collections.IEnumerator System.Collections.IEnumerable.GetEnumerator() => GetEnumerator();
 }
 
+/// <summary>One patch of a change, as a test reads it: the path joined with dots ("items.0.name").</summary>
+internal sealed record ChangeSeen(string Property, object? Value, string Target, long Generation, long Version, string Op, int? Index = null, int? Remove = null);
+
 internal sealed class RecordingClient : IRouteableClient
 {
     public Told<RouteableNavigated> Navigated { get; } = new();
-    public Told<RouteableChanged> Changed { get; } = new();
+    public Told<RouteableChanged> Batches { get; } = new();
+    public Told<ChangeSeen> Changed { get; } = new();
     public Told<RouteableFailure> Failed { get; } = new();
     public Told<SignalRDialog> Dialogs { get; } = new();
     public Told<RouteableToast> Toasts { get; } = new();
     public Told<RouteableClosed> Closed { get; } = new();
+    public Told<RouteableCompleted> Completed { get; } = new();
 
-    Task IRouteableClient.Navigated(RouteableNavigated message) { Navigated.Add(message); return Task.CompletedTask; }
-    Task IRouteableClient.Changed(RouteableChanged message) { Changed.Add(message); return Task.CompletedTask; }
-    Task IRouteableClient.Failed(RouteableFailure message) { Failed.Add(message); return Task.CompletedTask; }
-    Task IRouteableClient.DialogRequested(SignalRDialog message) { Dialogs.Add(message); return Task.CompletedTask; }
-    Task IRouteableClient.Notified(RouteableToast message) { Toasts.Add(message); return Task.CompletedTask; }
-    Task IRouteableClient.Closed(RouteableClosed message) { Closed.Add(message); return Task.CompletedTask; }
+    /// <summary>Everything, in the order it arrived.</summary>
+    public Told<object> All { get; } = new();
+
+    Task IRouteableClient.Navigated(RouteableNavigated message) { Navigated.Add(message); All.Add(message); return Task.CompletedTask; }
+    Task IRouteableClient.Changed(RouteableChanged message)
+    {
+        Batches.Add(message);
+        All.Add(message);
+        foreach (var patch in message.Patches)
+            Changed.Add(new ChangeSeen(string.Join('.', patch.Path), patch.Value, message.Target, message.Generation, message.Version, patch.Op, patch.Index, patch.Remove));
+        return Task.CompletedTask;
+    }
+    Task IRouteableClient.Failed(RouteableFailure message) { Failed.Add(message); All.Add(message); return Task.CompletedTask; }
+    Task IRouteableClient.DialogRequested(SignalRDialog message) { Dialogs.Add(message); All.Add(message); return Task.CompletedTask; }
+    Task IRouteableClient.Notified(RouteableToast message) { Toasts.Add(message); All.Add(message); return Task.CompletedTask; }
+    Task IRouteableClient.Closed(RouteableClosed message) { Closed.Add(message); All.Add(message); return Task.CompletedTask; }
+    Task IRouteableClient.Completed(RouteableCompleted message) { Completed.Add(message); All.Add(message); return Task.CompletedTask; }
+}
+
+/// <summary>The schema, the projector and the invoker the tests use outside a session.</summary>
+internal static class TestSchema
+{
+    public static RouteableSchema Schema { get; } = new(new RouteablesOptions());
+    public static RouteableStateProjector Projector { get; } = new(Schema);
+    public static RouteableCommandInvoker Invoker { get; } = new(Schema, detailedErrors: true);
+
+    public static ServiceCollection Services(Action<RouteablesOptions>? options = null)
+    {
+        var services = new ServiceCollection();
+        services.AddLogging();
+        services.AddRouteablesSignalR(options: o => { o.DetailedErrors = true; options?.Invoke(o); });
+        return services;
+    }
+
+    public static async Task<bool> EventuallyAsync(Func<bool> condition, int milliseconds = 3000)
+    {
+        for (var i = 0; i < milliseconds / 10 && !condition(); i++)
+            await Task.Delay(10, TestContext.Current.CancellationToken);
+        return condition();
+    }
 }
 
 /// <summary>What a browser client sees of a view model: its state, its commands, and what changes.</summary>
@@ -84,20 +125,22 @@ public class RouteableSessionTests
         var viewModel = new CounterViewModel { Title = "T" };
         viewModel.Items.Add(new CounterItem("a", 1));
 
-        var state = RouteableStateProjector.Project(viewModel);
+        var state = TestSchema.Projector.Project(viewModel);
 
         Assert.Equal(0, state["count"]);
         Assert.Equal("T", state["title"]);
-        Assert.Single((List<object?>)state["items"]!);
+        var item = (Dictionary<string, object?>)Assert.Single((List<object?>)state["items"]!)!;
+        Assert.Equal("a", item["name"]);
         Assert.DoesNotContain("router", state.Keys);
         Assert.Null(state["command"]);   // a command that is not there is null, not a token
         Assert.DoesNotContain("hidden", state.Keys);
+        Assert.DoesNotContain("secret", state.Keys);   // not exposed
     }
 
     [Fact]
     public void Only_the_methods_that_say_so_are_commands()
     {
-        var commands = RouteableStateProjector.Commands(typeof(CounterViewModel));
+        var commands = TestSchema.Schema.Commands(typeof(CounterViewModel));
 
         Assert.Contains("increment", commands.Keys);
         Assert.Contains("add", commands.Keys);
@@ -109,13 +152,13 @@ public class RouteableSessionTests
     {
         var viewModel = new CounterViewModel();
 
-        Assert.True((await RouteableCommandInvoker.InvokeAsync(viewModel, "add", [Json("5")])).Success);
+        Assert.True((await TestSchema.Invoker.InvokeAsync(viewModel, "add", [Json("5")])).Success);
         Assert.Equal(5, viewModel.Count);
 
-        Assert.True((await RouteableCommandInvoker.InvokeAsync(viewModel, "rename", null)).Success);
+        Assert.True((await TestSchema.Invoker.InvokeAsync(viewModel, "rename", null)).Success);
         Assert.Equal("default", viewModel.Title);
 
-        Assert.True((await RouteableCommandInvoker.InvokeAsync(viewModel, "slowAsync", null)).Success);
+        Assert.True((await TestSchema.Invoker.InvokeAsync(viewModel, "slowAsync", null)).Success);
         Assert.Equal(100, viewModel.Count);
     }
 
@@ -124,20 +167,18 @@ public class RouteableSessionTests
     {
         var viewModel = new CounterViewModel();
 
-        Assert.False((await RouteableCommandInvoker.InvokeAsync(viewModel, "notACommand", null)).Success);
-        Assert.False((await RouteableCommandInvoker.InvokeAsync(viewModel, "add", null)).Success);
-        Assert.False((await RouteableCommandInvoker.InvokeAsync(viewModel, "add", [Json("\"x\"")])).Success);
+        Assert.False((await TestSchema.Invoker.InvokeAsync(viewModel, "notACommand", null)).Success);
+        Assert.False((await TestSchema.Invoker.InvokeAsync(viewModel, "add", null)).Success);
+        Assert.False((await TestSchema.Invoker.InvokeAsync(viewModel, "add", [Json("\"x\"")])).Success);
 
-        var failed = await RouteableCommandInvoker.InvokeAsync(viewModel, "fail", null);
+        var failed = await TestSchema.Invoker.InvokeAsync(viewModel, "fail", null);
         Assert.False(failed.Success);
         Assert.Equal("failed", failed.Error);
     }
 
     private static ServiceProvider Services()
     {
-        var services = new ServiceCollection();
-        services.AddLogging();
-        services.AddRouteablesSignalR();
+        var services = TestSchema.Services();
         services.RegisterRoute<CounterView, CounterViewModel>(route: "/counter");
         return services.BuildServiceProvider();
     }
@@ -159,11 +200,13 @@ public class RouteableSessionTests
         Assert.True((await session.InvokeAsync("increment", null)).Success);
         Assert.Contains(client.Changed, c => c.Property == "count" && Equals(c.Value, 1));
 
-        Assert.True(session.Set("title", Json("\"hello\"")).Success);
+        Assert.True((await session.SetAsync("title", Json("\"hello\""))).Success);
         Assert.Contains(client.Changed, c => c.Property == "title" && Equals(c.Value, "hello"));
 
-        Assert.False(session.Set("router", Json("1")).Success);
-        Assert.False(session.Set("count", Json("\"x\"")).Success);
+        Assert.False((await session.SetAsync("router", Json("1"))).Success);
+        Assert.False((await session.SetAsync("count", Json("\"x\""))).Success);
+        Assert.False((await session.SetAsync("secret", Json("\"x\""))).Success);   // not exposed: not settable
+        Assert.Equal("secret", ((CounterViewModel)session.Current!).Secret);
     }
 
     [Fact]

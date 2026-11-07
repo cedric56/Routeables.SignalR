@@ -14,6 +14,7 @@ public sealed class CounterViewModel : INotifyPropertyChanged
 
     public event PropertyChangedEventHandler? PropertyChanged;
 
+    [RouteableState]
     public int Count
     {
         get => _count;
@@ -21,6 +22,7 @@ public sealed class CounterViewModel : INotifyPropertyChanged
     }
 
     /// <summary>Set by the client (a text box); the server checks it.</summary>
+    [RouteableState(Settable = true)]
     public int Step
     {
         get => _step;

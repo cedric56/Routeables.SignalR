@@ -11,13 +11,14 @@ using Routeables.SignalR;
 
 namespace Routeables.Tests.Remote;
 
-internal sealed class FakeHubContext(string id) : HubCallerContext
+internal sealed class FakeHubContext(string id, ClaimsPrincipal? user = null) : HubCallerContext
 {
     private readonly CancellationTokenSource _aborted = new();
 
+    public bool Aborted => _aborted.IsCancellationRequested;
     public override string ConnectionId => id;
-    public override string? UserIdentifier => null;
-    public override ClaimsPrincipal? User => null;
+    public override string? UserIdentifier => user?.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+    public override ClaimsPrincipal? User => user;
     public override IDictionary<object, object?> Items { get; } = new Dictionary<object, object?>();
     public override IFeatureCollection Features { get; } = new FeatureCollection();
     public override CancellationToken ConnectionAborted => _aborted.Token;
@@ -48,9 +49,7 @@ public class RouteablesHubTests
 
     private static ServiceProvider Services()
     {
-        var services = new ServiceCollection();
-        services.AddLogging();
-        services.AddRouteablesSignalR();
+        var services = TestSchema.Services();
         services.RegisterRoute<ShopView, ShopViewModel>(route: "/shop");
         services.AddRegion("side");
         services.AddRouteableTarget<MenuViewModel>("$menu");
@@ -76,6 +75,7 @@ public class RouteablesHubTests
 
         await hub.OnDisconnectedAsync(null);
         Assert.Equal(0, sessions.Count);
+        Assert.Equal(1, sessions.DetachedCount);   // kept for the client to resume it
     }
 
     [Fact]
@@ -97,8 +97,8 @@ public class RouteablesHubTests
         Assert.True((await a.Invoke("askCommand", [])).Success);
         Assert.Single(clientA.Dialogs);
         Assert.Empty(clientB.Dialogs);
-        Assert.False(b.Answer(clientA.Dialogs[0].Id, 0).Success);   // the dialog of the other connection
-        Assert.True(a.Answer(clientA.Dialogs[0].Id, 0).Success);
+        Assert.False((await b.Answer(clientA.Dialogs[0].Id, 0)).Success);   // the dialog of the other connection
+        Assert.True((await a.Answer(clientA.Dialogs[0].Id, 0)).Success);
 
         await a.OnDisconnectedAsync(null);
         await b.OnDisconnectedAsync(null);
@@ -115,20 +115,20 @@ public class RouteablesHubTests
 
         Assert.True((await hub.GoTo("/shop")).Success);
         Assert.True((await hub.Invoke("items.0.buyCommand", [])).Success);
-        Assert.True(hub.Set("result", Json("\"typed\"")).Success);
+        Assert.True((await hub.Set("result", Json("\"typed\""))).Success);
         Assert.Contains(client.Changed, c => c.Property == "result" && Equals(c.Value, "typed"));
         Assert.True((await hub.InvokeOn("", "items.0.buyCommand", [])).Success);
-        Assert.True(hub.SetOn("", "result", Json("\"again\"")).Success);
+        Assert.True((await hub.SetOn("", "result", Json("\"again\""))).Success);
 
-        Assert.True(hub.Watch("$menu").Success);
+        Assert.True((await hub.Watch("$menu")).Success);
         Assert.Contains(client.Navigated, n => n.Target == "$menu");
-        Assert.True(hub.Watch("side").Success);
+        Assert.True((await hub.Watch("side")).Success);
         Assert.True((await hub.GoToIn("side", "/shop")).Success);
         Assert.Contains(client.Navigated, n => n.Target == "side");
-        Assert.True(hub.Unwatch("side").Success);
+        Assert.True((await hub.Unwatch("side")).Success);
 
         Assert.True((await hub.Invoke("notifyCommand", [])).Success);
-        Assert.True(hub.Dismiss(client.Toasts[0].Id, click: false).Success);
+        Assert.True((await hub.Dismiss(client.Toasts[0].Id, click: false)).Success);
 
         Assert.False((await hub.GoTo("/nowhere")).Success);
         await hub.OnDisconnectedAsync(null);
@@ -142,7 +142,7 @@ public class RouteablesHubTests
         var hub = Connect(provider, sessions, "gone", new RecordingClient());
 
         // No OnConnectedAsync: the connection has no session (it was closed).
-        Assert.Throws<HubException>(() => hub.Set("x", Json("1")));
+        Assert.Throws<HubException>(() => { _ = hub.Set("x", Json("1")); });
         await Assert.ThrowsAsync<HubException>(() => hub.GoTo("/shop"));
     }
 }

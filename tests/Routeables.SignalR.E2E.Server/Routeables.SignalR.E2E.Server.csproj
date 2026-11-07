@@ -1,0 +1,18 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+
+  <!-- A server for the end-to-end tests (tests/e2e): real Kestrel, real SignalR, driven by @routeables/client from Node. -->
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <IsPackable>false</IsPackable>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\Routeables.SignalR\Routeables.SignalR.csproj" />
+    <ProjectReference Include="$(RouteablesRoot)src\Routeables.Routing\Routeables.Routing.csproj" />
+    <ProjectReference Include="$(RouteablesRoot)src\Routeables.Services\Routeables.Services.csproj" />
+  </ItemGroup>
+
+</Project>

@@ -6,26 +6,71 @@ Serves the view models of a Routeables application to a browser front end (Angul
 builder.Services.AddRouteablesSignalR(services =>
     services.RegisterRoute<CounterView, CounterViewModel>(route: "/counter"));   // or AddGeneratedRoutes()
 
-app.MapRouteables();   // the hub, at /routeables
+app.UseAuthentication();
+app.UseAuthorization();
+app.MapRouteables().RequireAuthorization();   // the hub, at /routeables
 ```
 
 ```csharp
 public sealed class CounterViewModel : INotifyPropertyChanged
 {
-    public int Count { get; private set; }          // sent, and sent again at every PropertyChanged
+    [RouteableState] public int Count { get; private set; }               // sent, and sent again at every PropertyChanged
+    [RouteableState(Settable = true)] public int Step { get; set; } = 1;  // sent, and set by the browser (a text box)
+    public string InternalNote { get; set; } = "";                        // never leaves the server
 
-    [RouteableCommand]                               // only these methods can be called from the browser
-    public void Increment() => Count++;
+    [RouteableCommand]                                                    // only these methods can be called from the browser
+    public void Increment() => Count += Step;
+
+    [RouteableCommand, Authorize(Roles = "manager")]                      // and only by the users who may
+    public void Reset() => Count = 0;
 }
 ```
 
+## What crosses the network
+
+Nothing that a view model does not expose. By default (`RouteableExposure.Explicit`):
+
+| What | Sent to the browser | Changed by the browser |
+| --- | --- | --- |
+| A property marked `[RouteableState]` | yes | no |
+| A property marked `[RouteableState(Settable = true)]` with a public setter | yes | `Set` / `SetOn` |
+| Every public property of a class marked `[RouteableState]` (or `[RouteableState(Settable = true)]`) | yes | when the class says `Settable` |
+| A type accepted by `options.ExposeTypes(predicate, settable)` (view models of a library you cannot annotate) | yes | when `settable` |
+| Any other property | no | no |
+| A method marked `[RouteableCommand]` | its name | `Invoke` / `InvokeOn` |
+| An `ICommand` held by an exposed property | `{ "$command": "items.2.buyCommand", "canExecute": true }` | `InvokeOn(target, path, [])` |
+
+`[JsonIgnore]` keeps a property on the server in every mode. A delegate, a task, a type, a stream, a `ClaimsPrincipal` and a service (`IRouter`, `IServiceProvider`) are never sent. The `RouteableCommand` buttons of a Routeables view model (a name and a command) are exposed, read-only.
+
+`options.Exposure = RouteableExposure.Public` restores the behaviour of the first versions (every public property read, every public setter callable): a deliberate choice for a prototype, not for view models that hold more than the screen.
+
+## Authorization
+
+Three barriers, evaluated with the authorization of ASP.NET Core (`IAuthorizationService`, your policies) against the user of the connection, **at every call**, so a policy that reads current permissions sees them change during a session:
+
+- **The hub.** Protect the endpoint as any other: `app.MapRouteables().RequireAuthorization()`. `options.RequireAuthenticatedUser = true` also closes an anonymous connection that would reach it.
+- **The view model.** `[Authorize]` on the class: the route guard that `AddRouteablesSignalR` registers cancels a route change to it, whoever asked for it (the client or a command), and a view model the user may not see is never sent, whatever showed it (a region, a registered target). A registered target (`AddRouteableTarget`) follows the same rule.
+- **The member.** `[Authorize]` on a `[RouteableCommand]` method; `[RouteableAuthorize]` on a property (ASP.NET Core's attribute cannot go on a property): the property is neither sent nor set, and the command it holds not called, for a user who does not meet it. `[AllowAnonymous]` lets anybody through, as in ASP.NET Core. The commands a user may not call are left out of the list the page sends.
+
+When a member asks for authorization and no authorization service is registered, it is refused: an absent service never opens a door. `AddRouteablesSignalR` registers `AddAuthorizationCore()`; add your policies as usual.
+
+`RouteableConnection` (scoped) gives a view model or a service the user of the connection.
+
 ## What a connection owns
 
-One `RouteableSession` per connection: a router with its history, and the view models it creates. When the connection closes the session is disposed, with the view models. After a reconnection the client has a new session: the application goes to its route again.
+One `RouteableSession` per connection: a router with its history, and the view models it creates.
+
+**Its dispatcher.** Every call of the client and every change of a view model runs on the dispatcher of the session, one at a time, in order, as on the UI thread of a desktop application. An `await` in a view model comes back to it; work may interleave at an `await`, never in between. A view model is never used by two threads at once, and a `PropertyChanged` raised on another thread is brought to the dispatcher before it is told.
+
+**Its stream of messages.** Every target is an ordered stream: `Navigated` (a full state, a new *generation*), then `Changed` (the same generation, *version* 1, 2, …). The client drops a message of an older generation and asks the state again (`Resync`) when a version is missing. The answer to a call is written after the messages the call caused: a client that gets the answer already has the state that goes with it.
+
+**Changes are patches.** A change says what changed: `set` a value at a path (`["title"]`, `["lines", 3, "text"]`), or `splice` an array (an item added, removed, moved or replaced in an `ObservableCollection`). The changes of one turn of the dispatcher are sent together, once: a property set a thousand times in a loop is sent once, with its last value. While a slow client lets messages wait, the changes of a target are merged into the one that waits; beyond `MaxPendingMessages` the connection is closed and the client resumes its session.
+
+**Calls that go on.** A command or a route change that lasts longer than `CommandGrace` (800 ms), or that asks the visitor something (a dialog, a modal, a page that asks before it is left), is answered `pending` with an operation id; `Completed` tells its end, with its success or its failure. SignalR runs the calls of a client one after the other: this is what lets the answer to a dialog reach the server while the command or the route change that asked it waits.
+
+**Its reconnection.** When the connection drops, the session waits `ReconnectGracePeriod` (30 s) for its client. The client says `Hello` with the token of its session on the new connection: the session is resumed — its view models, the state of every target (sent again), the dialogs that wait, and what was told while it was away (a `Completed`, a notification). Only the user the session was created for may resume it. After the grace period the session is disposed, and the client starts a new one (`@routeables/client` opens the last route again).
 
 ## Targets
-
-The client does not only see one page. What the server shows is a set of **targets**:
 
 | Target | What it shows | When it is sent |
 | --- | --- | --- |
@@ -34,38 +79,45 @@ The client does not only see one page. What the server shows is a set of **targe
 | a region name (`"history"`) | The page the router of that region shows (`AddRegion("history")`). | After `Watch(region)`. |
 | `$name` | A view model registered with `AddRouteableTarget<T>("$name")` (a menu, the state of a shell). | After `Watch("$name")`. |
 
-A client can watch at most `RouteableSession.MaxTargets` targets. `GoToIn(region, route)` navigates the router of a region.
+A client can watch at most `MaxTargets` targets (24) besides the page and the modal. `GoToIn(region, route)` navigates the router of a region.
 
 ## The messages
 
-They do not depend on SignalR (`IRouteableClient`, `RouteableNavigated`, `RouteableChanged`...), so that another transport can carry them.
+They do not depend on SignalR (`IRouteableClient`, `RouteableNavigated`, `RouteableChanged`…), so that another transport can carry them. The protocol has a version (`RouteableProtocol.Version`, 2), checked by `Hello`.
 
 | Client to server | Does |
 | --- | --- |
+| `Hello({ protocol, resume })` | First, and after each reconnection: the protocol of the client, and the token of the session to resume. Answers `{ success, protocol, session, resumed }`. |
 | `GoTo(route)` / `GoToIn(target, route)` | Goes to a route, as an address bar would; in a region for `GoToIn`. |
-| `Invoke(command, arguments)` / `InvokeOn(target, command, arguments)` | Calls a command (below). SignalR has no optional parameters: always send `arguments`, `[]` when there are none. |
-| `Set(property, value)` / `SetOn(target, property, value)` | Sets a public property with a setter (a text box, a check box). A type that converts from a string (`RouteTransition`) is set with a string. |
+| `Invoke(command, arguments)` / `InvokeOn(target, command, arguments)` | Calls a command. SignalR has no optional parameters: always send `arguments`, `[]` when there are none. |
+| `Set(property, value)` / `SetOn(target, property, value)` | Sets a settable property. A type that converts from a string (`RouteTransition`) is set with a string. |
 | `Watch(target)` / `Unwatch(target)` | Starts or stops the messages of a region or a `$name` target. |
+| `Resync(target)` | Sends the full state of a target again. |
 | `Answer(id, button)` | Answers a dialog with the index of a button. |
 | `Dismiss(id, click)` | A notification was closed, or clicked. |
 
+Every call answers `{ success, error, code, operation, pending }`. The codes: `not-found`, `unauthorized`, `invalid-argument`, `failed`, `cancelled`, `limit`, `disabled`, `protocol`.
+
 | Server to client | Tells |
 | --- | --- |
-| `Navigated` | A page is current in a target: route, view model name, state, commands. Also when a command navigates. |
-| `Changed` | A property of a target changed. It is sent for the objects inside the view model too: an `INotifyPropertyChanged` or `INotifyCollectionChanged` it holds, and the `CanExecuteChanged` of a command. |
-| `Closed` | A target has no view model any more (the modal closed). |
+| `Navigated` | A page is current in a target (or its state is sent again): route, view model name, state, commands, generation, instance. |
+| `Changed` | Patches of the state of a target: target, generation, version, patches. |
+| `Closed` | A target has no view model any more (the modal closed, a page the user may not see). |
+| `Completed` | A call answered `pending` has ended. |
 | `DialogRequested` | A message, content or task dialog to answer (see below). |
 | `Notified` | A notification to show. |
-| `Failed` | A route change, or a command that went on after its call returned, failed. |
+| `Failed` | Something failed that no call waits for: a route change, a part of a state that could not be sent. |
 
 ## Commands
 
 A client calls a command in one of two ways:
 
-- a method that carries `[RouteableCommand]`, by its name;
-- an `ICommand` of the state, by its path. The property is sent as `{ "$command": "choices.2.adoptCommand", "canExecute": true }`; the client gives the path back (`InvokeOn(target, path, [])`). A command that cannot execute is refused. A command with an `ExecuteAsync()` method (the `AsyncCommand` of the samples) is awaited, so its failure reaches the client.
+- a method that carries `[RouteableCommand]`, by its name. It returns `void`, `Task`, `Task<T>`, `ValueTask` or `ValueTask<T>` (the value is not sent); its parameters are read from the JSON the client sends, in order, and a parameter with a default value may be left out. A `CancellationToken` parameter is not sent by the client: it is cancelled when the session ends;
+- an `ICommand` of the exposed state, by its path. A command that cannot execute is refused (`disabled`). A command with an `ExecuteAsync` method (`AsyncRelayCommand`, the `AsyncCommand` of the samples) is awaited, so its failure reaches the client.
 
-A call returns when the command ends, when it opens a dialog (it does not end before the user answers), or after a moment (a countdown goes on by itself).
+What a client sends is checked before anything reads it: `MaxArgumentLength` (64 KiB of JSON), `MaxArgumentItems` (10 000 values), `MaxArgumentDepth` (32), at most 32 arguments, names of at most 512 characters. Every failure — a wrong type, an exception of the command, before or after its first `await`, a cancellation — is an answer, never an exception of the hub.
+
+An exception of a view model reaches the client with its message in Development (or when `DetailedErrors = true`); elsewhere the client reads "The command failed." and the exception is logged. Throw a `RouteableException` for a message meant for the visitor: it is always sent.
 
 ## Dialogs, notifications and the modal
 
@@ -76,19 +128,45 @@ A call returns when the command ends, when it opens a dialog (it does not end be
 public sealed class NoteModal(RemoteInteractions interactions) : RemoteModal<NoteViewModel, string?>(interactions);
 ```
 
-The client receives the view model as the page of the target `$modal`, calls its commands there, and gets `Closed` when it closes.
+The client receives the view model as the page of the target `$modal`, calls its commands there, and gets `Closed` when it closes. A dialog is sent after the changes that were made before it was asked.
 
-## What leaves the server
+## Limits of a state
 
-- **State:** the public readable properties, by their camel case name. A delegate, a task, a type, a stream, a service (`IRouter`, `IServiceProvider`) and a property marked `[JsonIgnore]` stay on the server. Values are scalars, lists and dictionaries; objects are sent four levels deep, and a cycle is cut. A command (`ICommand`) is sent as a token (above).
-- **Commands:** only methods with `[RouteableCommand]`, and the `ICommand` properties of the state. Arguments are read from JSON in order; a parameter with a default value may be left out.
-- **`GoTo` accepts any route** that is registered, and `GoToIn` any region: put the guards (`IRouteGuard`, authorization) on the routes that need them.
+A collection of more than `MaxCollectionItems` (10 000) items, or a property that holds more than `MaxStateNodes` (100 000) values, is sent as `null` and the client is told why (`Failed`, code `limit`): page it. Objects are read `MaxDepth` (4) levels deep, and a cycle is cut. A getter or an enumerator that throws gives `null` for that property, the others are sent. A collection changed by another thread while it is read is read again.
 
-## Limits
+## Options
 
-- The projection reads types by reflection: not for trimmed or AOT applications.
-- A page that has no `INotifyPropertyChanged` is sent once: nothing tells it changed.
-- A connection that drops loses its view models. Several servers need the same server for a client (sticky sessions) or a SignalR backplane.
-- A notification of the operating system (`CreateNotificationAsync`) is not offered: the browser draws the notifications.
+```csharp
+builder.Services.AddRouteablesSignalR(services => ..., options =>
+{
+    options.Exposure = RouteableExposure.Explicit;                 // the default
+    options.ExposeTypes(t => t.Namespace == "MyLib.ViewModels", settable: true);
+    options.RequireAuthenticatedUser = true;
+    options.CommandGrace = TimeSpan.FromMilliseconds(800);
+    options.ReconnectGracePeriod = TimeSpan.FromSeconds(30);
+    options.MaxTargets = 24;
+    options.MaxCollectionItems = 10_000;
+    options.MaxStateNodes = 100_000;
+    options.MaxPendingMessages = 1_000;
+    options.MaxArgumentLength = 64 * 1024;
+    options.DetailedErrors = null;                                 // Development only
+});
+```
 
-The client is in [clients/typescript](../../clients/typescript). The sample is [samples/SignalR/CounterServer](../../samples/SignalR/CounterServer).
+## Observability
+
+The logs of the sessions (`Routeables.SignalR.RouteableSession`), and an activity source and a meter named `Routeables.SignalR` (`RouteablesTelemetry.Name`): every call is an activity; the metrics count the sessions (attached and waiting for their client), the calls by method and outcome and their duration, the messages sent, merged and dropped, the depth of the queue of a slow client, the delivery latency, and the parts of a state that could not be sent.
+
+```csharp
+builder.Services.AddOpenTelemetry()
+    .WithTracing(t => t.AddSource(RouteablesTelemetry.Name))
+    .WithMetrics(m => m.AddMeter(RouteablesTelemetry.Name));
+```
+
+## Deployment
+
+- **One server per client.** A session lives in the memory of the server that holds its connection: with several servers, the client must always reach the same one (sticky sessions; with WebSockets and `skipNegotiation` a connection stays on its server anyway). A SignalR backplane is **not** needed: a session only talks to its own connection. A session cannot move to another server, and a restart loses them: the clients start new sessions and open their route again. Keep in the view models nothing that must outlive a session; keep it in your services and your database.
+- **No trimming, no Native AOT.** The view models are read by reflection (cached per type): `AddRouteablesSignalR` carries `[RequiresUnreferencedCode]` and `[RequiresDynamicCode]`, and the package is marked not trimmable.
+- **Messages from the browser.** SignalR limits a message to 32 KiB by default (`HubOptions.MaximumReceiveMessageSize`); the limits above apply within it.
+
+The client is in [clients/typescript](../../clients/typescript). The sample is [samples/SignalR/CounterServer](../../samples/SignalR/CounterServer). Security: [SECURITY.md](../../SECURITY.md).

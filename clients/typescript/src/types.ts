@@ -2,10 +2,12 @@
 export const PAGE = '';
 /** The name of the target that is the modal view model that is open. */
 export const MODAL = '$modal';
+/** The version of the messages this client speaks; the server says whether it speaks it too (`Hello`). */
+export const PROTOCOL = 2;
 
 /** A page the server made current: what the component that shows it needs. */
 export interface Page {
-  /** Counts the pages the target showed: it changes when another page arrives, not when the state of this one changes. */
+  /** Counts the pages the target showed: it changes when another page arrives, not when the state of this one changes or is sent again. */
   readonly sequence: number;
   /** What shows it: the main page (""), the modal ("$modal"), a region (its name) or a registered view model ("$name"). */
   readonly target: string;
@@ -15,8 +17,12 @@ export interface Page {
   readonly viewModel: string;
   /** The properties of the view model, by name (camel case). A new object after every change. */
   readonly state: Readonly<Record<string, unknown>>;
-  /** The methods the page may call by name (the ones marked [RouteableCommand]). */
+  /** The methods the page may call by name (the ones marked [RouteableCommand] that the user may call). */
   readonly commands: readonly string[];
+  /** The generation of the page on the server: the changes that belong to it carry it. */
+  readonly generation: number;
+  /** The last change applied (0 for the state as it arrived). */
+  readonly version: number;
 }
 
 /**
@@ -62,26 +68,65 @@ export interface NavigatedMessage {
   state: Record<string, unknown>;
   commands: string[];
   target?: string;
+  /** Grows at each page (or full state sent again) of the target. */
+  generation: number;
+  /** The view model object: the same when the state of the same page is sent again. */
+  instance: number;
+}
+
+/** One change of a state: `set` replaces the value at `path`; `splice` removes `remove` items at `index` of the array at `path` and inserts `value`. */
+export interface Patch {
+  op: 'set' | 'splice';
+  path: (string | number)[];
+  value?: unknown;
+  index?: number | null;
+  remove?: number | null;
 }
 
 export interface ChangedMessage {
-  property: string;
-  value: unknown;
-  target?: string;
+  target: string;
+  generation: number;
+  /** 1 for the first change after the page, then one more each time: a hole means a change was lost. */
+  version: number;
+  patches: Patch[];
 }
 
 export interface ClosedMessage {
   target: string;
+  generation?: number;
 }
 
 export interface FailureMessage {
   route: string;
   message: string;
+  target?: string | null;
+  code?: string | null;
+}
+
+export interface CompletedMessage {
+  operation: string;
+  success: boolean;
+  error?: string | null;
+  code?: string | null;
 }
 
 /** The answer of the server to a call. */
 export interface Ack {
   success: boolean;
+  error?: string | null;
+  /** What kind of failure: "not-found", "unauthorized", "invalid-argument", "failed", "cancelled", "limit", "disabled", "protocol", or "transport" when the call did not reach the server. */
+  code?: string | null;
+  /** The call went on after the server answered (a dialog, a long command): `Completed` tells its end. The client waits for it. */
+  pending?: boolean;
+  operation?: string | null;
+}
+
+/** What the server answers to `Hello`. */
+export interface Welcome {
+  success: boolean;
+  protocol: number;
+  session: string | null;
+  resumed: boolean;
   error?: string | null;
 }
 
@@ -93,12 +138,14 @@ export interface ServerMessages {
   dialogRequested(message: Dialog): void;
   notified(message: Toast): void;
   closed(message: ClosedMessage): void;
+  completed(message: CompletedMessage): void;
 }
 
 /** The methods of the server a transport calls. */
 export type ServerMethod =
+  | 'Hello'
   | 'GoTo' | 'Invoke' | 'Set'
-  | 'Watch' | 'Unwatch' | 'GoToIn' | 'InvokeOn' | 'SetOn'
+  | 'Watch' | 'Unwatch' | 'Resync' | 'GoToIn' | 'InvokeOn' | 'SetOn'
   | 'Answer' | 'Dismiss';
 
 /**
@@ -110,8 +157,8 @@ export interface RouteableTransport {
   start(handlers: ServerMessages): Promise<void>;
   /** Closes the connection. */
   stop(): Promise<void>;
-  /** Calls a method of the server. */
-  call(method: ServerMethod, ...args: unknown[]): Promise<Ack>;
-  /** Called when the connection closes without being asked to, then when it comes back. */
+  /** Calls a method of the server; rejects when the call does not reach it. */
+  call<T = Ack>(method: ServerMethod, ...args: unknown[]): Promise<T>;
+  /** Called with false when the connection drops (or closes), with true when it comes back. */
   onConnectionChange(handler: (connected: boolean) => void): void;
 }

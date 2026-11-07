@@ -1,5 +1,6 @@
 ﻿using System.ComponentModel;
 using Routeables.Abstraction;
+using Routeables.SignalR;
 using IRouter = Routeables.Abstraction.IRouter;
 using XAnimals.ViewModels;
 
@@ -9,6 +10,7 @@ namespace XAnimals.AngularServer;
 /// The pets of the Adopt a pet page, watched as <c>$pets</c>: every page of the history of the region "adopt", up to the current one.
 /// The page itself shows one status line; a front end that draws the cards side by side asks for the whole history.
 /// </summary>
+[RouteableState]
 internal sealed class PetsViewModel : INotifyPropertyChanged, IDisposable
 {
     private readonly IRouter _region;

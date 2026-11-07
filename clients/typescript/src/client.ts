@@ -1,6 +1,7 @@
-import { MODAL, PAGE } from './types.js';
+import { MODAL, PAGE, PROTOCOL } from './types.js';
 import type {
-  Ack, ChangedMessage, ClosedMessage, CommandRef, Dialog, FailureMessage, NavigatedMessage, Page, RouteableTransport, Toast,
+  Ack, ChangedMessage, ClosedMessage, CompletedMessage, Dialog, FailureMessage, NavigatedMessage, Page, Patch, RouteableTransport,
+  ServerMethod, Toast, Welcome,
 } from './types.js';
 
 export type PageListener = (page: Page | null) => void;
@@ -9,6 +10,33 @@ export type ConnectionListener = (connected: boolean) => void;
 export type DialogListener = (dialogs: readonly Dialog[]) => void;
 export type ToastListener = (toasts: readonly Toast[]) => void;
 
+/** A call of the client that failed without anybody waiting for its answer (a watch), or that did not reach the server. */
+export interface ClientError {
+  readonly method: ServerMethod;
+  readonly target?: string;
+  readonly message: string;
+  readonly code?: string | null;
+}
+export type ErrorListener = (error: ClientError) => void;
+
+/** What the recovery of a lost session knows. */
+export interface Recovery {
+  readonly client: RouteablesClient;
+  /** The route the main page showed before the session was lost, or null. */
+  readonly lastRoute: string | null;
+}
+
+export interface RouteablesClientOptions {
+  /**
+   * What to do when the server could not resume the session after a reconnection (it was gone: the grace period ended, the server restarted):
+   * the view models are new, nothing is shown. By default the main router goes back to the route it showed; `false` does nothing (the
+   * application listens to `onSessionLost`).
+   */
+  recover?: ((recovery: Recovery) => void | Promise<void>) | false;
+}
+
+const SESSION_LOST: Ack = { success: false, error: 'The session was lost: the call may not have ended.', code: 'session-lost' };
+
 /**
  * Holds what the server shows, and sends what the user does. It does not know Angular or Vue: a component subscribes
  * and shows `page.state`; a framework layer turns the subscription into signals, observables or refs.
@@ -16,6 +44,10 @@ export type ToastListener = (toasts: readonly Toast[]) => void;
  * What the server shows is a set of targets: the page of the main router (""), the modal ("$modal"), the regions (by their
  * name) and the view models the application registered ("$name"). The page and the modal are always sent; the others
  * are sent while somebody watches them (`watch`).
+ *
+ * Every target is an ordered stream: a page (a generation), then its changes (versions 1, 2, …). A change of an older page is dropped,
+ * and a missing change makes the client ask the state again. After a reconnection the client resumes its session on the server: the view
+ * models, their state and the dialogs that wait come back; when it cannot, `recover` runs.
  */
 export class RouteablesClient {
   private readonly pages = new Map<string, Page | null>();
@@ -25,30 +57,38 @@ export class RouteablesClient {
   private readonly connectionListeners = new Set<ConnectionListener>();
   private readonly dialogListeners = new Set<DialogListener>();
   private readonly toastListeners = new Set<ToastListener>();
+  private readonly errorListeners = new Set<ErrorListener>();
+  private readonly sessionLostListeners = new Set<(recovery: Recovery) => void>();
+  private readonly instances = new Map<string, number>();
+  private readonly resyncing = new Set<string>();
+  private readonly operations = new Map<string, (ack: Ack) => void>();
+  private readonly early = new Map<string, Ack>();
   private dialogList: readonly Dialog[] = [];
   private toastList: readonly Toast[] = [];
   private connected = false;
   private sequence = 0;
+  private session: string | null = null;
+  private lastRoute: string | null = null;
 
-  constructor(private readonly transport: RouteableTransport) {
+  constructor(private readonly transport: RouteableTransport, private readonly options: RouteablesClientOptions = {}) {
     transport.onConnectionChange(connected => {
-      this.connected = connected;
       if (!connected) {
-        // The server keeps the view models of a connection: a new connection starts with none, so what is shown is stale.
-        for (const target of [...this.pages.keys()]) this.setPage(target, null);
-        this.setDialogs([]);
-        this.setToasts([]);
-      } else {
-        // The new connection watches nothing yet.
-        for (const target of this.watchers.keys()) void this.transport.call('Watch', target);
+        // The pages stay on screen: the session is resumed when the connection comes back, or recovered.
+        this.setConnected(false);
+        return;
       }
-      this.connectionListeners.forEach(listener => listener(connected));
+      void this.hello().catch(error => this.fail('Hello', undefined, error));
     });
   }
 
-  /** The page of the main router, or null before the first one (and while disconnected). */
+  /** The page of the main router, or null before the first one. */
   get page(): Page | null {
     return this.pageOf(PAGE);
+  }
+
+  /** Whether the client is connected and has its session. */
+  get isConnected(): boolean {
+    return this.connected;
   }
 
   /** What a target shows now. */
@@ -66,18 +106,18 @@ export class RouteablesClient {
     return this.toastList;
   }
 
-  /** Opens the connection. Go to a route afterwards. */
+  /** Opens the connection and says hello (a session that dropped is resumed). Go to a route afterwards. */
   async connect(): Promise<void> {
     await this.transport.start({
       navigated: message => this.onNavigated(message),
       changed: message => this.onChanged(message),
       failed: message => this.failureListeners.forEach(listener => listener(message)),
-      dialogRequested: dialog => this.setDialogs([...this.dialogList, dialog]),
-      notified: toast => this.setToasts([...this.toastList, toast]),
+      dialogRequested: dialog => this.onDialog(dialog),
+      notified: toast => this.onToast(toast),
       closed: message => this.onClosed(message),
+      completed: message => this.onCompleted(message),
     });
-    this.connected = true;
-    for (const target of this.watchers.keys()) void this.transport.call('Watch', target);
+    await this.hello();
   }
 
   disconnect(): Promise<void> {
@@ -86,51 +126,56 @@ export class RouteablesClient {
 
   // ---------------------------------------------------------------- what the user does
 
-  /** Goes to a route, as the address bar would. The page arrives through the subscription. */
+  /** Goes to a route, as the address bar would. The page arrives through the subscription; the answer comes once the route change ended. */
   goTo(route: string): Promise<Ack> {
-    return this.transport.call('GoTo', route);
+    return this.send('GoTo', undefined, route);
   }
 
   /** Goes to a route in the router of a target: a region, by its name. */
   goToIn(target: string, route: string): Promise<Ack> {
-    return target === PAGE ? this.goTo(route) : this.transport.call('GoToIn', target, route);
+    return target === PAGE ? this.goTo(route) : this.send('GoToIn', target, target, route);
   }
 
-  /** Calls a method of the current page, by its name. */
+  /** Calls a method of the current page, by its name. The answer comes when the command ended (after a dialog it asked, for instance). */
   invoke(command: string, ...args: unknown[]): Promise<Ack> {
-    return this.transport.call('Invoke', command, args);
+    return this.send('Invoke', undefined, command, args);
   }
 
   /** Calls a method of what a target shows, by its name. */
   invokeOn(target: string, command: string, ...args: unknown[]): Promise<Ack> {
-    return this.transport.call('InvokeOn', target, command, args);
+    return this.send('InvokeOn', target, target, command, args);
   }
 
   /** Calls a command of the state (a `CommandRef` found in the state of a target). */
-  run(target: string, command: CommandRef, ...args: unknown[]): Promise<Ack> {
+  run(target: string, command: { readonly $command: string }, ...args: unknown[]): Promise<Ack> {
     return this.invokeOn(target, command.$command, ...args);
   }
 
   /** Sets a property of the current page (a text box, a check box). The server confirms by telling the change. */
   set(property: string, value: unknown): Promise<Ack> {
-    return this.transport.call('Set', property, value);
+    return this.send('Set', undefined, property, value);
   }
 
   /** Sets a property of what a target shows. */
   setOn(target: string, property: string, value: unknown): Promise<Ack> {
-    return this.transport.call('SetOn', target, property, value);
+    return this.send('SetOn', target, target, property, value);
   }
 
-  /** Answers a dialog: the index of the button the user chose. */
-  answer(dialog: Dialog, button: number): Promise<Ack> {
-    this.setDialogs(this.dialogList.filter(d => d.id !== dialog.id));
-    return this.transport.call('Answer', dialog.id, button);
+  /**
+   * Answers a dialog: the index of the button the user chose. The dialog leaves the list once the server took the answer (or does not know
+   * the dialog any more); it stays when the answer did not reach the server, to be answered again.
+   */
+  async answer(dialog: Dialog, button: number): Promise<Ack> {
+    const ack = await this.send('Answer', undefined, dialog.id, button);
+    if (ack.success || ack.code === 'not-found') this.setDialogs(this.dialogList.filter(d => d.id !== dialog.id));
+    return ack;
   }
 
-  /** Closes a notification, or tells that the user clicked it. */
-  dismiss(toast: Toast, click = false): Promise<Ack> {
-    this.setToasts(this.toastList.filter(t => t.id !== toast.id));
-    return this.transport.call('Dismiss', toast.id, click);
+  /** Closes a notification, or tells that the user clicked it. It leaves the list once the server took it. */
+  async dismiss(toast: Toast, click = false): Promise<Ack> {
+    const ack = await this.send('Dismiss', undefined, toast.id, click);
+    if (ack.success || ack.code === 'not-found') this.setToasts(this.toastList.filter(t => t.id !== toast.id));
+    return ack;
   }
 
   // ---------------------------------------------------------------- what the user sees
@@ -150,7 +195,10 @@ export class RouteablesClient {
     listeners.add(listener);
     this.watch(target);
     listener(this.pageOf(target));
+    let subscribed = true;
     return () => {
+      if (!subscribed) return;
+      subscribed = false;
       listeners.delete(listener);
       this.unwatch(target);
     };
@@ -168,14 +216,97 @@ export class RouteablesClient {
     return () => this.toastListeners.delete(listener);
   }
 
+  /** What failed on the server without a call waiting for it: a route change, a part of a state that could not be sent. */
   onFailure(listener: FailureListener): () => void {
     this.failureListeners.add(listener);
     return () => this.failureListeners.delete(listener);
   }
 
+  /** A call that did not reach the server, or a watch the server refused. */
+  onError(listener: ErrorListener): () => void {
+    this.errorListeners.add(listener);
+    return () => this.errorListeners.delete(listener);
+  }
+
+  /** Whether the client is connected (with its session): false when the connection drops, true when it comes back. */
   onConnection(listener: ConnectionListener): () => void {
     this.connectionListeners.add(listener);
     return () => this.connectionListeners.delete(listener);
+  }
+
+  /** The server could not resume the session after a reconnection: the view models are new. Called before `recover`. */
+  onSessionLost(listener: (recovery: Recovery) => void): () => void {
+    this.sessionLostListeners.add(listener);
+    return () => this.sessionLostListeners.delete(listener);
+  }
+
+  // ---------------------------------------------------------------- session
+
+  private async hello(): Promise<void> {
+    const previous = this.session;
+    const welcome = await this.transport.call<Welcome>('Hello', { protocol: PROTOCOL, resume: previous });
+    if (!welcome.success) {
+      const message = welcome.error ?? `The server speaks the protocol ${welcome.protocol}, this client ${PROTOCOL}.`;
+      this.fail('Hello', undefined, new Error(message), 'protocol');
+      throw new Error(message);
+    }
+    this.session = welcome.session;
+
+    if (previous !== null && !welcome.resumed) {
+      // A new session: what was shown belongs to view models that are gone.
+      for (const target of [...this.pages.keys()]) this.setPage(target, null);
+      this.instances.clear();
+      this.setDialogs([]);
+      this.setToasts([]);
+      for (const [operation, settle] of this.operations) {
+        settle(SESSION_LOST);
+        this.operations.delete(operation);
+      }
+    }
+
+    this.setConnected(true);
+    // A resumed session already sent what it watches; a new one watches nothing yet.
+    if (!welcome.resumed) for (const target of this.watchers.keys()) this.watchRemote(target);
+
+    if (previous !== null && !welcome.resumed) {
+      const recovery: Recovery = { client: this, lastRoute: this.lastRoute };
+      this.sessionLostListeners.forEach(listener => listener(recovery));
+      if (this.options.recover !== false) {
+        const recover = this.options.recover ?? (async (r: Recovery) => { if (r.lastRoute !== null) await r.client.goTo(r.lastRoute); });
+        await recover(recovery);
+      }
+    }
+  }
+
+  private setConnected(connected: boolean): void {
+    if (this.connected === connected) return;
+    this.connected = connected;
+    this.connectionListeners.forEach(listener => listener(connected));
+  }
+
+  // Sends a call and waits for its end: the answer, or Completed when the server answered that it goes on.
+  private async send(method: ServerMethod, target: string | undefined, ...args: unknown[]): Promise<Ack> {
+    let ack: Ack;
+    try {
+      ack = await this.transport.call<Ack>(method, ...args);
+    } catch (error) {
+      return this.fail(method, target, error);
+    }
+    if (!ack.pending || !ack.operation) return ack;
+
+    const operation = ack.operation;
+    const early = this.early.get(operation);
+    if (early !== undefined) {
+      this.early.delete(operation);
+      return early;
+    }
+    return new Promise<Ack>(resolve => this.operations.set(operation, resolve));
+  }
+
+  private fail(method: ServerMethod, target: string | undefined, error: unknown, code = 'transport'): Ack {
+    const message = error instanceof Error ? error.message : String(error);
+    this.errorListeners.forEach(listener => listener({ method, target, message, code }));
+    return { success: false, error: message, code };
   }
 
   // ---------------------------------------------------------------- watchers
@@ -188,7 +319,14 @@ export class RouteablesClient {
     if (this.isAlwaysSent(target)) return;
     const count = (this.watchers.get(target) ?? 0) + 1;
     this.watchers.set(target, count);
-    if (count === 1 && this.connected) void this.transport.call('Watch', target);
+    if (count === 1 && this.connected) this.watchRemote(target);
+  }
+
+  private watchRemote(target: string): void {
+    void this.send('Watch', target, target).then(ack => {
+      if (!ack.success && ack.code !== 'transport')
+        this.errorListeners.forEach(listener => listener({ method: 'Watch', target, message: ack.error ?? 'The target cannot be watched.', code: ack.code }));
+    });
   }
 
   private unwatch(target: string): void {
@@ -200,33 +338,85 @@ export class RouteablesClient {
     }
     this.watchers.delete(target);
     this.setPage(target, null);
-    if (this.connected) void this.transport.call('Unwatch', target);
+    if (this.connected) void this.send('Unwatch', target, target);
+  }
+
+  private resync(target: string): void {
+    if (this.resyncing.has(target)) return;
+    this.resyncing.add(target);
+    void this.send('Resync', target, target).then(ack => {
+      if (!ack.success) this.resyncing.delete(target);
+    });
   }
 
   // ---------------------------------------------------------------- what the server tells
 
   private onNavigated(message: NavigatedMessage): void {
     const target = message.target ?? PAGE;
+    const current = this.pageOf(target);
+    if (current !== null && message.generation < current.generation) return;   // an older page
+
+    this.resyncing.delete(target);
+    // The same view model sent again (a resync, a resumed session) keeps its sequence: a component is not recreated.
+    const sameInstance = current !== null && this.instances.get(target) === message.instance;
+    this.instances.set(target, message.instance);
+    if (target === PAGE) this.lastRoute = message.route;
     this.setPage(target, {
-      sequence: ++this.sequence,
+      sequence: sameInstance ? current!.sequence : ++this.sequence,
       target,
       route: message.route,
       viewModel: message.viewModel,
       state: message.state,
       commands: message.commands,
+      generation: message.generation,
+      version: 0,
     });
   }
 
   private onChanged(message: ChangedMessage): void {
     const target = message.target ?? PAGE;
     const page = this.pageOf(target);
-    if (page === null) return;
+    if (page === null || message.generation < page.generation) return;   // a change of a page that is gone
+    if (message.generation > page.generation || message.version > page.version + 1) {
+      this.resync(target);   // a page or a change was lost: the whole state is asked again
+      return;
+    }
+    if (message.version <= page.version) return;   // already applied
+
+    let state = page.state as Record<string, unknown>;
+    for (const patch of message.patches) state = apply(state, patch);
     // A new object, so that a framework that compares references sees the change.
-    this.setPage(target, { ...page, state: { ...page.state, [message.property]: message.value } });
+    this.setPage(target, { ...page, state, version: message.version });
   }
 
   private onClosed(message: ClosedMessage): void {
+    const page = this.pageOf(message.target);
+    if (page !== null && message.generation !== undefined && page.generation > message.generation) return;   // closes an older page
+    this.instances.delete(message.target);
     this.setPage(message.target, null);
+  }
+
+  private onCompleted(message: CompletedMessage): void {
+    const ack: Ack = { success: message.success, error: message.error, code: message.code };
+    const settle = this.operations.get(message.operation);
+    if (settle === undefined) {
+      // Arrived before the answer that names it was read: kept for it.
+      this.early.set(message.operation, ack);
+      if (this.early.size > 256) this.early.delete(this.early.keys().next().value!);
+      return;
+    }
+    this.operations.delete(message.operation);
+    settle(ack);
+  }
+
+  private onDialog(dialog: Dialog): void {
+    if (this.dialogList.some(d => d.id === dialog.id)) return;   // sent again by a resumed session
+    this.setDialogs([...this.dialogList, dialog]);
+  }
+
+  private onToast(toast: Toast): void {
+    if (this.toastList.some(t => t.id === toast.id)) return;
+    this.setToasts([...this.toastList, toast]);
   }
 
   private setPage(target: string, page: Page | null): void {
@@ -243,4 +433,26 @@ export class RouteablesClient {
     this.toastList = toasts;
     this.toastListeners.forEach(listener => listener(toasts));
   }
+}
+
+/** Applies a patch to a state without changing it: the objects and the arrays on the path are copied. */
+export function apply(state: Record<string, unknown>, patch: Patch): Record<string, unknown> {
+  return update(state, patch.path, 0, patch) as Record<string, unknown>;
+}
+
+function update(node: unknown, path: readonly (string | number)[], depth: number, patch: Patch): unknown {
+  if (depth === path.length) {
+    if (patch.op === 'set') return patch.value;
+    const array = Array.isArray(node) ? [...node] : [];
+    array.splice(patch.index ?? 0, patch.remove ?? 0, ...((patch.value as unknown[] | undefined) ?? []));
+    return array;
+  }
+  const key = path[depth]!;
+  if (Array.isArray(node)) {
+    const copy = [...node];
+    copy[Number(key)] = update(node[Number(key)], path, depth + 1, patch);
+    return copy;
+  }
+  const object = (typeof node === 'object' && node !== null ? node : {}) as Record<string, unknown>;
+  return { ...object, [key]: update(object[key as string], path, depth + 1, patch) };
 }

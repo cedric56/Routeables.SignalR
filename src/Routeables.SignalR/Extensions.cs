@@ -1,4 +1,5 @@
-﻿using Microsoft.AspNetCore.Builder;
+﻿using System.Diagnostics.CodeAnalysis;
+using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Routing;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
@@ -13,28 +14,43 @@ namespace Routeables.SignalR;
 /// <summary>Adds Routeables to an ASP.NET Core application that serves a JavaScript front end over SignalR.</summary>
 public static class Extensions
 {
+    private const string ReflectionMessage = "Routeables.SignalR reads the view models by reflection: it does not support trimming nor Native AOT.";
+
     /// <summary>
     /// <c>AddRouteablesSignalR&lt;TMain&gt;</c> for an application that has no menu: no main view model to write.
     /// </summary>
     /// <param name="services">The service collection.</param>
     /// <param name="configure">More registrations, such as the services the view models ask for.</param>
-    public static IServiceCollection AddRouteablesSignalR(this IServiceCollection services, Action<IServiceCollection>? configure = null)
-        => services.AddRouteablesSignalR<DefaultMainViewModel>(configure);
+    /// <param name="options">The options (what crosses the network, the limits, the reconnection).</param>
+    [RequiresUnreferencedCode(ReflectionMessage)]
+    [RequiresDynamicCode(ReflectionMessage)]
+    public static IServiceCollection AddRouteablesSignalR(this IServiceCollection services, Action<IServiceCollection>? configure = null, Action<RouteablesOptions>? options = null)
+        => services.AddRouteablesSignalR<DefaultMainViewModel>(configure, options);
 
     /// <summary>
-    /// Registers SignalR and what a session needs: a router per connection (scoped), the sessions, and the main view model.
-    /// Register the routes of the application as usual (<c>AddGeneratedRoutes()</c>, or <c>RegisterRoute</c> by name).
+    /// Registers SignalR and what a session needs: a router per connection (scoped), the sessions, the main view model, the authorization of the
+    /// view models and the options. Register the routes of the application as usual (<c>AddGeneratedRoutes()</c>, or <c>RegisterRoute</c> by name).
     /// </summary>
     /// <typeparam name="TMain">The main view model; call <c>AddRouteablesSignalR()</c> without it for an application without a menu.</typeparam>
     /// <param name="services">The service collection.</param>
     /// <param name="configure">More registrations, such as the services the view models ask for.</param>
-    public static IServiceCollection AddRouteablesSignalR<TMain>(this IServiceCollection services, Action<IServiceCollection>? configure = null)
+    /// <param name="options">The options (what crosses the network, the limits, the reconnection).</param>
+    [RequiresUnreferencedCode(ReflectionMessage)]
+    [RequiresDynamicCode(ReflectionMessage)]
+    public static IServiceCollection AddRouteablesSignalR<TMain>(this IServiceCollection services, Action<IServiceCollection>? configure = null, Action<RouteablesOptions>? options = null)
         where TMain : class, IMainViewModel
     {
         ArgumentNullException.ThrowIfNull(services);
 
+        var settings = new RouteablesOptions();
+        options?.Invoke(settings);
+        services.AddSingleton(settings);
+        services.AddSingleton(new RouteableSchema(settings));
+
         services.AddSignalR();
+        services.AddAuthorizationCore();
         services.AddSingleton<RouteableSessions>();
+        services.AddScoped<RouteableConnection>();
         services.RegisterMainViewModel<TMain>(ServiceLifetime.Scoped);
         services.AddRouteCoordinator(ServiceLifetime.Scoped);
         services.AddScoped(_ => new RouteableHostLifetime(ServiceLifetime.Scoped));
@@ -47,12 +63,15 @@ public static class Extensions
         services.Replace(ServiceDescriptor.Scoped<IRouteableNotificationService, RemoteNotificationService>());
 
         configure?.Invoke(services);
+
+        // After configure, so that an application that replaces its own guard does not remove this one.
+        services.TryAddEnumerable(ServiceDescriptor.Scoped<IRouteGuard, RouteableAuthorizationGuard>());
         return services;
     }
 
     /// <summary>
     /// Offers a view model to the client besides the pages, under <paramref name="name"/> (a menu, the state of the shell). The client
-    /// watches it with <c>Watch(name)</c>; the view model lives as long as the connection.
+    /// watches it with <c>Watch(name)</c>; the view model lives as long as the session. <c>[Authorize]</c> on its class applies.
     /// </summary>
     /// <typeparam name="TViewModel">The view model; it is created by the services of the connection.</typeparam>
     /// <param name="services">The service collection.</param>
@@ -69,7 +88,10 @@ public static class Extensions
         return services;
     }
 
-    /// <summary>Maps the hub the client connects to.</summary>
+    /// <summary>
+    /// Maps the hub the client connects to. Protect it as any endpoint: <c>app.MapRouteables().RequireAuthorization()</c> (after
+    /// <c>app.UseAuthentication()</c> and <c>app.UseAuthorization()</c>).
+    /// </summary>
     /// <param name="endpoints">The endpoint route builder.</param>
     /// <param name="pattern">The address of the hub, <c>/routeables</c> by default.</param>
     public static HubEndpointConventionBuilder MapRouteables(this IEndpointRouteBuilder endpoints, string pattern = "/routeables")

@@ -21,16 +21,29 @@
     const connection = new signalR.HubConnectionBuilder().withUrl('/routeables').withAutomaticReconnect().build();
     const el = id => document.getElementById(id);
     const show = state => { el('count').textContent = state.count; el('step').value = state.step; };
+    let page = null;   // the state of the page, its generation and its last version
 
-    connection.on('Navigated', page => show(page.state));
-    connection.on('Changed', change => show({ count: el('count').textContent, step: el('step').value, [change.property]: change.value }));
+    connection.on('Navigated', message => {
+      page = { generation: message.generation, version: 0, state: message.state };
+      show(page.state);
+    });
+    connection.on('Changed', message => {
+      if (page === null || message.generation !== page.generation) return;   // a change of an older page
+      if (message.version !== page.version + 1) { connection.invoke('Resync', ''); return; }   // one was lost: ask the state again
+      page.version = message.version;
+      for (const patch of message.patches) if (patch.op === 'set' && patch.path.length === 1) page.state[patch.path[0]] = patch.value;
+      show(page.state);
+    });
     connection.on('Failed', failure => { el('error').textContent = failure.message; });
+    connection.on('Completed', () => {});
 
     el('increment').onclick = () => connection.invoke('Set', 'step', Number(el('step').value))
       .then(() => connection.invoke('Invoke', 'increment', []));
     el('reset').onclick = () => connection.invoke('Invoke', 'reset', []);
 
-    connection.start().then(() => connection.invoke('GoTo', '/counter'));
+    connection.start()
+      .then(() => connection.invoke('Hello', { protocol: 2 }))
+      .then(() => connection.invoke('GoTo', '/counter'));
   </script>
 </body>
 </html>

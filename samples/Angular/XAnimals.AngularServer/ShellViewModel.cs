@@ -3,6 +3,7 @@ using System.ComponentModel;
 using System.Windows.Input;
 using Routeables.Abstraction;
 using Routeables.Services;
+using Routeables.SignalR;
 using XAnimals.Common;
 
 namespace XAnimals.AngularServer;
@@ -13,12 +14,14 @@ namespace XAnimals.AngularServer;
 /// <param name="Glyph">Its icon.</param>
 /// <param name="Description">What the page shows, in one line.</param>
 /// <param name="IsLocked">Whether the entry cannot be followed now (a page published a lock).</param>
+[RouteableState]
 internal sealed record MenuEntry(string Name, string Route, string Glyph, string Description, bool IsLocked);
 
 /// <summary>
 /// What the app shows around the pages, watched as <c>$shell</c>: the menu, built from the main view model (it follows its lock),
 /// and the theme. The app goes to the route of an entry itself.
 /// </summary>
+[RouteableState]
 internal sealed class ShellViewModel : INotifyPropertyChanged, IDisposable
 {
     // The Birds module has views for the other platforms only.
@@ -39,7 +42,7 @@ internal sealed class ShellViewModel : INotifyPropertyChanged, IDisposable
     public event PropertyChangedEventHandler? PropertyChanged;
 
     /// <summary>The entries of the menu.</summary>
-    public IReadOnlyList<MenuEntry> Entries => [.. _main.Routeables
+    public IReadOnlyList<MenuEntry> Entries => [.. _main.Entries
         .Select(e => (Entry: e, Route: "/" + e.Route.TrimStart('/')))
         .Where(e => !Unserved.Contains(e.Route, StringComparer.OrdinalIgnoreCase))
         .Select(e => new MenuEntry(
@@ -47,7 +50,7 @@ internal sealed class ShellViewModel : INotifyPropertyChanged, IDisposable
             e.Entry.Description?.Split('\n')[0].Trim() ?? string.Empty, e.Entry.IsLock))];
 
     /// <summary>Whether a page published a lock.</summary>
-    public bool IsLocked => _main.Routeables.Any(e => e.IsLock);
+    public bool IsLocked => _main.Entries.Any(e => e.IsLock);
 
     /// <summary>The theme that was asked for: Default (the browser decides), Light or Dark.</summary>
     public string Theme => _theme.Requested.ToString();

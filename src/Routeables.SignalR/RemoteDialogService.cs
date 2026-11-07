@@ -29,7 +29,7 @@ public sealed class RemoteDialogService(RemoteInteractions interactions) : Route
         var answer = interactions.AskAsync("content", @params.Title ?? string.Empty, null, @params.Content?.ToString(), null, false, [.. choices.Select(c => c.Text)]);
         @params.Opened?.Invoke();
 
-        var chosen = choices[await answer.ConfigureAwait(false)];
+        var chosen = choices[await answer];
         chosen.Click?.Invoke();
         @params.Closed?.Invoke();
         return chosen.Result;
@@ -47,7 +47,7 @@ public sealed class RemoteDialogService(RemoteInteractions interactions) : Route
             @params.ShowsFooter ? @params.Footer?.ToString() : null, @params.ShowProgressBar, [.. buttons.Select(b => b.ToString())]);
         @params.Opened?.Invoke();
 
-        var result = buttons[await answer.ConfigureAwait(false)];
+        var result = buttons[await answer];
         @params.Closed?.Invoke();
         return result;
     }

@@ -6,86 +6,234 @@ using System.Windows.Input;
 namespace Routeables.SignalR;
 
 /// <summary>
-/// Calls a command of a view model with the arguments a client sent as JSON. A command is a method marked <see cref="RouteableCommandAttribute"/>,
-/// or an <see cref="ICommand"/> reached by its path in the state (<c>adopt</c>, <c>choices.2.adoptCommand</c>).
+/// Calls a command of a view model, or sets one of its properties, with what a client sent as JSON. A command is a method marked
+/// <see cref="RouteableCommandAttribute"/>, or an <see cref="ICommand"/> of the exposed state reached by its path (<c>adopt</c>,
+/// <c>choices.2.adoptCommand</c>). The arguments are checked against the limits of <see cref="RouteablesOptions"/>, the authorization
+/// of the member is evaluated, and every failure becomes a failed <see cref="RouteableAck"/>: nothing a client sends makes the hub throw.
 /// </summary>
-public static class RouteableCommandInvoker
+public sealed class RouteableCommandInvoker
 {
-    /// <summary>Calls the command named <paramref name="command"/> on <paramref name="viewModel"/>.</summary>
-    /// <param name="viewModel">The view model that is current.</param>
-    /// <param name="command">The client name of the command.</param>
-    /// <param name="arguments">The arguments, in the order of the parameters.</param>
-    /// <returns>Whether it was called, and why not when it was not.</returns>
-    public static async Task<RouteableAck> InvokeAsync(object viewModel, string command, IReadOnlyList<JsonElement>? arguments)
+    private const int MaxNameLength = 512;
+    private static readonly JsonSerializerOptions Web = new(JsonSerializerOptions.Web);
+
+    private readonly RouteableSchema _schema;
+    private readonly JsonSerializerOptions _json;
+
+    /// <summary>Creates the invoker of a schema.</summary>
+    /// <param name="schema">What the client may call and set.</param>
+    /// <param name="detailedErrors">Whether the message of any exception is sent; otherwise only that of a <see cref="RouteableException"/>.</param>
+    public RouteableCommandInvoker(RouteableSchema schema, bool detailedErrors = false)
+    {
+        _schema = schema ?? throw new ArgumentNullException(nameof(schema));
+        DetailedErrors = detailedErrors;
+        _json = new JsonSerializerOptions(Web) { MaxDepth = Math.Max(1, schema.Options.MaxArgumentDepth) };
+    }
+
+    /// <summary>Whether the message of any exception is sent to the client.</summary>
+    public bool DetailedErrors { get; }
+
+    private RouteablesOptions Options => _schema.Options;
+
+    /// <summary>Calls the command named <paramref name="command"/> on <paramref name="viewModel"/>, without authorization.</summary>
+    public async Task<RouteableAck> InvokeAsync(object viewModel, string command, IReadOnlyList<JsonElement>? arguments)
+        => (await InvokeAsync(viewModel, command, arguments, null, default).ConfigureAwait(true)).Ack;
+
+    /// <summary>Sets the property named <paramref name="property"/> (its client name) of <paramref name="viewModel"/>, without authorization.</summary>
+    public async Task<RouteableAck> SetAsync(object viewModel, string property, JsonElement value)
+        => (await SetAsync(viewModel, property, value, null).ConfigureAwait(true)).Ack;
+
+    internal async Task<Outcome> InvokeAsync(object viewModel, string command, IReadOnlyList<JsonElement>? arguments, RouteableAuthorizer? authorizer, CancellationToken lifetime = default)
     {
         ArgumentNullException.ThrowIfNull(viewModel);
+        if (string.IsNullOrEmpty(command) || command.Length > MaxNameLength)
+            return Outcome.Fail("The name of the command is empty or too long.", RouteableErrorCodes.InvalidArgument);
 
-        if (!RouteableStateProjector.Commands(viewModel.GetType()).TryGetValue(command, out var method))
-            return await InvokeCommandAsync(viewModel, command, arguments).ConfigureAwait(false);
+        arguments ??= [];
+        if (CheckArguments(arguments) is { } invalid)
+            return Outcome.Fail(invalid, RouteableErrorCodes.InvalidArgument);
 
-        if (!TryReadArguments(method, arguments ?? [], out var values, out var error))
-            return RouteableAck.Fail(error!);
+        var shape = _schema.Shape(viewModel.GetType());
+        if (!shape.Commands.TryGetValue(command, out var method))
+            return await InvokeCommandAsync(viewModel, shape, command, arguments, authorizer).ConfigureAwait(true);
+
+        if (authorizer is not null && !await authorizer.CanInvokeAsync(viewModel, shape, method).ConfigureAwait(true))
+            return Outcome.Fail($"You may not call '{command}'.", RouteableErrorCodes.Unauthorized);
+
+        if (!TryReadArguments(method, arguments, lifetime, out var values, out var error))
+            return Outcome.Fail(error!, RouteableErrorCodes.InvalidArgument);
 
         try
         {
-            var result = method.Invoke(viewModel, values);
-            if (result is Task task)
-                await task.ConfigureAwait(false);
-            return RouteableAck.Ok;
+            var result = method.Method.Invoke(viewModel, BindingFlags.DoNotWrapExceptions, null, values, null);
+            switch (method.Returns)
+            {
+                case CommandReturn.Task:
+                    await ((Task)result!).ConfigureAwait(true);
+                    break;
+                case CommandReturn.ValueTask:
+                    await ((ValueTask)result!).ConfigureAwait(true);
+                    break;
+                case CommandReturn.ValueTaskOf:
+                    await (Task)result!.GetType().GetMethod(nameof(ValueTask<int>.AsTask))!.Invoke(result, null)!;
+                    break;
+            }
+            return Outcome.Ok;
         }
-        catch (TargetInvocationException exception) when (exception.InnerException is not null)
+        catch (Exception exception)
         {
-            return RouteableAck.Fail(exception.InnerException.Message);
+            return Failure(exception);
         }
     }
 
-    /// <summary>Finds the <see cref="ICommand"/> at <paramref name="path"/> in the state of <paramref name="viewModel"/>.</summary>
-    public static ICommand? Resolve(object viewModel, string path)
+    internal async Task<Outcome> SetAsync(object viewModel, string property, JsonElement value, RouteableAuthorizer? authorizer)
     {
-        object? current = viewModel;
-        foreach (var segment in path.Split('.'))
+        ArgumentNullException.ThrowIfNull(viewModel);
+        if (string.IsNullOrEmpty(property) || property.Length > MaxNameLength)
+            return Outcome.Fail("The name of the property is empty or too long.", RouteableErrorCodes.InvalidArgument);
+        if (CheckArgument(value) is { } invalid)
+            return Outcome.Fail(invalid, RouteableErrorCodes.InvalidArgument);
+
+        var shape = _schema.Shape(viewModel.GetType());
+        if (!shape.ByName.TryGetValue(property, out var member) || !member.Settable)
+            return Outcome.Fail($"'{viewModel.GetType().Name}' has no property '{property}' that can be set.", RouteableErrorCodes.NotFound);
+
+        if (authorizer is not null && !await authorizer.CanUseAsync(viewModel, shape, member).ConfigureAwait(true))
+            return Outcome.Fail($"You may not set '{property}'.", RouteableErrorCodes.Unauthorized);
+
+        object? converted;
+        try
         {
-            current = current switch
+            converted = RouteableSchema.FromString(member.Property.PropertyType) is { } fromString && value.ValueKind == JsonValueKind.String
+                ? fromString.Invoke(null, BindingFlags.DoNotWrapExceptions, null, [value.GetString()], null)
+                : value.Deserialize(member.Property.PropertyType, _json);
+        }
+        catch (Exception exception) when (exception is JsonException or NotSupportedException or ArgumentException or InvalidOperationException or FormatException or OverflowException)
+        {
+            return Outcome.Fail($"The value of '{property}' is not a {member.Property.PropertyType.Name}.", RouteableErrorCodes.InvalidArgument);
+        }
+
+        if (converted is null && member.Property.PropertyType.IsValueType && Nullable.GetUnderlyingType(member.Property.PropertyType) is null)
+            return Outcome.Fail($"The value of '{property}' is not a {member.Property.PropertyType.Name}.", RouteableErrorCodes.InvalidArgument);
+
+        try
+        {
+            member.Property.SetMethod!.Invoke(viewModel, BindingFlags.DoNotWrapExceptions, null, [converted], null);
+            return Outcome.Ok;
+        }
+        catch (Exception exception)
+        {
+            return Failure(exception);
+        }
+    }
+
+    /// <summary>Finds the <see cref="ICommand"/> at <paramref name="path"/> in the exposed state of <paramref name="viewModel"/>.</summary>
+    public ICommand? Resolve(object viewModel, string path) => Resolve(viewModel, path, null);
+
+    private ICommand? Resolve(object viewModel, string path, List<(object Owner, TypeShape Shape, StateMember Member)>? traversed)
+    {
+        ArgumentNullException.ThrowIfNull(viewModel);
+        var segments = path.Split('.');
+        if (segments.Length > Options.MaxDepth * 2 + 1)
+            return null;
+
+        object? current = viewModel;
+        foreach (var segment in segments)
+        {
+            switch (current)
             {
-                null => null,
-                IDictionary dictionary => dictionary.Contains(segment) ? dictionary[segment] : null,
-                IList list => int.TryParse(segment, System.Globalization.NumberStyles.None, System.Globalization.CultureInfo.InvariantCulture, out var index) && index < list.Count ? list[index] : null,
-                _ => RouteableStateProjector.StateProperties(current.GetType())
-                        .FirstOrDefault(p => string.Equals(RouteableStateProjector.ClientName(p.Name), segment, StringComparison.Ordinal))?.GetValue(current)
-            };
-            if (current is null)
-                return null;
+                case null:
+                    return null;
+                case ICommand:
+                    return null;   // a path goes on past a command
+                case IDictionary dictionary:
+                    current = dictionary.Contains(segment) ? dictionary[segment] : null;
+                    break;
+                case IList list:
+                    current = int.TryParse(segment, System.Globalization.NumberStyles.None, System.Globalization.CultureInfo.InvariantCulture, out var index) && index < list.Count ? list[index] : null;
+                    break;
+                default:
+                    var shape = _schema.Shape(current.GetType());
+                    if (!shape.ByName.TryGetValue(segment, out var member))
+                        return null;
+                    traversed?.Add((current, shape, member));
+                    current = RouteableStateProjector.TryRead(current, member.Property, out var value) ? value : null;
+                    break;
+            }
         }
         return current as ICommand;
     }
 
-    private static async Task<RouteableAck> InvokeCommandAsync(object viewModel, string path, IReadOnlyList<JsonElement>? arguments)
+    private async Task<Outcome> InvokeCommandAsync(object viewModel, TypeShape shape, string path, IReadOnlyList<JsonElement> arguments, RouteableAuthorizer? authorizer)
     {
+        if (arguments.Count > 1)
+            return Outcome.Fail($"The command '{path}' takes at most one argument, {arguments.Count} given.", RouteableErrorCodes.InvalidArgument);
+
+        var traversed = new List<(object Owner, TypeShape Shape, StateMember Member)>();
         ICommand? command;
-        try { command = Resolve(viewModel, path); }
-        catch (TargetInvocationException exception) { return RouteableAck.Fail(exception.InnerException?.Message ?? exception.Message); }
+        try { command = Resolve(viewModel, path, traversed); }
+        catch (Exception exception) { return Failure(exception); }
 
         if (command is null)
-            return RouteableAck.Fail($"'{viewModel.GetType().Name}' has no command '{path}'.");
+            return Outcome.Fail($"'{viewModel.GetType().Name}' has no command '{path}'.", RouteableErrorCodes.NotFound);
 
-        var parameter = arguments is { Count: > 0 } ? ToParameter(arguments[0]) : null;
-        if (!command.CanExecute(parameter))
-            return RouteableAck.Fail($"The command '{path}' cannot run now.");
+        if (authorizer is not null)
+        {
+            if (!await authorizer.CanSeeAsync(viewModel, shape).ConfigureAwait(true))
+                return Outcome.Fail($"You may not call '{path}'.", RouteableErrorCodes.Unauthorized);
+            foreach (var (owner, ownerShape, member) in traversed)
+                if (!await authorizer.CanUseAsync(owner, ownerShape, member).ConfigureAwait(true))
+                    return Outcome.Fail($"You may not call '{path}'.", RouteableErrorCodes.Unauthorized);
+        }
 
+        var parameter = arguments.Count > 0 ? ToParameter(arguments[0]) : null;
         try
         {
-            // A command that offers ExecuteAsync() (AsyncCommand) is awaited, so that its failure reaches the client: Execute is async void.
-            if (command.GetType().GetMethod("ExecuteAsync", BindingFlags.Public | BindingFlags.Instance, Type.EmptyTypes) is { } execute
-                && typeof(Task).IsAssignableFrom(execute.ReturnType))
-                await ((Task)execute.Invoke(command, null)!).ConfigureAwait(false);
+            if (!command.CanExecute(parameter))
+                return Outcome.Fail($"The command '{path}' cannot run now.", RouteableErrorCodes.Disabled);
+
+            // A command that offers ExecuteAsync (AsyncCommand, AsyncRelayCommand) is awaited, so that its failure reaches the client: Execute is async void.
+            if (FindExecuteAsync(command.GetType(), parameter) is { } execute)
+            {
+                object?[] values = execute.GetParameters().Length == 0 ? [] : [parameter];
+                if (execute.Invoke(command, BindingFlags.DoNotWrapExceptions, null, values, null) is Task task)
+                    await task.ConfigureAwait(true);
+            }
             else
                 command.Execute(parameter);
-            return RouteableAck.Ok;
+            return Outcome.Ok;
         }
-        catch (TargetInvocationException exception) when (exception.InnerException is not null)
+        catch (Exception exception)
         {
-            return RouteableAck.Fail(exception.InnerException.Message);
+            return Failure(exception);
         }
+    }
+
+    private static MethodInfo? FindExecuteAsync(Type type, object? parameter)
+    {
+        foreach (var method in type.GetMethods(BindingFlags.Public | BindingFlags.Instance))
+        {
+            if (method.Name != "ExecuteAsync" || !typeof(Task).IsAssignableFrom(method.ReturnType) || method.IsGenericMethodDefinition)
+                continue;
+            var parameters = method.GetParameters();
+            if (parameters.Length == 0 && parameter is null)
+                return method;
+            if (parameters.Length == 1 && (parameter is null ? !parameters[0].ParameterType.IsValueType || Nullable.GetUnderlyingType(parameters[0].ParameterType) is not null : parameters[0].ParameterType.IsInstanceOfType(parameter)))
+                return method;
+        }
+        return null;
+    }
+
+    private Outcome Failure(Exception exception)
+    {
+        if (exception is TargetInvocationException { InnerException: { } inner })
+            exception = inner;
+
+        return exception switch
+        {
+            OperationCanceledException => new Outcome(RouteableAck.Fail("The command was cancelled.", RouteableErrorCodes.Cancelled), null),
+            RouteableException routeable => new Outcome(RouteableAck.Fail(routeable.Message), null),
+            _ => new Outcome(RouteableAck.Fail(DetailedErrors ? exception.Message : "The command failed."), exception),
+        };
     }
 
     private static object? ToParameter(JsonElement value) => value.ValueKind switch
@@ -97,41 +245,114 @@ public static class RouteableCommandInvoker
         _ => null
     };
 
-    private static bool TryReadArguments(MethodInfo method, IReadOnlyList<JsonElement> arguments, out object?[] values, out string? error)
+    private string? CheckArguments(IReadOnlyList<JsonElement> arguments)
     {
-        var parameters = method.GetParameters();
+        if (arguments.Count > 32)
+            return $"At most 32 arguments can be given, {arguments.Count} given.";
+        foreach (var argument in arguments)
+            if (CheckArgument(argument) is { } error)
+                return error;
+        return null;
+    }
+
+    /// <summary>Checks the size, the number of values and the depth of an argument before anything reads it.</summary>
+    private string? CheckArgument(JsonElement argument)
+    {
+        if (argument.ValueKind == JsonValueKind.Undefined)
+            return "An argument is missing.";
+        if (argument.GetRawText().Length > Options.MaxArgumentLength)
+            return $"An argument is longer than {Options.MaxArgumentLength} characters.";
+
+        var items = 0;
+        var stack = new Stack<(JsonElement Element, int Depth)>();
+        stack.Push((argument, 1));
+        while (stack.Count > 0)
+        {
+            var (element, depth) = stack.Pop();
+            if (depth > Options.MaxArgumentDepth)
+                return $"An argument is nested more than {Options.MaxArgumentDepth} levels deep.";
+            switch (element.ValueKind)
+            {
+                case JsonValueKind.Array:
+                    foreach (var item in element.EnumerateArray())
+                    {
+                        if (++items > Options.MaxArgumentItems)
+                            return $"An argument holds more than {Options.MaxArgumentItems} values.";
+                        stack.Push((item, depth + 1));
+                    }
+                    break;
+                case JsonValueKind.Object:
+                    foreach (var property in element.EnumerateObject())
+                    {
+                        if (++items > Options.MaxArgumentItems)
+                            return $"An argument holds more than {Options.MaxArgumentItems} values.";
+                        stack.Push((property.Value, depth + 1));
+                    }
+                    break;
+            }
+        }
+        return null;
+    }
+
+    private bool TryReadArguments(CommandMember method, IReadOnlyList<JsonElement> arguments, CancellationToken lifetime, out object?[] values, out string? error)
+    {
+        var parameters = method.Parameters;
         values = new object?[parameters.Length];
         error = null;
 
-        if (arguments.Count > parameters.Length)
+        // A CancellationToken parameter is not sent by the client: it is cancelled when the session ends.
+        var sent = parameters.Count(p => p.ParameterType != typeof(CancellationToken));
+        if (arguments.Count > sent)
         {
-            error = $"'{method.Name}' takes {parameters.Length} argument(s), {arguments.Count} given.";
+            error = $"'{method.Method.Name}' takes {sent} argument(s), {arguments.Count} given.";
             return false;
         }
 
+        var next = 0;
         for (var i = 0; i < parameters.Length; i++)
         {
-            if (i >= arguments.Count)
+            var parameter = parameters[i];
+            if (parameter.ParameterType == typeof(CancellationToken))
             {
-                if (!parameters[i].HasDefaultValue)
+                values[i] = lifetime;
+                continue;
+            }
+
+            if (next >= arguments.Count)
+            {
+                if (!parameter.HasDefaultValue)
                 {
-                    error = $"'{method.Name}' needs its '{parameters[i].Name}' argument.";
+                    error = $"'{method.Method.Name}' needs its '{parameter.Name}' argument.";
                     return false;
                 }
-                values[i] = parameters[i].DefaultValue;
+                values[i] = parameter.DefaultValue;
                 continue;
             }
 
             try
             {
-                values[i] = arguments[i].Deserialize(parameters[i].ParameterType, JsonSerializerOptions.Web);
+                values[i] = arguments[next++].Deserialize(parameter.ParameterType, _json);
             }
-            catch (JsonException)
+            catch (Exception exception) when (exception is JsonException or NotSupportedException or ArgumentException or InvalidOperationException or FormatException or OverflowException)
             {
-                error = $"The '{parameters[i].Name}' argument of '{method.Name}' is not a {parameters[i].ParameterType.Name}.";
+                error = $"The '{parameter.Name}' argument of '{method.Method.Name}' is not a {parameter.ParameterType.Name}.";
+                return false;
+            }
+
+            if (values[i] is null && parameter.ParameterType.IsValueType && Nullable.GetUnderlyingType(parameter.ParameterType) is null)
+            {
+                error = $"The '{parameter.Name}' argument of '{method.Method.Name}' is not a {parameter.ParameterType.Name}.";
                 return false;
             }
         }
         return true;
+    }
+
+    /// <summary>What a call gave: the answer, and the exception to log when it is not sent.</summary>
+    internal readonly record struct Outcome(RouteableAck Ack, Exception? Unexpected)
+    {
+        public static Outcome Ok { get; } = new(RouteableAck.Ok, null);
+
+        public static Outcome Fail(string error, string code) => new(RouteableAck.Fail(error, code), null);
     }
 }

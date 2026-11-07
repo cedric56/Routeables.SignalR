@@ -1,4 +1,5 @@
 ﻿using Routeables.Abstraction;
+using Routeables.SignalR;
 using XAnimals.ViewModels;
 using IRouter = Routeables.Abstraction.IRouter;
 
@@ -11,6 +12,7 @@ internal sealed class AnimalsPage;
 /// The detail of a panda on this server. <see cref="PandaDetailViewModel"/> receives the name from a property of the view
 /// (<c>{panda::}</c>), and this server has no view, so the name comes by the constructor, like every other detail.
 /// </summary>
+[RouteableState(Settable = true)]
 internal sealed class PandaDetail : PandaDetailViewModel
 {
     public PandaDetail(IRouter router, string name) : base(router) => Name = name;

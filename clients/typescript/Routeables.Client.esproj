@@ -1,0 +1,16 @@
+<Project Sdk="Microsoft.VisualStudio.JavaScript.Sdk/1.0.6578810">
+
+  <!--
+    Opens @routeables/client in Visual Studio: the sources (src), the tests (test), package.json. It is a library: nothing to start.
+    Build runs "npm run build" (dist). The tests use the test runner of Node (node:test), which the Test Explorer of Visual Studio does
+    not list: run "npm test" from the Task Runner Explorer or a terminal.
+  -->
+  <PropertyGroup>
+    <BuildCommand>npm run build</BuildCommand>
+    <BuildOutputFolder>$(MSBuildProjectDirectory)\dist</BuildOutputFolder>
+    <!-- The CI builds and tests the client with npm: dotnet build leaves it alone. -->
+    <ShouldRunBuildScript Condition="'$(BuildingInsideVisualStudio)' != 'true'">false</ShouldRunBuildScript>
+    <ShouldRunNpmInstall Condition="'$(BuildingInsideVisualStudio)' != 'true'">false</ShouldRunNpmInstall>
+  </PropertyGroup>
+
+</Project>

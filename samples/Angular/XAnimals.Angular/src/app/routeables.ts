@@ -23,7 +23,7 @@ export class Routeables {
   private readonly client = new RouteablesClient(signalRTransport('/routeables'));
   private readonly timers = new Set<number>();
 
-  /** The page the server made current; null before the first one, and while the connection is down. */
+  /** The page the server made current; null before the first one (it stays while the connection is down: the session is resumed). */
   readonly page = signal<Page | null>(null);
   /** The view model of the modal that is open (the note), or null. */
   readonly modal = signal<Page | null>(null);
@@ -57,12 +57,11 @@ export class Routeables {
       }
     });
     this.client.onFailure(failure => this.error.set(failure.message));
+    this.client.onError(error => this.error.set(error.message));
 
-    // The server keeps the view models of a connection: after a reconnection, the page is opened again.
-    this.client.onConnection(connected => {
-      this.connected.set(connected);
-      if (connected) void this.goTo(location.pathname + location.search);
-    });
+    // After a reconnection the client resumes its session on the server: the pages, their state and the dialogs come back. When the
+    // session is gone (the server restarted), the client opens the last page again by itself.
+    this.client.onConnection(connected => this.connected.set(connected));
     addEventListener('popstate', () => void this.goTo(location.pathname + location.search));
   }
 

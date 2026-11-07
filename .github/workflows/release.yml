@@ -1,0 +1,73 @@
+name: Release
+
+# A tag v2.1.0 publishes Routeables.SignalR 2.1.0 to NuGet and @routeables/client 2.1.0 to npm: the two packages always share their version
+# (see VERSIONING.md). The NuGet package depends on the published packages of Routeables (vars.ROUTEABLES_VERSION), not on its sources.
+#
+# Needs: the secret NUGET_API_KEY, the secret NPM_TOKEN, and the variable ROUTEABLES_VERSION (the version of the Routeables packages).
+
+on:
+  push:
+    tags: ['v*.*.*']
+
+permissions:
+  contents: read
+  id-token: write   # npm provenance
+
+env:
+  DOTNET_NOLOGO: true
+  DOTNET_CLI_TELEMETRY_OPTOUT: true
+
+jobs:
+  publish:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    environment: release
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Version from the tag
+        id: version
+        run: echo "value=${GITHUB_REF_NAME#v}" >> "$GITHUB_OUTPUT"
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          registry-url: https://registry.npmjs.org
+
+      - name: Pack Routeables.SignalR against the packages of Routeables
+        run: >
+          dotnet pack src/Routeables.SignalR/Routeables.SignalR.csproj -c Release -o artifacts
+          -p:RouteablesVersion=${{ vars.ROUTEABLES_VERSION }} -p:Version=${{ steps.version.outputs.value }} -p:ContinuousIntegrationBuild=true
+
+      # The package as an application gets it: from a feed, in an empty project, with nothing of this repository around it.
+      - name: Install the NuGet package
+        run: |
+          mkdir "$RUNNER_TEMP/consumer" && cd "$RUNNER_TEMP/consumer"
+          dotnet new web --framework net10.0 --name Consumer --output . > /dev/null
+          dotnet add package Routeables.SignalR --version ${{ steps.version.outputs.value }} --source "$GITHUB_WORKSPACE/artifacts" --source https://api.nuget.org/v3/index.json
+          dotnet build -c Release
+
+      - name: Test the TypeScript client
+        run: npm ci --no-audit --no-fund && npm test
+        working-directory: clients/typescript
+
+      - name: Version the TypeScript client
+        run: npm version ${{ steps.version.outputs.value }} --no-git-tag-version --allow-same-version
+        working-directory: clients/typescript
+
+      - name: Publish to NuGet
+        run: dotnet nuget push "artifacts/*.nupkg" --api-key "${{ secrets.NUGET_API_KEY }}" --source https://api.nuget.org/v3/index.json --skip-duplicate
+
+      - name: Publish to npm
+        run: npm publish --provenance --access public
+        working-directory: clients/typescript
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}

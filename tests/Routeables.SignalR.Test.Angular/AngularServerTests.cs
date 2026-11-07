@@ -32,7 +32,7 @@ internal sealed class AppClient : IRouteableClient
     /// <summary>Pages that became current.</summary>
     public Told<RouteableNavigated> Navigated { get; } = new();
 
-    /// <summary>Property changes that arrived after a page was shown.</summary>
+    /// <summary>Changes that arrived after a page was shown.</summary>
     public Told<RouteableChanged> Changed { get; } = new();
 
     /// <summary>Failed navigations.</summary>
@@ -47,25 +47,70 @@ internal sealed class AppClient : IRouteableClient
     /// <summary>Targets that were closed (for example the modal).</summary>
     public Told<RouteableClosed> Closed { get; } = new();
 
+    /// <summary>Calls that went on and ended.</summary>
+    public Told<RouteableCompleted> Completed { get; } = new();
+
     Task IRouteableClient.Navigated(RouteableNavigated message) { Navigated.Add(message); return Task.CompletedTask; }
     Task IRouteableClient.Changed(RouteableChanged message) { Changed.Add(message); return Task.CompletedTask; }
     Task IRouteableClient.Failed(RouteableFailure message) { Failed.Add(message); return Task.CompletedTask; }
     Task IRouteableClient.DialogRequested(RouteableDialog message) { Dialogs.Add(message); return Task.CompletedTask; }
     Task IRouteableClient.Notified(RouteableToast message) { Toasts.Add(message); return Task.CompletedTask; }
     Task IRouteableClient.Closed(RouteableClosed message) { Closed.Add(message); return Task.CompletedTask; }
+    Task IRouteableClient.Completed(RouteableCompleted message) { Completed.Add(message); return Task.CompletedTask; }
 
-    /// <summary>The state of a target as the app holds it: the page that arrived, with every change since applied.</summary>
+    /// <summary>
+    /// The state of a target as the app holds it: the last page that arrived, with the changes of its generation applied in the order of their
+    /// versions, as @routeables/client does.
+    /// </summary>
     public Dictionary<string, object?> State(string target)
     {
         var page = Navigated.LastOrDefault(n => n.Target == target)
             ?? throw new InvalidOperationException($"Nothing was shown in '{target}'.");
-        var state = new Dictionary<string, object?>(page.State);
-        var after = Navigated.Count(n => n.Target == target);
-        foreach (var change in Changed.Where(c => c.Target == target))
-            state[change.Property] = change.Value;
-        _ = after;
+        var state = (Dictionary<string, object?>)Copy(page.State)!;
+        var expected = 1L;
+        foreach (var change in Changed.Where(c => c.Target == target && c.Generation == page.Generation).OrderBy(c => c.Version))
+        {
+            if (change.Version != expected++)
+                throw new InvalidOperationException($"A change of '{target}' is missing before version {change.Version}.");
+            foreach (var patch in change.Patches)
+                Apply(state, patch);
+        }
         return state;
     }
+
+    private static void Apply(Dictionary<string, object?> state, RouteablePatch patch)
+    {
+        object? parent = state;
+        for (var i = 0; i < patch.Path.Count - 1; i++)
+            parent = Child(parent, patch.Path[i]);
+        var last = patch.Path[^1];
+        if (patch.Op == RouteablePatch.Set)
+        {
+            switch (parent)
+            {
+                case Dictionary<string, object?> map: map[(string)last] = Copy(patch.Value); break;
+                case List<object?> list: list[Convert.ToInt32(last, System.Globalization.CultureInfo.InvariantCulture)] = Copy(patch.Value); break;
+            }
+            return;
+        }
+        var array = (List<object?>)Child(parent, last)!;
+        array.RemoveRange(patch.Index!.Value, patch.Remove!.Value);
+        array.InsertRange(patch.Index.Value, ((IEnumerable<object?>)patch.Value!).Select(Copy));
+    }
+
+    private static object? Child(object? parent, object key) => parent switch
+    {
+        Dictionary<string, object?> map => map[(string)key],
+        List<object?> list => list[Convert.ToInt32(key, System.Globalization.CultureInfo.InvariantCulture)],
+        _ => throw new InvalidOperationException($"No '{key}' in the state.")
+    };
+
+    private static object? Copy(object? value) => value switch
+    {
+        IReadOnlyDictionary<string, object?> map => map.ToDictionary(e => e.Key, e => Copy(e.Value)),
+        IEnumerable<object?> list => list.Select(Copy).ToList(),
+        _ => value
+    };
 
     /// <summary>View-model type name of the page currently shown in the given target.</summary>
     public string ViewModelOf(string target) => Navigated.Last(n => n.Target == target).ViewModel;
@@ -89,7 +134,7 @@ internal sealed class Connection : IAsyncDisposable
     public RouteableSession Session { get; }
 
     /// <summary>Navigates the main router to the given route.</summary>
-    public async Task<RouteableAck> GoToAsync(string route) => await Session.GoToAsync(route);
+    public async Task<RouteableAck> GoToAsync(string route) => await Session.GoToAsync(route, TestContext.Current.CancellationToken);
 
     /// <summary>Calls the command found in the state of a target, as the app does: it gives the path back.</summary>
     public async Task<RouteableAck> RunAsync(string target, string property)
@@ -103,8 +148,8 @@ internal sealed class Connection : IAsyncDisposable
     public Dictionary<string, object?> Token(string target, string property) => (Dictionary<string, object?>)Client.State(target)[property]!;
 
     /// <summary>Sets a property on a target (serialized as JSON).</summary>
-    public RouteableAck Set(string target, string property, object? value)
-        => Session.SetOn(target, property, JsonSerializer.SerializeToElement(value ?? NoValue));
+    public Task<RouteableAck> SetAsync(string target, string property, object? value)
+        => Session.SetOnAsync(target, property, JsonSerializer.SerializeToElement(value ?? NoValue));
 
     /// <summary>Disposes the underlying session.</summary>
     public ValueTask DisposeAsync() => Session.DisposeAsync();
@@ -120,7 +165,7 @@ public class AngularServerTests : IAsyncLifetime
     {
         var services = new ServiceCollection();
         services.AddLogging();
-        services.AddRouteablesSignalR<MainViewModel>(s => s.AddAnimalsForAngular());
+        services.AddRouteablesSignalR<MainViewModel>(s => s.AddAnimalsForAngular(), o => { o.AddAnimalsExposure(); o.DetailedErrors = true; });
         _provider = services.BuildServiceProvider();
         return ValueTask.CompletedTask;
     }
@@ -147,7 +192,7 @@ public class AngularServerTests : IAsyncLifetime
     public async Task The_shell_sends_the_menu_with_a_glyph_and_without_the_pages_this_sample_does_not_serve()
     {
         await using var connection = new Connection(_provider);
-        Assert.True(connection.Session.Watch("$shell").Success);
+        Assert.True((await connection.Session.WatchAsync("$shell")).Success);
         var entries = Entries(connection.Client);
         Assert.Equal(13, entries.Count);
         Assert.Equal("Cats", entries[0]["name"]);
@@ -162,7 +207,7 @@ public class AngularServerTests : IAsyncLifetime
     public async Task Every_entry_of_the_menu_opens_a_page()
     {
         await using var connection = new Connection(_provider);
-        connection.Session.Watch("$shell");
+        await connection.Session.WatchAsync("$shell");
         foreach (var entry in Entries(connection.Client))
         {
             var route = (string)entry["route"]!;
@@ -208,7 +253,7 @@ public class AngularServerTests : IAsyncLifetime
         await using var connection = new Connection(_provider);
         await connection.GoToAsync("/bears");
         var all = ((List<object?>)connection.Client.State("")["filteredAnimals"]!).Count;
-        Assert.True(connection.Set("", "searchText", "polar").Success);
+        Assert.True((await connection.SetAsync("", "searchText", "polar")).Success);
         Assert.True(await EventuallyAsync(() => ((List<object?>)connection.Client.State("")["filteredAnimals"]!).Count < all));
         Assert.True(((List<object?>)connection.Client.State("")["filteredAnimals"]!).Count >= 1);
     }
@@ -230,7 +275,7 @@ public class AngularServerTests : IAsyncLifetime
     public async Task The_theme_command_goes_round_default_light_dark()
     {
         await using var connection = new Connection(_provider);
-        connection.Session.Watch("$shell");
+        await connection.Session.WatchAsync("$shell");
         Assert.Equal("Default", connection.Client.State("$shell")["theme"]);
         foreach (var expected in new[] { "Light", "Dark", "Default" })
         {
@@ -245,8 +290,8 @@ public class AngularServerTests : IAsyncLifetime
     {
         await using var first = new Connection(_provider);
         await using var second = new Connection(_provider);
-        first.Session.Watch("$shell");
-        second.Session.Watch("$shell");
+        await first.Session.WatchAsync("$shell");
+        await second.Session.WatchAsync("$shell");
         await first.RunAsync("$shell", "themeCommand");
         Assert.True(await EventuallyAsync(() => Equals(first.Client.State("$shell")["theme"], "Light")));
         Assert.Equal("Default", second.Client.State("$shell")["theme"]);
@@ -265,7 +310,7 @@ public class AngularServerTests : IAsyncLifetime
         Assert.Equal("message", dialog.Kind);
         Assert.Equal(2, dialog.Buttons.Count);
         Assert.Equal("Yes", dialog.Buttons[0]);
-        Assert.True(connection.Session.Answer(dialog.Id, 0).Success);
+        Assert.True((await connection.Session.AnswerAsync(dialog.Id, 0)).Success);
         // The properties of a page arrive one by one: the result can come before hasResult.
         Assert.True(await EventuallyAsync(() => Equals(connection.Client.State("")["result"], "Answer: Yes.")
             && Equals(connection.Client.State("")["hasResult"], true)));
@@ -286,7 +331,7 @@ public class AngularServerTests : IAsyncLifetime
         {
             Assert.True((await connection.RunAsync("", commands[i])).Success, commands[i]);
             Assert.Equal(i + 1, connection.Client.Dialogs.Count);
-            Assert.True(connection.Session.Answer(connection.Client.Dialogs[i].Id, 0).Success, commands[i]);
+            Assert.True((await connection.Session.AnswerAsync(connection.Client.Dialogs[i].Id, 0)).Success, commands[i]);
             Assert.True(await EventuallyAsync(() => Equals(connection.Client.State("")["hasResult"], true)), commands[i]);
         }
         Assert.Contains(connection.Client.Dialogs, d => d.Kind == "content");
@@ -303,7 +348,7 @@ public class AngularServerTests : IAsyncLifetime
         var toast = Assert.Single(connection.Client.Toasts);
         Assert.Equal("Warning", toast.Type);
         Assert.Equal(6, toast.ExpirationSeconds);
-        Assert.True(connection.Session.Dismiss(toast.Id, click: true).Success);
+        Assert.True((await connection.Session.DismissAsync(toast.Id, click: true)).Success);
         Assert.True(await EventuallyAsync(() => ((string)connection.Client.State("")["result"]!).Contains("notification", StringComparison.Ordinal)));
     }
 
@@ -321,7 +366,7 @@ public class AngularServerTests : IAsyncLifetime
         var save = (Dictionary<string, object?>)((Dictionary<string, object?>)commands[0]!)["command"]!;
         Assert.Equal(false, save["canExecute"]);
         Assert.False((await connection.Session.InvokeOnAsync(RouteableTargets.Modal, (string)save["$command"]!, [])).Success);
-        Assert.True(connection.Set(RouteableTargets.Modal, "note", "Hello Angular").Success);
+        Assert.True((await connection.SetAsync(RouteableTargets.Modal, "note", "Hello Angular")).Success);
         Assert.True(await EventuallyAsync(() => Equals(connection.Client.State(RouteableTargets.Modal)["note"], "Hello Angular")));
         Assert.True(await EventuallyAsync(() =>
         {
@@ -354,7 +399,7 @@ public class AngularServerTests : IAsyncLifetime
     public async Task The_history_page_pushes_pages_into_its_region_and_goes_back_and_forward()
     {
         await using var connection = new Connection(_provider);
-        connection.Session.Watch("history");
+        await connection.Session.WatchAsync("history");
         await connection.GoToAsync("/history");
         Assert.True(await EventuallyAsync(() => connection.Client.Navigated.Any(n => n.Target == "history")));
         var entries = () => ((List<object?>)connection.Client.State("")["entries"]!).Count;
@@ -374,7 +419,7 @@ public class AngularServerTests : IAsyncLifetime
     {
         await using var connection = new Connection(_provider);
         await connection.GoToAsync("/history");
-        Assert.True(connection.Set("", "transition", "Fade").Success);
+        Assert.True((await connection.SetAsync("", "transition", "Fade")).Success);
         Assert.True(await EventuallyAsync(() => Equals(connection.Client.State("")["transition"], "Fade")));
         Assert.Contains("Fade", ((List<object?>)connection.Client.State("")["transitions"]!).Cast<string>());
     }
@@ -384,9 +429,9 @@ public class AngularServerTests : IAsyncLifetime
     public async Task A_page_that_cannot_be_left_refuses_and_the_app_is_told()
     {
         await using var connection = new Connection(_provider);
-        connection.Session.Watch("history");
+        await connection.Session.WatchAsync("history");
         await connection.GoToAsync("/history");
-        Assert.True(connection.Set("", "blockLeaving", true).Success);
+        Assert.True((await connection.SetAsync("", "blockLeaving", true)).Success);
         Assert.True(await EventuallyAsync(() => Equals(connection.Client.State("")["blockLeaving"], true)));
         var ack = await connection.GoToAsync("/cats");
         Assert.False(ack.Success);
@@ -400,7 +445,7 @@ public class AngularServerTests : IAsyncLifetime
         await using var connection = new Connection(_provider);
         var regions = new[] { LayoutController.Header, LayoutController.Footer, LayoutController.LeftPanel, LayoutController.Content };
         foreach (var region in regions)
-            Assert.True(connection.Session.Watch(region).Success, region);
+            Assert.True((await connection.Session.WatchAsync(region)).Success, region);
         await connection.GoToAsync("/regions");
         foreach (var region in regions)
             Assert.True(await EventuallyAsync(() => connection.Client.Navigated.Any(n => n.Target == region)), region);
@@ -418,7 +463,7 @@ public class AngularServerTests : IAsyncLifetime
     {
         await using var connection = new Connection(_provider);
         foreach (var region in new[] { LayoutController.Header, LayoutController.Footer, LayoutController.LeftPanel, LayoutController.Content })
-            connection.Session.Watch(region);
+            await connection.Session.WatchAsync(region);
         await connection.GoToAsync("/regions");
         Assert.True(await EventuallyAsync(() => connection.Client.Navigated.Any(n => n.Target == LayoutController.Content)));
         Assert.True((await connection.RunAsync("", "creditsCommand")).Success);
@@ -443,7 +488,7 @@ public class AngularServerTests : IAsyncLifetime
     public async Task The_tabs_show_their_route_in_the_region_of_the_page()
     {
         await using var connection = new Connection(_provider);
-        connection.Session.Watch(TabsViewModel.Region);
+        await connection.Session.WatchAsync(TabsViewModel.Region);
         await connection.GoToAsync("/tabs");
         Assert.True((await connection.Session.GoToInAsync(TabsViewModel.Region, "dogs", TestContext.Current.CancellationToken)).Success);
         Assert.Equal(nameof(DogsViewModel), connection.Client.ViewModelOf(TabsViewModel.Region));
@@ -458,7 +503,7 @@ public class AngularServerTests : IAsyncLifetime
     public async Task Adopting_a_pet_adds_its_card_to_the_pets_and_releasing_removes_it()
     {
         await using var connection = new Connection(_provider);
-        connection.Session.Watch("$pets");
+        await connection.Session.WatchAsync("$pets");
         await connection.GoToAsync("/adopt");
         Assert.Empty((List<object?>)connection.Client.State("$pets")["pets"]!);
         var choices = (List<object?>)connection.Client.State("")["choices"]!;
@@ -534,7 +579,7 @@ public class AngularServerTests : IAsyncLifetime
     public async Task A_lock_disables_the_menu_until_the_page_unlocks_it()
     {
         await using var connection = new Connection(_provider);
-        connection.Session.Watch("$shell");
+        await connection.Session.WatchAsync("$shell");
         await connection.GoToAsync("/features");
         Assert.Equal(false, connection.Client.State("$shell")["isLocked"]);
         Assert.True((await connection.RunAsync("", "lockCommand")).Success);
@@ -551,7 +596,7 @@ public class AngularServerTests : IAsyncLifetime
     public async Task A_lock_for_some_seconds_returns_at_once_and_ends_by_itself()
     {
         await using var connection = new Connection(_provider);
-        connection.Session.Watch("$shell");
+        await connection.Session.WatchAsync("$shell");
         await connection.GoToAsync("/features");
         var started = DateTime.UtcNow;
         Assert.True((await connection.RunAsync("", "lockForCommand")).Success);

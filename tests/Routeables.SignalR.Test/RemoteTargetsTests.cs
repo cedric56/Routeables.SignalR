@@ -26,12 +26,13 @@ public sealed class TestCommand(Func<Task> run, Func<bool>? can = null) : IComma
     public void Raise() => CanExecuteChanged?.Invoke(this, EventArgs.Empty);
 }
 
+[RouteableState]
 public sealed class NoteModalViewModel : ICloseableViewModel<string>
 {
     public NoteModalViewModel() => SaveCommand = new TestCommand(() => CloseAsync("saved"));
 
     public ICommand SaveCommand { get; }
-    public string Text { get; set; } = string.Empty;
+    [RouteableState(Settable = true)] public string Text { get; set; } = string.Empty;
     public string Title => "Note";
     public ObservableCollection<RouteableCommand> Commands { get; } = [];
     public ICommand? CloseCommand => null;
@@ -39,8 +40,10 @@ public sealed class NoteModalViewModel : ICloseableViewModel<string>
     public Task CloseAsync(string? value) { CloseRequested?.Invoke(this, value); return Task.CompletedTask; }
 }
 
+[RouteableState]
 public sealed record ShopItem(string Name, ICommand BuyCommand);
 
+[RouteableState]
 public sealed class ShopViewModel : INotifyPropertyChanged
 {
     private readonly IRouteableDialogService _dialogs;
@@ -70,7 +73,7 @@ public sealed class ShopViewModel : INotifyPropertyChanged
     public ICommand NotifyCommand { get; }
     public ICommand ModalCommand { get; }
     public int Bought { get; private set; }
-    public string Result { get => _result; set { _result = value; Raise(); } }
+    [RouteableState(Settable = true)] public string Result { get => _result; set { _result = value; Raise(); } }
 
     public void AddItem() { Items.Add(new ShopItem("coffee", new TestCommand(() => { Bought++; return Task.CompletedTask; }))); _checkout.Raise(); }
 
@@ -81,6 +84,7 @@ public sealed class ShopViewModel : INotifyPropertyChanged
     private void Raise([CallerMemberName] string? name = null) => PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(name));
 }
 
+[RouteableState]
 public sealed class MenuViewModel
 {
     public string Title => "Menu";
@@ -93,6 +97,7 @@ public sealed class Mode(string name)
     public static implicit operator Mode(string name) => new(name);
 }
 
+[RouteableState(Settable = true)]
 public sealed class ModeViewModel : INotifyPropertyChanged
 {
     private Mode _mode = "Fast";
@@ -107,9 +112,7 @@ public class RemoteTargetsTests
 
     private static ServiceProvider Services()
     {
-        var services = new ServiceCollection();
-        services.AddLogging();
-        services.AddRouteablesSignalR();
+        var services = TestSchema.Services();
         services.RegisterRoute<ShopView, ShopViewModel>(route: "/shop");
         services.RegisterRoute<NoteModalView, NoteModalViewModel>();
         services.AddRegion("side");
@@ -126,19 +129,14 @@ public class RemoteTargetsTests
         return (provider, client, session, (ShopViewModel)session.Current!);
     }
 
-    private static async Task<bool> EventuallyAsync(Func<bool> condition)
-    {
-        for (var i = 0; i < 200 && !condition(); i++)
-            await Task.Delay(10, TestContext.Current.CancellationToken);
-        return condition();
-    }
+    private static Task<bool> EventuallyAsync(Func<bool> condition) => TestSchema.EventuallyAsync(condition);
 
     [Fact]
     public void A_command_of_the_state_is_sent_as_a_token_with_its_path()
     {
         var shop = new ShopViewModel(null!, null!, null!);
 
-        var state = RouteableStateProjector.Project(shop);
+        var state = TestSchema.Projector.Project(shop);
 
         var checkout = (Dictionary<string, object?>)state["checkoutCommand"]!;
         Assert.Equal("checkoutCommand", checkout["$command"]);
@@ -154,12 +152,12 @@ public class RemoteTargetsTests
     {
         var shop = new ShopViewModel(null!, null!, null!);
 
-        Assert.True((await RouteableCommandInvoker.InvokeAsync(shop, "items.0.buyCommand", null)).Success);
+        Assert.True((await TestSchema.Invoker.InvokeAsync(shop, "items.0.buyCommand", null)).Success);
         Assert.Equal(1, shop.Bought);
 
-        Assert.False((await RouteableCommandInvoker.InvokeAsync(shop, "checkoutCommand", null)).Success);   // disabled
-        Assert.False((await RouteableCommandInvoker.InvokeAsync(shop, "items.7.buyCommand", null)).Success);
-        Assert.False((await RouteableCommandInvoker.InvokeAsync(shop, "bought", null)).Success);           // not a command
+        Assert.False((await TestSchema.Invoker.InvokeAsync(shop, "checkoutCommand", null)).Success);   // disabled
+        Assert.False((await TestSchema.Invoker.InvokeAsync(shop, "items.7.buyCommand", null)).Success);
+        Assert.False((await TestSchema.Invoker.InvokeAsync(shop, "bought", null)).Success);           // not a command
         Assert.Equal(1, shop.Bought);
     }
 
@@ -201,9 +199,9 @@ public class RemoteTargetsTests
         Assert.Equal("No", dialog.Buttons[1]);
         Assert.Equal(string.Empty, shop.Result);
 
-        Assert.False(session.Answer("nobody", 0).Success);
-        Assert.False(session.Answer(dialog.Id, 5).Success);
-        Assert.True(session.Answer(dialog.Id, 1).Success);
+        Assert.False((await session.AnswerAsync("nobody", 0)).Success);
+        Assert.False((await session.AnswerAsync(dialog.Id, 5)).Success);
+        Assert.True((await session.AnswerAsync(dialog.Id, 1)).Success);
 
         // The value is set, then told: wait for what the client receives.
         Assert.True(await EventuallyAsync(() => client.Changed.Any(c => c.Property == "result" && Equals(c.Value, "answer False"))));
@@ -223,9 +221,9 @@ public class RemoteTargetsTests
         Assert.Equal("Success", toast.Type);
         Assert.Equal(5, toast.ExpirationSeconds);
 
-        Assert.True(session.Dismiss(toast.Id, click: true).Success);
+        Assert.True((await session.DismissAsync(toast.Id, click: true)).Success);
         Assert.Equal("clickedclosed", shop.Result);
-        Assert.False(session.Dismiss(toast.Id, click: false).Success);
+        Assert.False((await session.DismissAsync(toast.Id, click: false)).Success);
     }
 
     [Fact]
@@ -242,7 +240,7 @@ public class RemoteTargetsTests
         Assert.Equal("Note", page.State["title"]);
 
         // The modal is edited and closed through its own target.
-        Assert.True(session.SetOn(RouteableTargets.Modal, "text", Json("\"abc\"")).Success);
+        Assert.True((await session.SetOnAsync(RouteableTargets.Modal, "text", Json("\"abc\""))).Success);
         Assert.True((await session.InvokeOnAsync(RouteableTargets.Modal, "saveCommand", [])).Success);
 
         Assert.True(await EventuallyAsync(() => shop.Result == "note saved"));
@@ -257,11 +255,11 @@ public class RemoteTargetsTests
         var client = new RecordingClient();
         await using var session = new RouteableSession(provider, client);
 
-        Assert.True(session.Watch("$menu").Success);
+        Assert.True((await session.WatchAsync("$menu")).Success);
         var menu = Assert.Single(client.Navigated, n => n.Target == "$menu");
         Assert.Equal("Menu", menu.State["title"]);
 
-        Assert.True(session.Watch("side").Success);
+        Assert.True((await session.WatchAsync("side")).Success);
         Assert.DoesNotContain(client.Navigated, n => n.Target == "side");   // nothing shown yet
         Assert.True((await session.GoToInAsync("side", "/shop", TestContext.Current.CancellationToken)).Success);
         var page = Assert.Single(client.Navigated, n => n.Target == "side");
@@ -271,48 +269,46 @@ public class RemoteTargetsTests
         Assert.Null(session.Current);
         Assert.True((await session.InvokeOnAsync("side", "items.0.buyCommand", [])).Success);
 
-        Assert.False(session.Watch("$unknown").Success);
-        Assert.False(session.Watch("nowhere").Success);
+        Assert.False((await session.WatchAsync("$unknown")).Success);
+        Assert.False((await session.WatchAsync("nowhere")).Success);
         Assert.False((await session.InvokeOnAsync("never-watched", "x", [])).Success);
         Assert.False((await session.GoToInAsync("nowhere", "/shop", TestContext.Current.CancellationToken)).Success);
 
-        Assert.True(session.Unwatch("side").Success);
+        Assert.True((await session.UnwatchAsync("side")).Success);
         Assert.False((await session.InvokeOnAsync("side", "items.0.buyCommand", [])).Success);
     }
 
     [Fact]
-    public async Task A_client_can_not_watch_more_than_the_limit()
+    public async Task A_client_can_not_watch_more_than_the_limit_even_when_it_asks_all_at_once()
     {
-        var services = new ServiceCollection();
-        services.AddLogging();
-        services.AddRouteablesSignalR();
-        for (var i = 0; i < RouteableSession.MaxTargets + 2; i++)
+        const int max = 5;
+        var services = TestSchema.Services(o => o.MaxTargets = max);
+        for (var i = 0; i < max + 2; i++)
             services.AddRegion("r" + i);
         await using var provider = services.BuildServiceProvider();
         await using var session = new RouteableSession(provider, new RecordingClient());
 
-        var results = Enumerable.Range(0, RouteableSession.MaxTargets + 2).Select(i => session.Watch("r" + i).Success).ToList();
+        // Asked from several threads at once: the check and the add are one step on the dispatcher of the session.
+        var results = await Task.WhenAll(Enumerable.Range(0, max + 2).Select(i => Task.Run(() => session.WatchAsync("r" + i), TestContext.Current.CancellationToken)));
 
-        Assert.Equal(RouteableSession.MaxTargets - 1, results.Count(r => r));   // the main page takes one place
-        Assert.False(results[^1]);
+        Assert.Equal(max, results.Count(r => r.Success));   // the main page and the modal do not count
+        Assert.All(results.Where(r => !r.Success), r => Assert.Equal(RouteableErrorCodes.Limit, r.Code));
     }
 
     [Fact]
     public async Task A_value_that_is_a_name_is_sent_and_set_as_a_string()
     {
         var viewModel = new ModeViewModel();
-        Assert.Equal("Fast", RouteableStateProjector.Project(viewModel)["mode"]);
+        Assert.Equal("Fast", TestSchema.Projector.Project(viewModel)["mode"]);
 
-        var services = new ServiceCollection();
-        services.AddLogging();
-        services.AddRouteablesSignalR();
+        var services = TestSchema.Services();
         services.RegisterRoute<ShopView, ModeViewModel>(route: "/mode");
         await using var provider = services.BuildServiceProvider();
         var client = new RecordingClient();
         await using var session = new RouteableSession(provider, client);
         Assert.True((await session.GoToAsync("/mode", TestContext.Current.CancellationToken)).Success);
 
-        Assert.True(session.SetOn(RouteableTargets.Page, "mode", Json("\"Slow\"")).Success);
+        Assert.True((await session.SetOnAsync(RouteableTargets.Page, "mode", Json("\"Slow\""))).Success);
         Assert.Equal("Slow", ((ModeViewModel)session.Current!).Mode.ToString());
         Assert.True(await EventuallyAsync(() => client.Changed.Any(c => c.Property == "mode" && Equals(c.Value, "Slow"))));
     }

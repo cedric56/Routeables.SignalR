@@ -4,13 +4,24 @@
     <File Path="Directory.Build.targets" />
     <File Path="global.json" />
     <File Path="README.md" />
+    <File Path="CHANGELOG.md" />
+    <File Path="SECURITY.md" />
+    <File Path="VERSIONING.md" />
+    <File Path="Routeables.SignalR.slnLaunch" />
+  </Folder>
+  <Folder Name="/.github/">
+    <File Path=".github/workflows/ci.yml" />
+    <File Path=".github/workflows/release.yml" />
   </Folder>
   <Folder Name="/clients/">
-    <File Path="clients/typescript/README.md" />
+    <!-- @routeables/client, for Visual Studio. dotnet build skips it: the CI builds and tests it with npm. -->
+    <Project Path="clients/typescript/Routeables.Client.esproj" />
   </Folder>
   <Folder Name="/samples/">
     <Project Path="samples/Angular/XAnimals.AngularServer/XAnimals.AngularServer.csproj" />
-    <Project Path="samples/SignalR/CounterServer/CounterServer.csproj" />
+    <!-- The front ends, for Visual Studio. dotnet build skips them: the CI builds them with npm. -->
+    <Project Path="samples/Angular/XAnimals.Angular/XAnimals.Angular.esproj" />
+    <Project Path="samples/Vue/XAnimals.Vue/XAnimals.Vue.esproj" />
     <File Path="samples/Angular/README.md" />
     <File Path="samples/Vue/README.md" />
   </Folder>
@@ -20,5 +31,7 @@
   <Folder Name="/tests/">
     <Project Path="tests/Routeables.SignalR.Test/Routeables.SignalR.Test.csproj" />
     <Project Path="tests/Routeables.SignalR.Test.Angular/Routeables.SignalR.Test.Angular.csproj" />
+    <Project Path="tests/Routeables.SignalR.E2E.Server/Routeables.SignalR.E2E.Server.csproj" />
+    <File Path="tests/e2e/e2e.test.mjs" />
   </Folder>
 </Solution>

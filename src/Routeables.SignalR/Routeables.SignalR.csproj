@@ -8,16 +8,27 @@
     <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
 
     <Description>Serves Routeables view models to a browser front end (Angular, Vue or any JavaScript client) over SignalR.</Description>
+    <!-- The view models are read by reflection: say it to an application that trims or compiles ahead of time. -->
+    <IsTrimmable>false</IsTrimmable>
+    <IsAotCompatible>false</IsAotCompatible>
   </PropertyGroup>
 
   <ItemGroup>
     <FrameworkReference Include="Microsoft.AspNetCore.App" />
   </ItemGroup>
 
-  <ItemGroup>
+  <!--
+    Routeables: its sources, checked out next to this repository (RouteablesRoot), while it is developed; its packages when RouteablesVersion
+    is given (dotnet pack -p:RouteablesVersion=2.0.0), so that the package of Routeables.SignalR depends on published packages only.
+  -->
+  <ItemGroup Condition="'$(RouteablesVersion)' == ''">
     <ProjectReference Include="$(RouteablesRoot)src\Routeables.Core\Routeables.Core.csproj" />
     <ProjectReference Include="$(RouteablesRoot)src\Routeables.Abstraction\Routeables.Abstraction.csproj" />
     <ProjectReference Include="$(RouteablesRoot)src\Routeables.Segments\Routeables.Segments.csproj" />
+  </ItemGroup>
+  <ItemGroup Condition="'$(RouteablesVersion)' != ''">
+    <PackageReference Include="Routeables" Version="$(RouteablesVersion)" />
+    <PackageReference Include="Routeables.Abstraction" Version="$(RouteablesVersion)" />
   </ItemGroup>
 
   <ItemGroup>

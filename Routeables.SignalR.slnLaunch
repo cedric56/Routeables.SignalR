@@ -1,0 +1,45 @@
+[
+  {
+    "Name": "Angular + server",
+    "Projects": [
+      {
+        "Path": "samples\\Angular\\XAnimals.AngularServer\\XAnimals.AngularServer.csproj",
+        "Action": "Start"
+      },
+      {
+        "Path": "samples\\Angular\\XAnimals.Angular\\XAnimals.Angular.esproj",
+        "Action": "Start"
+      }
+    ]
+  },
+  {
+    "Name": "Vue + server",
+    "Projects": [
+      {
+        "Path": "samples\\Angular\\XAnimals.AngularServer\\XAnimals.AngularServer.csproj",
+        "Action": "Start"
+      },
+      {
+        "Path": "samples\\Vue\\XAnimals.Vue\\XAnimals.Vue.esproj",
+        "Action": "Start"
+      }
+    ]
+  },
+  {
+    "Name": "Angular + Vue + server",
+    "Projects": [
+      {
+        "Path": "samples\\Angular\\XAnimals.AngularServer\\XAnimals.AngularServer.csproj",
+        "Action": "Start"
+      },
+      {
+        "Path": "samples\\Angular\\XAnimals.Angular\\XAnimals.Angular.esproj",
+        "Action": "Start"
+      },
+      {
+        "Path": "samples\\Vue\\XAnimals.Vue\\XAnimals.Vue.esproj",
+        "Action": "Start"
+      }
+    ]
+  }
+]

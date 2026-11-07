@@ -30,6 +30,12 @@ Open http://localhost:5173. Use the side panel; reload on `/dogs/Afghan%20Hound`
 
 `npm run build` checks the types (`vue-tsc`) and builds the app into `dist`.
 
+## In Visual Studio
+
+Open `Routeables.SignalR.slnx`: the app is the project `XAnimals.Vue` (`XAnimals.Vue.esproj`, the JavaScript project system of Visual Studio). Choose the launch profile **Vue + server** in the toolbar (it comes from `Routeables.SignalR.slnLaunch`) and press F5: Visual Studio starts XAnimals.AngularServer on http://localhost:5090, runs `npm start` and opens http://localhost:5173 in Edge or Chrome with the debugger attached (`.vscode/launch.json`). It runs `npm install` when `node_modules` is missing. **Angular + Vue + server** starts both apps against the same server.
+
+Visual Studio 2022 17.14 or later (or Visual Studio 2026) with the "Node.js development" or "ASP.NET and web development" workload, and Node.js 22.
+
 ## What is worth reading
 
 - `src/routeables.ts`: the connection as refs, the address bar that follows the page, the dialogs and the notifications. It is the file to compare with `routeables.ts` of the Angular sample: a `signal` is a `shallowRef`, the rest is the same.
@@ -42,6 +48,6 @@ The app imports `@routeables/client` from `clients/typescript/src` (see `vite.co
 ## Limits
 
 - The photos come from the same web addresses as in the other samples.
-- A connection is a session: the server forgets the view models when it closes, and the app opens the page again after a reconnection.
-- With several servers, SignalR needs sticky sessions (or a backplane).
+- A connection is a session: when it drops, the server keeps the view models for 30 seconds and the client resumes them (the page, its state, the dialog that waits). After that, the client opens the last page again on a new session.
+- With several servers, a client must always reach the same one (sticky sessions); a backplane does not help, a session lives on one server.
 - The Birds module has no page here, and the notification of the operating system ("System") is a notification of the page.

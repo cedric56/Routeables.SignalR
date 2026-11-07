@@ -31,7 +31,7 @@ function savedDrawerClosed(): boolean {
  * the view models the server registered (`$shell` is the menu, `$pets` the cards of the Adopt page).
  */
 export const routeables = {
-  /** The page the server made current; null before the first one, and while the connection is down. */
+  /** The page the server made current; null before the first one (it stays while the connection is down: the session is resumed). */
   page: shallowRef<Page | null>(null),
   /** The view model of the modal that is open (the note), or null. */
   modal: shallowRef<Page | null>(null),
@@ -133,10 +133,9 @@ client.subscribeToasts(toasts => {
   }
 });
 client.onFailure(failure => (routeables.error.value = failure.message));
+client.onError(error => (routeables.error.value = error.message));
 
-// The server keeps the view models of a connection: after a reconnection, the page is opened again.
-client.onConnection(connected => {
-  routeables.connected.value = connected;
-  if (connected) void routeables.goTo(location.pathname + location.search);
-});
+// After a reconnection the client resumes its session on the server: the pages, their state and the dialogs come back. When the
+// session is gone (the server restarted), the client opens the last page again by itself.
+client.onConnection(connected => (routeables.connected.value = connected));
 addEventListener('popstate', () => void routeables.goTo(location.pathname + location.search));

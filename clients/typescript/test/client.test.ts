@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
-import { MODAL, PAGE, RouteablesClient, isCommand } from '../src/index.js';
-import type { Ack, Dialog, RouteableTransport, ServerMessages, ServerMethod, Toast } from '../src/index.js';
+import { MODAL, PAGE, PROTOCOL, RouteablesClient, apply, isCommand } from '../src/index.js';
+import type { Ack, Dialog, NavigatedMessage, RouteableTransport, ServerMessages, ServerMethod, Toast, Welcome } from '../src/index.js';
 
 /** A transport the test drives by hand: what the client calls is recorded, what the server tells is `server`. */
 class FakeTransport implements RouteableTransport {
@@ -9,14 +9,19 @@ class FakeTransport implements RouteableTransport {
   server!: ServerMessages;
   private connection: (connected: boolean) => void = () => {};
   reply: Ack = { success: true };
+  replies = new Map<ServerMethod, Ack>();
+  welcome: Welcome = { success: true, protocol: PROTOCOL, session: 's1', resumed: false };
+  unreachable = false;
 
   async start(handlers: ServerMessages): Promise<void> {
     this.server = handlers;
   }
   async stop(): Promise<void> {}
-  async call(method: ServerMethod, ...args: unknown[]): Promise<Ack> {
+  async call<T>(method: ServerMethod, ...args: unknown[]): Promise<T> {
     this.calls.push({ method, args });
-    return this.reply;
+    if (this.unreachable) throw new Error('Not connected.');
+    if (method === 'Hello') return this.welcome as T;
+    return (this.replies.get(method) ?? this.reply) as T;
   }
   onConnectionChange(handler: (connected: boolean) => void): void {
     this.connection = handler;
@@ -29,16 +34,20 @@ class FakeTransport implements RouteableTransport {
   }
 }
 
-async function connected(): Promise<{ client: RouteablesClient; transport: FakeTransport }> {
+async function connected(options?: ConstructorParameters<typeof RouteablesClient>[1]): Promise<{ client: RouteablesClient; transport: FakeTransport }> {
   const transport = new FakeTransport();
-  const client = new RouteablesClient(transport);
+  const client = new RouteablesClient(transport, options);
   await client.connect();
   return { client, transport };
 }
 
-const page = (route: string, state: Record<string, unknown> = {}, target?: string) => ({
-  route, viewModel: 'CatsViewModel', state, commands: ['go'], target,
+const tick = () => new Promise(resolve => setTimeout(resolve, 0));
+
+let generation = 0;
+const page = (route: string, state: Record<string, unknown> = {}, target?: string, instance = ++generation): NavigatedMessage => ({
+  route, viewModel: 'CatsViewModel', state, commands: ['go'], target, generation: ++generation, instance,
 });
+const set = (property: string, value: unknown) => ({ op: 'set' as const, path: [property], value });
 
 describe('the page of the main router', () => {
   it('is null before the first page, then what the server navigated to', async () => {
@@ -52,38 +61,84 @@ describe('the page of the main router', () => {
     assert.equal(shown?.viewModel, 'CatsViewModel');
     assert.equal(shown?.target, PAGE);
     assert.deepEqual(shown?.commands, ['go']);
+    assert.equal(shown?.version, 0);
   });
 
   it('changes state with a new object, and keeps the sequence', async () => {
     const { client, transport } = await connected();
-    transport.server.navigated(page('/cats', { searchText: '', count: 1 }));
+    const cats = page('/cats', { searchText: '', count: 1 });
+    transport.server.navigated(cats);
     const before = client.page!;
 
-    transport.server.changed({ property: 'searchText', value: 'abys' });
+    transport.server.changed({ target: PAGE, generation: cats.generation, version: 1, patches: [set('searchText', 'abys')] });
 
     assert.notEqual(client.page, before);
     assert.notEqual(client.page!.state, before.state);
     assert.equal(client.page!.state['searchText'], 'abys');
     assert.equal(client.page!.state['count'], 1);
     assert.equal(client.page!.sequence, before.sequence);
+    assert.equal(client.page!.version, 1);
   });
 
-  it('gets another sequence when another page arrives', async () => {
+  it('gets another sequence when another page arrives, and keeps it when the same page is sent again', async () => {
     const { client, transport } = await connected();
-    transport.server.navigated(page('/cats'));
-    const first = client.page!.sequence;
+    const first = page('/cats');
+    transport.server.navigated(first);
+    const sequence = client.page!.sequence;
+
+    transport.server.navigated({ ...first, generation: first.generation + 1 });   // a resync: the same instance
+    assert.equal(client.page!.sequence, sequence);
 
     transport.server.navigated(page('/cats'));
-
-    assert.notEqual(client.page!.sequence, first);
+    assert.notEqual(client.page!.sequence, sequence);
   });
 
   it('ignores a change when there is no page', async () => {
     const { client, transport } = await connected();
 
-    transport.server.changed({ property: 'x', value: 1 });
+    transport.server.changed({ target: PAGE, generation: 1, version: 1, patches: [set('x', 1)] });
 
     assert.equal(client.page, null);
+  });
+
+  it('never applies a change of a page that was left to the page that replaced it', async () => {
+    const { client, transport } = await connected();
+    const cats = page('/cats', { title: 'cats' });
+    const dogs = page('/dogs', { title: 'dogs' });
+    transport.server.navigated(cats);
+    transport.server.navigated(dogs);
+
+    transport.server.changed({ target: PAGE, generation: cats.generation, version: 1, patches: [set('title', 'late cats')] });
+    transport.server.navigated(cats);   // an older page arriving late
+
+    assert.equal(client.page!.route, '/dogs');
+    assert.equal(client.page!.state['title'], 'dogs');
+  });
+
+  it('asks the state again when a change is missing, and only once', async () => {
+    const { client, transport } = await connected();
+    const cats = page('/cats', { n: 0 });
+    transport.server.navigated(cats);
+
+    transport.server.changed({ target: PAGE, generation: cats.generation, version: 2, patches: [set('n', 2)] });
+    transport.server.changed({ target: PAGE, generation: cats.generation, version: 3, patches: [set('n', 3)] });
+
+    assert.equal(client.page!.state['n'], 0);
+    assert.deepEqual(transport.called('Resync'), [['']]);
+    transport.server.navigated({ ...cats, generation: cats.generation + 1, state: { n: 3 } });
+    assert.equal(client.page!.state['n'], 3);
+  });
+
+  it('ignores a change it already applied', async () => {
+    const { client, transport } = await connected();
+    const cats = page('/cats', { n: 0 });
+    transport.server.navigated(cats);
+    transport.server.changed({ target: PAGE, generation: cats.generation, version: 1, patches: [set('n', 1)] });
+
+    transport.server.changed({ target: PAGE, generation: cats.generation, version: 1, patches: [set('n', 99)] });
+
+    assert.equal(client.page!.state['n'], 1);
+    assert.deepEqual(transport.called('Resync'), []);
   });
 
   it('tells the subscribers now and at every change, until they stop', async () => {
@@ -100,6 +155,28 @@ describe('the page of the main router', () => {
   });
 });
 
+describe('patches', () => {
+  it('sets a value at a path without changing the objects it came from', () => {
+    const state = { items: [{ name: 'a' }, { name: 'b' }], title: 't' };
+
+    const next = apply(state, { op: 'set', path: ['items', 1, 'name'], value: 'B' });
+
+    assert.deepEqual(next, { items: [{ name: 'a' }, { name: 'B' }], title: 't' });
+    assert.equal(state.items[1]!.name, 'b');
+    assert.equal((next['items'] as unknown[])[0], state.items[0]);   // what did not change is shared
+  });
+
+  it('removes and inserts items of an array', () => {
+    const state = { words: ['a', 'b', 'c'] };
+
+    let next = apply(state, { op: 'splice', path: ['words'], index: 1, remove: 1, value: ['x', 'y'] });
+    next = apply(next, { op: 'splice', path: ['words'], index: 0, remove: 0, value: ['first'] });
+
+    assert.deepEqual(next['words'], ['first', 'a', 'x', 'y', 'c']);
+    assert.deepEqual(state.words, ['a', 'b', 'c']);
+  });
+});
+
 describe('what the user does', () => {
   it('goes to a route, calls a command, sets a property', async () => {
     const { client, transport } = await connected();
@@ -111,6 +188,21 @@ describe('what the user does', () => {
     assert.deepEqual(transport.called('GoTo'), [['/cats']]);
     assert.deepEqual(transport.called('Invoke'), [['go', [1, 'two']]]);
     assert.deepEqual(transport.called('Set'), [['searchText', 'abys']]);
+  });
+
+  it('says hello first, in its protocol', async () => {
+    const { transport } = await connected();
+
+    assert.equal(transport.calls[0]!.method, 'Hello');
+    assert.deepEqual(transport.called('Hello'), [[{ protocol: PROTOCOL, resume: null }]]);
+  });
+
+  it('refuses to go on with a server of another protocol', async () => {
+    const transport = new FakeTransport();
+    transport.welcome = { success: false, protocol: 3, session: null, resumed: false, error: 'update' };
+    const client = new RouteablesClient(transport);
+
+    await assert.rejects(client.connect(), /update/);
   });
 
   it('always sends the arguments of a command, an empty list when there are none', async () => {
@@ -128,6 +220,33 @@ describe('what the user does', () => {
     transport.reply = { success: false, error: 'no' };
 
     assert.deepEqual(await client.goTo('/x'), { success: false, error: 'no' });
+  });
+
+  it('waits for the end of a call that goes on, even when the end arrives first', async () => {
+    const { client, transport } = await connected();
+    transport.replies.set('Invoke', { success: true, pending: true, operation: 'op1' });
+
+    const call = client.invoke('ask');
+    await tick();
+    transport.server.completed({ operation: 'op1', success: false, error: 'refused', code: 'failed' });
+    assert.deepEqual(await call, { success: false, error: 'refused', code: 'failed' });
+
+    transport.replies.set('Invoke', { success: true, pending: true, operation: 'op2' });
+    transport.server.completed({ operation: 'op2', success: true });
+    assert.deepEqual(await client.invoke('ask'), { success: true, error: undefined, code: undefined });
+  });
+
+  it('answers a failure, and tells it, when the call does not reach the server', async () => {
+    const { client, transport } = await connected();
+    const errors: string[] = [];
+    client.onError(e => errors.push(`${e.method}:${e.code}`));
+    transport.unreachable = true;
+
+    const ack = await client.invoke('go');
+
+    assert.equal(ack.success, false);
+    assert.equal(ack.code, 'transport');
+    assert.deepEqual(errors, ['Invoke:transport']);
   });
 
   it('goes to a route in a region, and in the main router for the empty target', async () => {
@@ -169,9 +288,22 @@ describe('targets', () => {
     assert.deepEqual(transport.called('Watch'), [['history']]);
 
     first();
+    first();   // stopping twice does not stop the other subscriber
     assert.deepEqual(transport.called('Unwatch'), []);
     second();
     assert.deepEqual(transport.called('Unwatch'), [['history']]);
+  });
+
+  it('tells when a watch is refused', async () => {
+    const { client, transport } = await connected();
+    const errors: string[] = [];
+    client.onError(e => errors.push(`${e.method}:${e.target}:${e.code}`));
+    transport.replies.set('Watch', { success: false, error: 'At most 24 targets can be watched.', code: 'limit' });
+
+    client.subscribeTo('r25', () => {});
+    await tick();
+
+    assert.deepEqual(errors, ['Watch:r25:limit']);
   });
 
   it('does not ask to watch the main page nor the modal', async () => {
@@ -189,8 +321,9 @@ describe('targets', () => {
     client.subscribeTo('side', p => regions.push(p?.route));
 
     transport.server.navigated(page('/cats', { a: 1 }));
-    transport.server.navigated(page('/dogs', { b: 2 }, 'side'));
-    transport.server.changed({ property: 'b', value: 3, target: 'side' });
+    const side = page('/dogs', { b: 2 }, 'side');
+    transport.server.navigated(side);
+    transport.server.changed({ target: 'side', generation: side.generation, version: 1, patches: [set('b', 3)] });
 
     assert.equal(client.page!.route, '/cats');
     assert.equal(client.pageOf('side')!.route, '/dogs');
@@ -215,11 +348,24 @@ describe('targets', () => {
     const seen: (string | undefined)[] = [];
     client.subscribeTo(MODAL, p => seen.push(p?.viewModel));
 
-    transport.server.navigated({ route: '', viewModel: 'NoteViewModel', state: { note: '' }, commands: [], target: MODAL });
-    transport.server.closed({ target: MODAL });
+    const modal = { ...page('', { note: '' }, MODAL), viewModel: 'NoteViewModel' };
+    transport.server.navigated(modal);
+    transport.server.closed({ target: MODAL, generation: modal.generation });
 
     assert.deepEqual(seen, [undefined, 'NoteViewModel', undefined]);
     assert.equal(client.pageOf(MODAL), null);
+  });
+
+  it('does not close a page with the close of an older one', async () => {
+    const { client, transport } = await connected();
+    const first = page('', {}, MODAL);
+    const second = page('', {}, MODAL);
+    transport.server.navigated(first);
+    transport.server.navigated(second);
+
+    transport.server.closed({ target: MODAL, generation: first.generation });
+
+    assert.notEqual(client.pageOf(MODAL), null);
   });
 
   it('sets a property of a target', async () => {
@@ -235,18 +381,34 @@ describe('dialogs and notifications', () => {
   const dialog: Dialog = { id: 'd1', kind: 'message', title: 'T', header: null, body: 'B', footer: null, showProgress: false, buttons: ['Yes', 'No'] };
   const toast: Toast = { id: 7, title: 'Saved', message: 'ok', type: 'Success', expirationSeconds: 6 };
 
-  it('keeps the dialogs that wait, in order, and removes the one that was answered', async () => {
+  it('keeps the dialogs that wait, in order, and removes the one the server took the answer of', async () => {
     const { client, transport } = await connected();
     const counts: number[] = [];
     client.subscribeDialogs(d => counts.push(d.length));
 
     transport.server.dialogRequested(dialog);
     transport.server.dialogRequested({ ...dialog, id: 'd2' });
+    transport.server.dialogRequested(dialog);   // sent again by a resumed session
     await client.answer(dialog, 1);
 
     assert.deepEqual(counts, [0, 1, 2, 1]);
     assert.deepEqual(client.dialogs.map(d => d.id), ['d2']);
     assert.deepEqual(transport.called('Answer'), [['d1', 1]]);
+  });
+
+  it('keeps a dialog whose answer did not reach the server, and drops one the server does not know', async () => {
+    const { client, transport } = await connected();
+    transport.server.dialogRequested(dialog);
+    transport.server.dialogRequested({ ...dialog, id: 'd2' });
+
+    transport.unreachable = true;
+    assert.equal((await client.answer(dialog, 0)).success, false);
+    assert.deepEqual(client.dialogs.map(d => d.id), ['d1', 'd2']);
+
+    transport.unreachable = false;
+    transport.replies.set('Answer', { success: false, error: 'No such dialog is waiting for an answer.', code: 'not-found' });
+    await client.answer({ ...dialog, id: 'd2' }, 0);
+    assert.deepEqual(client.dialogs.map(d => d.id), ['d1']);
   });
 
   it('keeps the notifications and tells when one is closed or clicked', async () => {
@@ -261,30 +423,80 @@ describe('dialogs and notifications', () => {
     assert.equal(client.toasts.length, 0);
     assert.deepEqual(transport.called('Dismiss'), [[7, true], [8, false]]);
   });
+
+  it('keeps a notification whose dismissal did not reach the server', async () => {
+    const { client, transport } = await connected();
+    transport.server.notified(toast);
+    transport.unreachable = true;
+
+    await client.dismiss(toast);
+
+    assert.equal(client.toasts.length, 1);
+  });
 });
 
 describe('the connection', () => {
-  it('forgets what was shown when the connection drops, and watches the targets again when it comes back', async () => {
+  it('keeps what is shown while the connection is down, and resumes the session when it comes back', async () => {
     const { client, transport } = await connected();
     client.subscribeTo('history', () => {});
     transport.server.navigated(page('/cats'));
-    transport.server.navigated(page('/dogs', {}, 'history'));
     transport.server.dialogRequested({ id: 'd', kind: 'message', title: 'T', header: null, body: null, footer: null, showProgress: false, buttons: [] });
-    transport.server.notified({ id: 1, title: 'T', message: 'M', type: 'Information', expirationSeconds: null });
     const states: boolean[] = [];
     client.onConnection(c => states.push(c));
 
     transport.changeConnection(false);
+    assert.equal(client.isConnected, false);
+    assert.equal(client.page!.route, '/cats');
 
-    assert.equal(client.page, null);
-    assert.equal(client.pageOf('history'), null);
-    assert.equal(client.dialogs.length, 0);
-    assert.equal(client.toasts.length, 0);
-
+    transport.welcome = { success: true, protocol: PROTOCOL, session: 's1', resumed: true };
     transport.changeConnection(true);
+    await tick();
 
     assert.deepEqual(states, [false, true]);
+    assert.deepEqual(transport.called('Hello').at(-1), [{ protocol: PROTOCOL, resume: 's1' }]);
+    assert.equal(client.page!.route, '/cats');
+    assert.equal(client.dialogs.length, 1);
+    assert.deepEqual(transport.called('Watch'), [['history']]);   // the resumed session watches it already
+    assert.deepEqual(transport.called('GoTo'), []);
+  });
+
+  it('starts again from the last route when the session could not be resumed', async () => {
+    const { client, transport } = await connected();
+    client.subscribeTo('history', () => {});
+    transport.server.navigated(page('/cats'));
+    transport.server.notified({ id: 1, title: 'T', message: 'M', type: 'Information', expirationSeconds: null });
+    transport.replies.set('Invoke', { success: true, pending: true, operation: 'op9' });
+    const waiting = client.invoke('slow');
+    await tick();
+    const lost: (string | null)[] = [];
+    client.onSessionLost(r => lost.push(r.lastRoute));
+
+    transport.changeConnection(false);
+    transport.welcome = { success: true, protocol: PROTOCOL, session: 's2', resumed: false };
+    transport.changeConnection(true);
+    await tick();
+
+    assert.deepEqual(lost, ['/cats']);
+    assert.equal((await waiting).code, 'session-lost');
+    assert.equal(client.page, null);
+    assert.equal(client.toasts.length, 0);
     assert.deepEqual(transport.called('Watch'), [['history'], ['history']]);
+    assert.deepEqual(transport.called('GoTo'), [['/cats']]);
+  });
+
+  it('lets the application recover by itself', async () => {
+    const recovered: (string | null)[] = [];
+    const { client, transport } = await connected({ recover: r => { recovered.push(r.lastRoute); } });
+    transport.server.navigated(page('/dogs'));
+
+    transport.changeConnection(false);
+    transport.welcome = { success: true, protocol: PROTOCOL, session: 's2', resumed: false };
+    transport.changeConnection(true);
+    await tick();
+
+    assert.deepEqual(recovered, ['/dogs']);
+    assert.deepEqual(transport.called('GoTo'), []);
+    assert.equal(client.isConnected, true);
   });
 
   it('tells the failures of the server', async () => {
