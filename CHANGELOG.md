@@ -44,10 +44,11 @@ The first version meant for production. It changes the protocol (2) and some def
 ### Build and distribution
 
 - Builds against the current Routeables (`GetEntries` / `IMenuEntry`); the CI pins the revision of Routeables (`ROUTEABLES_REF`).
+- The CounterServer sample is removed: the Angular and Vue samples show the library.
 - `-p:RouteablesVersion=…` builds and packs against the Routeables packages; a release workflow publishes the NuGet and npm packages from a tag, after installing the NuGet package in an empty application.
 - `npm ci` with lockfiles; the npm package is packed and installed in an empty project in the CI.
 - End-to-end tests over a real Kestrel and SignalR server, driven by the client from Node.
-- The Angular and Vue samples open in Visual Studio (`XAnimals.Angular.esproj`, `XAnimals.Vue.esproj`), with shared launch profiles that start the server and the apps (`Routeables.SignalR.slnLaunch`). `dotnet build` of the solution skips them.
+- The Angular and Vue samples and the TypeScript client open in Visual Studio (`XAnimals.Angular.esproj`, `XAnimals.Vue.esproj`, `Routeables.Client.esproj`), with shared launch profiles that start the server and the apps (`Routeables.SignalR.slnLaunch`). Outside Visual Studio they run neither `npm install` nor their build.
 - The package is marked not trimmable; `AddRouteablesSignalR` carries `[RequiresUnreferencedCode]` and `[RequiresDynamicCode]`.
 
 ### Breaking changes

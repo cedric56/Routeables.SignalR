@@ -1,4 +1,19 @@
 <Solution>
+  <Folder Name="/samples/Angular/">
+    <File Path="samples/Angular/README.md" />
+    <Project Path="samples/Angular/XAnimals.Angular/XAnimals.Angular.esproj">
+      <Build />
+      <Deploy />
+    </Project>
+    <Project Path="samples/Angular/XAnimals.AngularServer/XAnimals.AngularServer.csproj" />
+  </Folder>
+  <Folder Name="/samples/Vue/">
+    <File Path="samples/Vue/README.md" />
+    <Project Path="samples/Vue/XAnimals.Vue/XAnimals.Vue.esproj">
+      <Build />
+      <Deploy />
+    </Project>
+  </Folder>
   <Folder Name="/Solution Items/">
     <File Path="Directory.Build.props" />
     <File Path="Directory.Build.targets" />
@@ -14,17 +29,13 @@
     <File Path=".github/workflows/release.yml" />
   </Folder>
   <Folder Name="/clients/">
-    <!-- @routeables/client, for Visual Studio. dotnet build skips it: the CI builds and tests it with npm. -->
-    <Project Path="clients/typescript/Routeables.Client.esproj" />
+    <!-- @routeables/client, for Visual Studio. Outside Visual Studio the project runs neither npm install nor its build: the CI builds and tests it with npm. -->
+    <Project Path="clients/typescript/Routeables.Client.esproj">
+      <Build />
+      <Deploy />
+    </Project>
   </Folder>
-  <Folder Name="/samples/">
-    <Project Path="samples/Angular/XAnimals.AngularServer/XAnimals.AngularServer.csproj" />
-    <!-- The front ends, for Visual Studio. dotnet build skips them: the CI builds them with npm. -->
-    <Project Path="samples/Angular/XAnimals.Angular/XAnimals.Angular.esproj" />
-    <Project Path="samples/Vue/XAnimals.Vue/XAnimals.Vue.esproj" />
-    <File Path="samples/Angular/README.md" />
-    <File Path="samples/Vue/README.md" />
-  </Folder>
+  <Folder Name="/samples/" />
   <Folder Name="/src/">
     <Project Path="src/Routeables.SignalR/Routeables.SignalR.csproj" />
   </Folder>

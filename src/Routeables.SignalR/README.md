@@ -169,4 +169,4 @@ builder.Services.AddOpenTelemetry()
 - **No trimming, no Native AOT.** The view models are read by reflection (cached per type): `AddRouteablesSignalR` carries `[RequiresUnreferencedCode]` and `[RequiresDynamicCode]`, and the package is marked not trimmable.
 - **Messages from the browser.** SignalR limits a message to 32 KiB by default (`HubOptions.MaximumReceiveMessageSize`); the limits above apply within it.
 
-The client is in [clients/typescript](../../clients/typescript). The sample is [samples/SignalR/CounterServer](../../samples/SignalR/CounterServer). Security: [SECURITY.md](../../SECURITY.md).
+The client is in [clients/typescript](../../clients/typescript). The samples are [samples/Angular](../../samples/Angular) (with its server, XAnimals.AngularServer) and [samples/Vue](../../samples/Vue). Security: [SECURITY.md](../../SECURITY.md).
