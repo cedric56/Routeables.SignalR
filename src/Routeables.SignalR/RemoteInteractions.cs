@@ -14,6 +14,10 @@ public sealed class RemoteInteractions : IDisposable
 
     private sealed record Toast(Action? OnClick, Action? OnClose);
 
+    // The notifications the client may still close or click. A client that never says it closed them (a notification that does not expire,
+    // a client of its own) cannot make the session grow: beyond this, the oldest ones are forgotten (their callbacks are not called).
+    private const int MaxOpenToasts = 64;
+
     private readonly ConcurrentDictionary<string, Pending> _dialogs = new(StringComparer.Ordinal);
     private readonly ConcurrentDictionary<int, Toast> _toasts = new();
     private int _nextDialog;
@@ -28,8 +32,8 @@ public sealed class RemoteInteractions : IDisposable
     /// <summary>A modal view model is open: the client shows it as a page of the target <see cref="RouteableTargets.Modal"/>.</summary>
     public event Action<object>? ModalOpened;
 
-    /// <summary>The modal view model closed.</summary>
-    public event Action? ModalClosed;
+    /// <summary>A modal view model closed (the one given; a modal opened from another one closes before it, or after it).</summary>
+    public event Action<object>? ModalClosed;
 
     /// <summary>How many dialogs wait for an answer.</summary>
     public int PendingCount => _dialogs.Count;
@@ -61,7 +65,8 @@ public sealed class RemoteInteractions : IDisposable
         if (id is null || !_dialogs.TryGetValue(id, out var pending))
             return false;
 
-        if (index < 0 || (pending.Dialog.Buttons.Count > 0 && index >= pending.Dialog.Buttons.Count))
+        // A dialog without buttons is closed, its answer is 0: the view model never receives a button that was not offered.
+        if (index < 0 || index >= Math.Max(1, pending.Dialog.Buttons.Count))
             return false;
 
         return pending.Answer.TrySetResult(index);
@@ -75,6 +80,8 @@ public sealed class RemoteInteractions : IDisposable
     {
         var id = Interlocked.Increment(ref _nextToast);
         _toasts[id] = new Toast(onClick, onClose);
+        while (_toasts.Count > MaxOpenToasts)
+            _toasts.TryRemove(_toasts.Keys.Min(), out _);
         ToastRequested?.Invoke(new RouteableToast(id, title, message, type.ToString(), expiration?.TotalSeconds));
     }
 
@@ -101,7 +108,7 @@ public sealed class RemoteInteractions : IDisposable
         ModalOpened?.Invoke(viewModel);
         RouteableInvocation.Current?.Asked();
         try { return await closed.Task; }
-        finally { ModalClosed?.Invoke(); }
+        finally { ModalClosed?.Invoke(viewModel); }
     }
 
     /// <inheritdoc />

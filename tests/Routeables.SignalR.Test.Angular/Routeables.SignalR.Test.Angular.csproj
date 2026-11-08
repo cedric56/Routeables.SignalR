@@ -27,7 +27,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\..\samples\Angular\XAnimals.AngularServer\XAnimals.AngularServer.csproj" />
+    <ProjectReference Include="..\..\samples\Angular\XAnimals.AngularServer\XAnimals.Server.csproj" />
     <ProjectReference Include="..\..\src\Routeables.SignalR\Routeables.SignalR.csproj" />
   </ItemGroup>
 

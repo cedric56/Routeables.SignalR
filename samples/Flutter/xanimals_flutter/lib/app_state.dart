@@ -1,5 +1,3 @@
-import 'dart:async';
-
 import 'package:flutter/foundation.dart';
 import 'package:routeables_client/routeables_client.dart' as rt;
 
@@ -33,13 +31,7 @@ class AppState extends ChangeNotifier {
     client.subscribeTo(r'$shell', (shell) => _update(() => this.shell = shell));
     client.subscribeDialogs((dialogs) => _update(() => this.dialogs = dialogs));
     client.subscribeToasts((toasts) {
-      _update(() => this.toasts = toasts);
-      // A notification closes by itself after its time.
-      for (final toast in toasts) {
-        final seconds = toast.expirationSeconds;
-        if (seconds == null || !_timers.add(toast.id)) continue;
-        Timer(Duration(milliseconds: (seconds * 1000).round()), () => dismiss(toast, false));
-      }
+      _update(() => this.toasts = toasts); // the client closes a notification after its time
     });
     client.onFailure((failure) => _update(() => error = failure.message));
     client.onError((failure) => _update(() => error = failure.message));
@@ -49,7 +41,6 @@ class AppState extends ChangeNotifier {
   }
 
   final rt.RouteablesClient client;
-  final Set<int> _timers = {};
 
   /// The page the server made current; null before the first one (it stays while the connection is down: the session is resumed).
   rt.Page? page;
@@ -114,7 +105,6 @@ class AppState extends ChangeNotifier {
 
   /// Closes a notification, or tells that the user clicked it.
   Future<void> dismiss(rt.Toast toast, bool click) {
-    _timers.remove(toast.id);
     return client.dismiss(toast, click: click);
   }
 }

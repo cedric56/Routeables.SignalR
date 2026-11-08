@@ -21,7 +21,6 @@ export type State = any;
 export class Routeables {
   // /routeables is the hub of Routeables.SignalR: `ng serve` proxies it to the server (proxy.conf.json).
   private readonly client = new RouteablesClient(signalRTransport('/routeables'));
-  private readonly timers = new Set<number>();
 
   /** The page the server made current; null before the first one (it stays while the connection is down: the session is resumed). */
   readonly page = signal<Page | null>(null);
@@ -48,13 +47,7 @@ export class Routeables {
     this.client.subscribeTo(MODAL, modal => this.modal.set(modal));
     this.client.subscribeDialogs(dialogs => this.dialogs.set(dialogs));
     this.client.subscribeToasts(toasts => {
-      this.toasts.set(toasts);
-      // A notification closes by itself after its time.
-      for (const toast of toasts) {
-        if (toast.expirationSeconds === null || this.timers.has(toast.id)) continue;
-        this.timers.add(toast.id);
-        setTimeout(() => void this.dismiss(toast, false), toast.expirationSeconds * 1000);
-      }
+      this.toasts.set(toasts);   // the client closes a notification after its time
     });
     this.client.onFailure(failure => this.error.set(failure.message));
     this.client.onError(error => this.error.set(error.message));
@@ -135,7 +128,6 @@ export class Routeables {
 
   /** Closes a notification, or tells that the user clicked it. */
   async dismiss(toast: Toast, click: boolean): Promise<void> {
-    this.timers.delete(toast.id);
     await this.client.dismiss(toast, click);
   }
 }

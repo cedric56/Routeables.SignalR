@@ -1,5 +1,6 @@
 ﻿using System.Diagnostics.CodeAnalysis;
 using Microsoft.AspNetCore.Builder;
+using Microsoft.AspNetCore.Http.Connections;
 using Microsoft.AspNetCore.Routing;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
@@ -97,9 +98,13 @@ public static class Extensions
     /// </summary>
     /// <param name="endpoints">The endpoint route builder.</param>
     /// <param name="pattern">The address of the hub, <c>/routeables</c> by default.</param>
-    public static HubEndpointConventionBuilder MapRouteables(this IEndpointRouteBuilder endpoints, string pattern = "/routeables")
+    /// <param name="options">
+    /// The options of the connections, such as <c>CloseOnAuthenticationExpiration = true</c> (the connection closes when the cookie or the token
+    /// of the user expires; the client reconnects with a new one).
+    /// </param>
+    public static HubEndpointConventionBuilder MapRouteables(this IEndpointRouteBuilder endpoints, string pattern = "/routeables", Action<HttpConnectionDispatcherOptions>? options = null)
     {
         ArgumentNullException.ThrowIfNull(endpoints);
-        return endpoints.MapHub<RouteablesHub>(pattern);
+        return endpoints.MapHub<RouteablesHub>(pattern, options ?? (static _ => { }));
     }
 }

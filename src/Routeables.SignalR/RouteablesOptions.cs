@@ -80,6 +80,18 @@ public sealed class RouteablesOptions
     public TimeSpan ReconnectGracePeriod { get; set; } = TimeSpan.FromSeconds(30);
 
     /// <summary>
+    /// How many sessions may wait for their client at once, on this server. Beyond, the one that waits for the longest is disposed: a client
+    /// that opens and drops connections in a loop cannot fill the memory. Only a session whose client said <c>Hello</c> waits. 10 000 by default.
+    /// </summary>
+    public int MaxDetachedSessions { get; set; } = 10_000;
+
+    /// <summary>
+    /// How many sessions of one authenticated user may wait for their client at once (tabs, devices). Beyond, the one that waits for the longest
+    /// is disposed. Anonymous sessions are counted by <see cref="MaxDetachedSessions"/> only. 16 by default.
+    /// </summary>
+    public int MaxDetachedSessionsPerUser { get; set; } = 16;
+
+    /// <summary>
     /// Whether the message of an exception thrown by a view model is sent to the client. When <see langword="null"/> (the default), it is sent
     /// in the Development environment only; elsewhere the client gets a generic message and the exception is logged. The message of a
     /// <see cref="RouteableException"/> is always sent.
@@ -115,6 +127,8 @@ public sealed class RouteablesOptions
         AtLeast(nameof(MaxArgumentItems), MaxArgumentItems, 1);
         AtLeast(nameof(MaxArgumentDepth), MaxArgumentDepth, 1);
         AtLeast(nameof(MaxPendingMessages), MaxPendingMessages, 1);
+        AtLeast(nameof(MaxDetachedSessions), MaxDetachedSessions, 0);
+        AtLeast(nameof(MaxDetachedSessionsPerUser), MaxDetachedSessionsPerUser, 1);
         if (MaxDepth > 64)
             problems.Add($"MaxDepth is {MaxDepth}: it must be 64 or less (a state is read recursively).");
         if (MaxStateNodes >= 1 && MaxCollectionItems > MaxStateNodes)

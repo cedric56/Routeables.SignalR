@@ -31,6 +31,16 @@ jobs:
         id: version
         run: echo "value=${GITHUB_REF_NAME#v}" >> "$GITHUB_OUTPUT"
 
+      # The tag must name the version the sources say: v2.1.0 or v2.1.0-beta.1 for VersionPrefix 2.1.0 and package.json 2.1.0.
+      - name: The tag matches the version of the sources
+        run: |
+          tag="${{ steps.version.outputs.value }}"
+          prefix=$(sed -n 's:.*<VersionPrefix>\(.*\)</VersionPrefix>.*:\1:p' Directory.Build.props)
+          npm=$(node -p "require('./clients/typescript/package.json').version")
+          echo "tag $tag, VersionPrefix $prefix, package.json $npm"
+          [ "${tag%%-*}" = "$prefix" ] || { echo "::error::The tag $tag does not match VersionPrefix $prefix (Directory.Build.props)."; exit 1; }
+          [ "${tag%%-*}" = "${npm%%-*}" ] || { echo "::error::The tag $tag does not match the version of @routeables/client ($npm)."; exit 1; }
+
       - name: Setup .NET
         uses: actions/setup-dotnet@v4
         with:
@@ -41,6 +51,11 @@ jobs:
         with:
           node-version: 22
           registry-url: https://registry.npmjs.org
+
+      # The tests of the server, against the published packages of Routeables that the package will depend on: what passed in the CI against
+      # the pinned sources of Routeables must pass against them too, or nothing is published.
+      - name: Test the server against the packages of Routeables
+        run: dotnet test tests/Routeables.SignalR.Test -c Release -p:RouteablesVersion=${{ vars.ROUTEABLES_VERSION }}
 
       - name: Pack Routeables.SignalR against the packages of Routeables
         run: >

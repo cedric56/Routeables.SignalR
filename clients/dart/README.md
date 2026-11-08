@@ -49,6 +49,10 @@ The modal is a page of the target `modalTarget`; it becomes `null` when it close
 
 When the connection drops, the pages stay and `onConnection(false)` is told. When it comes back, the client says `Hello` with the token of its session and the server resumes it: the pages are sent again (same `sequence`), the dialogs that wait come back, and the calls that were running complete when they end — the client names them in `Hello`, so an end told while the connection was gone is told again (`code: 'lost'` if the server forgot it). When the server cannot resume it, what was shown is cleared, the calls that waited complete with `code: 'session-lost'`, `onSessionLost` is told, and the main router goes back to the last route (pass `recover:` to do something else, or `recoverAutomatically: false`).
 
+When the SignalR client stops retrying, the client does not reconnect by itself and the calls that wait keep waiting: call `connect()` again (the session is resumed and they end, or they end as `session-lost`). `disconnect()` is for an application that is done: the calls that wait complete with `code: 'disconnected'`. A notification that has an expiration is dismissed by the client after it (`expireToasts: false` leaves it to the application).
+
+The package is not published on pub.dev yet (`publish_to: none`): depend on it by path or by git (`git: { url: https://github.com/cedric56/Routeables.SignalR.git, path: clients/dart }`).
+
 ## Transport
 
 `RouteableTransport` is what the client needs from a connection. `SignalRTransport` uses [signalr_netcore](https://pub.dev/packages/signalr_netcore) (MIT): WebSockets, Server-Sent Events or long polling, automatic reconnection (`retryDelays`), and `accessTokenFactory` for a hub that requires authorization. The SignalR client for Dart does not send a `null` argument: a property is set to `null` only inside a list or a map. `applyPatch(state, patch)` is exported for a transport or a test that applies the patches itself.

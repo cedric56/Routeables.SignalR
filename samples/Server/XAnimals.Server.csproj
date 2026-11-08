@@ -7,9 +7,9 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\..\..\src\Routeables.SignalR\Routeables.SignalR.csproj" />
-    <ProjectReference Include="$(RouteablesRoot)samples\Bases\XAnimals.Common\XAnimals.Common.csproj" />
     <ProjectReference Include="$(RouteablesRoot)samples\Bases\XAnimals.ViewModels\XAnimals.ViewModels.csproj" />
+    <ProjectReference Include="$(RouteablesRoot)samples\Bases\XAnimals.ViewModels\XAnimals.Common.csproj" />
+    <ProjectReference Include="..\..\src\Routeables.SignalR\Routeables.SignalR.csproj" />
   </ItemGroup>
 
   <ItemGroup>

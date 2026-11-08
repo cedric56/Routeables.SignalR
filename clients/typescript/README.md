@@ -51,6 +51,10 @@ The modal is a page of the target `MODAL` (`client.subscribeTo(MODAL, ...)`); it
 
 When the connection drops, the pages stay on screen and `onConnection(false)` is told. When it comes back, the client says `Hello` with the token of its session and the server resumes it: the pages are sent again (same `sequence`: components are kept), the dialogs that wait come back, and the calls that were running resolve when they end — the client names them in `Hello`, so an end told while the connection was gone is told again (`{ code: 'lost' }` if the server forgot it).
 
+The SignalR client retries a few times (`withAutomaticReconnect`), then gives up: the client does not reconnect by itself, and the calls that wait keep waiting. Call `connect()` again (on a button, on `online`, on a timer): the session is resumed if the server still keeps it and the calls end then, or they end as `session-lost`. `disconnect()` is for an application that is done: the calls that wait resolve `{ code: 'disconnected' }`.
+
+A notification that has an expiration is dismissed by the client after it; `new RouteablesClient(transport, { expireToasts: false })` leaves it to the application.
+
 When the server cannot resume it (the grace period ended, the server restarted), the view models are new: what was shown is cleared, the calls that waited resolve `{ code: 'session-lost' }`, `onSessionLost` is told, and the main router goes back to the last route. Pass `recover` to do something else:
 
 ```ts

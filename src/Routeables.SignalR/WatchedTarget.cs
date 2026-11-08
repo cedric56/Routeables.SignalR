@@ -467,8 +467,11 @@ internal sealed class WatchedTarget : IDisposable
                 RouteablePatches.Add(patches, pending.Patch);
                 continue;
             }
-            if (!RouteableStateProjector.TryRead(viewModel, pending.Member.Property, out var value))
+            if (!RouteableStateProjector.TryRead(viewModel, pending.Member.Property, out var value, out var failure))
+            {
+                Report(RouteableStateProjector.ReadFailure(pending.Member.Name, failure!));
                 continue;
+            }
             var projected = _session.Projector.ProjectAt(pending.Member.Name, pending.Member.Name, value, depth: 1, issue => Report(issue), _guard);
             RouteablePatches.Add(patches, new RouteablePatch(RouteablePatch.Set, [pending.Member.Name], projected));
         }
@@ -496,8 +499,20 @@ internal sealed class WatchedTarget : IDisposable
             return;
         }
 
-        if (_reported.Add(issue.Property + "|" + issue.Code))
-            _session.Report(new RouteableFailure(_route, issue.Message, Name, issue.Code));
+        if (!_reported.Add(issue.Property + "|" + issue.Code))
+            return;
+        // What a getter threw may say more than the visitor should know (a connection string, a table): its message is sent in Development only,
+        // or when it is a RouteableException, meant for the visitor. The server logs it.
+        var message = issue.Message;
+        if (issue.Exception is { } exception)
+        {
+            _session.LogProjectionFailure(exception, Name, issue.Property);
+            if (!_session.DetailedErrors && exception is not RouteableException)
+                message = $"'{issue.Property}' could not be read.";
+            else if (exception is RouteableException)
+                message = exception.Message;
+        }
+        _session.Report(new RouteableFailure(_route, message, Name, issue.Code));
     }
 
     public void Dispose()

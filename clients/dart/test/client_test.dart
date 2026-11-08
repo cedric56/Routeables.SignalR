@@ -37,9 +37,9 @@ class FakeTransport implements RouteableTransport {
   List<List<Object?>> called(String method) => [for (final (name, args) in calls) if (name == method) args];
 }
 
-Future<(RouteablesClient, FakeTransport)> connected({Future<void> Function(Recovery)? recover}) async {
+Future<(RouteablesClient, FakeTransport)> connected({Future<void> Function(Recovery)? recover, bool expireToasts = true}) async {
   final transport = FakeTransport();
-  final client = RouteablesClient(transport, recover: recover);
+  final client = RouteablesClient(transport, recover: recover, expireToasts: expireToasts);
   await client.connect();
   return (client, transport);
 }
@@ -67,7 +67,7 @@ Map<String, Object?> changed(Map<String, Object?> page, int version, List<Map<St
 Map<String, Object?> setPatch(String property, Object? value) => {'op': 'set', 'path': [property], 'value': value};
 
 const dialog = {'id': 'd1', 'kind': 'message', 'title': 'T', 'header': null, 'body': 'B', 'footer': null, 'showProgress': false, 'buttons': ['Yes', 'No']};
-const toast = {'id': 7, 'title': 'Saved', 'message': 'ok', 'type': 'Success', 'expirationSeconds': 6};
+const toast = {'id': 7, 'title': 'Saved', 'message': 'ok', 'type': 'Success', 'expirationSeconds': null};
 
 void main() {
   group('the page of the main router', () {
@@ -428,6 +428,20 @@ void main() {
   });
 
   group('dialogs and notifications', () {
+    test('closes a notification after its time, unless told not to', () async {
+      final (_, transport) = await connected();
+      transport.server.notified({...toast, 'id': 3, 'expirationSeconds': 0.01});
+      await Future<void>.delayed(const Duration(milliseconds: 50));
+      expect(transport.called('Dismiss'), [
+        [3, false],
+      ]);
+
+      final (_, kept) = await connected(expireToasts: false);
+      kept.server.notified({...toast, 'id': 4, 'expirationSeconds': 0.01});
+      await Future<void>.delayed(const Duration(milliseconds: 50));
+      expect(kept.called('Dismiss'), isEmpty);
+    });
+
     test('keeps the dialogs that wait, in order, and removes the one the server took the answer of', () async {
       final (client, transport) = await connected();
       final counts = <int>[];
@@ -536,6 +550,16 @@ void main() {
       await tick();
       expect(ended?.success, isFalse);
       expect(ended?.code, 'lost');
+    });
+
+    test('ends the calls that wait when the application disconnects', () async {
+      final (client, transport) = await connected();
+      transport.replies['Invoke'] = {'success': true, 'pending': true, 'operation': 'op2'};
+      final waiting = client.invoke('slow');
+      await tick();
+      await client.disconnect();
+      expect((await waiting).code, 'disconnected');
+      expect(client.isConnected, isFalse);
     });
 
     test('starts again from the last route when the session could not be resumed', () async {

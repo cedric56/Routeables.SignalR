@@ -114,6 +114,7 @@ internal sealed class Outbound(Func<string, long> generationOf, Action overflow,
             if (_queue.Count > maxPending)
             {
                 _queue.Clear();
+                RouteablesTelemetry.Overflows.Add(1);
                 RouteablesTelemetry.MessagesDropped.Add(maxPending, new KeyValuePair<string, object?>("reason", "overflow"));
                 logger.LogWarning("More than {MaxPending} messages wait for the client: the connection is closed, the client resumes the session.", maxPending);
                 ThreadPool.UnsafeQueueUserWorkItem(static o => ((Action)o!)(), overflow, preferLocal: false);
@@ -183,9 +184,20 @@ internal sealed class Outbound(Func<string, long> generationOf, Action overflow,
             }
             catch (Exception exception) when (exception is not OutOfMemoryException)
             {
-                // The client left: the session is detached or disposed by the hub. A message is never retried out of order.
-                logger.LogDebug(exception, "A message could not be sent to the client.");
-                RouteablesTelemetry.MessagesDropped.Add(1, new KeyValuePair<string, object?>("reason", "failed"));
+                // A message is never retried out of order: the state is sent again when the session is resumed, the end of a call when the client
+                // says it waits for it. A message that cannot be serialized is a fault of the application, not of the network: it is logged as such.
+                var reason = exception switch
+                {
+                    System.Text.Json.JsonException or NotSupportedException => "serialization",
+                    OperationCanceledException or ObjectDisposedException => "closed",
+                    TimeoutException => "timeout",
+                    _ => "transport",
+                };
+                if (reason == "serialization")
+                    logger.LogError(exception, "A message could not be serialized for the client: it is not sent.");
+                else
+                    logger.LogDebug(exception, "A message could not be sent to the client ({Reason}).", reason);
+                RouteablesTelemetry.MessagesDropped.Add(1, new KeyValuePair<string, object?>("reason", reason));
             }
         }
     }

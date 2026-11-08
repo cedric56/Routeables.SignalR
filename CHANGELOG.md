@@ -10,6 +10,13 @@ The first version meant for production. It changes the protocol (2) and some def
 - **Authorization of commands, properties and pages**, at every call, with ASP.NET Core's authorization: `[Authorize]` / `[AllowAnonymous]` on a `[RouteableCommand]` method or a view model class, `[RouteableAuthorize]` on a property. A route guard (`RouteableAuthorizationGuard`) cancels a route change to a view model the user may not see, and such a view model is never sent. The commands a user may not call are left out of the page.
 - **Authorization of the objects inside a state**: `[Authorize]` on a nested type and `[RouteableAuthorize]` on its properties apply to what is sent (the page, its changes, the items added to a list), as they applied to the commands at the same path. Before, only the properties of the view model itself were filtered: a protected property of a nested object was sent to every user.
 - An `ICommand` is reachable only through an exposed property: it was reachable through any public property.
+- **What a getter throws is no longer sent outside Development.** A getter or an enumerator of the state that throws is reported to the client with a generic message (its own message in Development, or a `RouteableException`'s), and logged. Before, its message (a connection string, a path) reached the browser whatever `DetailedErrors` said.
+- **Two commands with one name are refused** when the type is read: which one a client called depended on the order of reflection, and could be the less protected one. A method hidden by `new` is replaced by it.
+- **Who may resume a session**: the scheme, the issuer and the identifier of the user (`NameIdentifier`, else `sub`). A user authenticated without an identifier can no longer resume a session (all such users shared one key).
+- **Sessions that wait are bounded**: only a session whose client said `Hello` waits for it, at most `MaxDetachedSessions` (10 000) per server and `MaxDetachedSessionsPerUser` (16). Before, opening and dropping connections in a loop kept a session alive 30 s each, without limit.
+- **Authorizing what is shown again**: `RouteableSessions.ReauthorizeAsync(user => ...)` and `RouteableSession.ReauthorizeAsync()` send the targets again with what the user may read now. SECURITY.md says precisely when reading is authorized (when shown) and calling (at every call). `MapRouteables(options: ...)` takes the options of the connections (`CloseOnAuthenticationExpiration`).
+- `[RouteableState(Settable = false)]` on a property wins over `[RouteableState(Settable = true)]` on its class.
+- A dialog without buttons accepts the answer 0 only; a session keeps the last 64 notifications that were not dismissed.
 - `RequireAuthenticatedUser` closes anonymous connections; the documentation shows `MapRouteables().RequireAuthorization()`.
 - What a client sends is checked before it is read: size, number of values, depth, number of arguments, length of names. No input makes the hub throw.
 - The message of an unexpected exception is sent in Development only (`DetailedErrors`); `RouteableException` carries messages meant for the visitor.
@@ -32,6 +39,10 @@ The first version meant for production. It changes the protocol (2) and some def
 - Limits of a state: `MaxCollectionItems`, `MaxStateNodes` (the property is sent as `null` and the client told why); a throwing getter or enumerator no longer stops a page.
 - The reflection is cached per type; a change resubscribes only the property that changed.
 - **Resumable sessions**: a session waits `ReconnectGracePeriod` (30 s) for its client, which resumes it with `Hello` — view models, state, dialogs that wait, and what was told meanwhile. Only by the same user.
+- **A client that comes back before the server noticed it left** gets its session: the old connection is closed. Before, a new session was made, and the old one waited for nobody. Every move of a session (connected, detached, resumed, expired) is made under one lock.
+- **Modals opened from a modal**: the one under is shown again when the one on top closes. Before, it disappeared from the client while its command still awaited it.
+- A message that cannot be serialized is logged as an error; a message lost with its connection is counted by reason (`closed`, `timeout`, `transport`). New metrics: `routeables.signalr.overflows`, `routeables.signalr.sessions.evicted`.
+- The reflection of `ExecuteAsync` and `ValueTask<T>.AsTask` is cached per type.
 - **The end of a call is never lost**: the client names in `Hello` the calls it still waits for, and the resumed session tells their end again after the state — a `Completed` told while the connection was gone, or lost with it. Before, it was dropped with the oldest messages beyond 256, or lost when the connection failed as it was written, and the call never resolved. The session keeps the end of its last 256 calls; an older one ends as `lost`.
 - The options are checked when the hub is registered (`RouteablesOptions.Problems()`): a limit that is not positive, a negative duration or contradictory limits stop the application at startup.
 - Logs, an activity per call, and metrics (`RouteablesTelemetry`, meter and source `Routeables.SignalR`).
@@ -44,10 +55,13 @@ The first version meant for production. It changes the protocol (2) and some def
 - `onError` for calls that did not reach the server and watches that were refused.
 - Keeps the pages while reconnecting, resumes the session, and recovers a lost one (`recover`, `onSessionLost`).
 - Names the calls it waits for when it resumes its session, so that their end is never lost.
+- The calls that wait end with `{ code: 'disconnected' }` after `disconnect()`; they waited forever. After SignalR stopped retrying, they wait for `connect()`, which resumes the session (they end then) or finds it lost (`session-lost`).
+- Closes a notification after its expiration (`expireToasts`, on by default): the samples no longer do it themselves.
+- `exports` in `package.json`: the public API is the root of the package.
 
 ### Client for Dart and Flutter (`routeables_client`)
 
-- A port of `@routeables/client` to Dart, on the SignalR client for Dart (signalr_netcore): the same protocol, the same guarantees, the same tests.
+- A port of `@routeables/client` to Dart, on the SignalR client for Dart (signalr_netcore): the same protocol, the same guarantees, the same tests (with the changes of the TypeScript client above). Not published on pub.dev yet.
 - A Flutter sample (web, desktop, mobile) against the server of the Angular sample, which allows the pages of the machine (CORS) for Flutter web.
 
 ### Build and distribution
@@ -60,6 +74,8 @@ The first version meant for production. It changes the protocol (2) and some def
 - End-to-end tests over a real Kestrel and SignalR server, driven by the client from Node.
 - The web samples and the TypeScript client open in Visual Studio (one `.esproj` each), with shared launch profiles that start the server and the apps (`Routeables.SignalR.slnLaunch`). Outside Visual Studio they run neither `npm install` nor their build.
 - The package is marked not trimmable; `AddRouteablesSignalR` carries `[RequiresUnreferencedCode]` and `[RequiresDynamicCode]`.
+- The release runs the tests of the server against the published packages of Routeables before it publishes, and refuses a tag that does not match `VersionPrefix` and `package.json`.
+- The Angular sample is driven in Chrome by the CI too; Flutter is pinned to a release line (3.47.x); Dependabot keeps the actions and the packages up to date. `global.json` no longer declares `Uno.Sdk`; an empty `package-lock.json` is removed.
 
 ### Breaking changes
 
@@ -68,3 +84,4 @@ The first version meant for production. It changes the protocol (2) and some def
 - `RouteableStateProjector` and `RouteableCommandInvoker` are classes built on a `RouteableSchema` (they were static).
 - The messages: `RouteableChanged` carries patches, `Navigated` a generation and an instance, `IRouteableClient` has `Completed`, the hub has `Hello` and `Resync`. Protocol 2: update `@routeables/client` with the server.
 - `@routeables/client`: `RouteableTransport.call` is generic and rejects when the call does not reach the server; `ServerMessages` has `completed`; the pages are no longer cleared when the connection drops.
+- `RemoteInteractions.ModalClosed` gives the view model that closed; `RouteableProjectionIssue` has the `Exception`; a session whose client never said `Hello` is disposed when its connection drops.

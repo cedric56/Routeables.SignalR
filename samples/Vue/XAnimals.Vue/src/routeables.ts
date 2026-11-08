@@ -12,7 +12,6 @@ export type State = any;
 
 // /routeables is the hub of Routeables.SignalR: `npm start` proxies it to the server (vite.config.ts).
 const client = new RouteablesClient(signalRTransport('/routeables'));
-const timers = new Set<number>();
 
 function savedDrawerClosed(): boolean {
   try {
@@ -106,7 +105,6 @@ export const routeables = {
 
   /** Closes a notification, or tells that the user clicked it. */
   async dismiss(toast: Toast, click: boolean): Promise<void> {
-    timers.delete(toast.id);
     await client.dismiss(toast, click);
   },
 };
@@ -124,13 +122,7 @@ client.subscribeTo(PAGE, page => {
 client.subscribeTo(MODAL, modal => (routeables.modal.value = modal));
 client.subscribeDialogs(dialogs => (routeables.dialogs.value = dialogs));
 client.subscribeToasts(toasts => {
-  routeables.toasts.value = toasts;
-  // A notification closes by itself after its time.
-  for (const toast of toasts) {
-    if (toast.expirationSeconds === null || timers.has(toast.id)) continue;
-    timers.add(toast.id);
-    setTimeout(() => void routeables.dismiss(toast, false), toast.expirationSeconds * 1000);
-  }
+  routeables.toasts.value = toasts;   // the client closes a notification after its time
 });
 client.onFailure(failure => (routeables.error.value = failure.message));
 client.onError(error => (routeables.error.value = error.message));

@@ -112,7 +112,8 @@ public sealed class RouteableSchema
             else
             {
                 readable = marked is not null || classState is not null || exposedType;
-                settable = marked?.Settable == true || classState?.Settable == true || exposedSettable;
+                // A property that says whether it may be set wins over its class and over ExposeTypes.
+                settable = marked is { SettableIsSet: true } ? marked.Settable : classState?.Settable == true || exposedSettable;
             }
             if (!readable)
                 continue;
@@ -137,14 +138,34 @@ public sealed class RouteableSchema
             if (method.GetParameters().Any(p => p.ParameterType.IsByRef || p.ParameterType.IsPointer))
                 continue;
 
-            commands[ClientName(attribute.Name ?? method.Name)] = new CommandMember(
+            var command = new CommandMember(
                 method, method.GetParameters(), ReturnKindOf(method.ReturnType),
                 method.GetCustomAttributes(inherit: true).OfType<IAuthorizeData>().ToArray(),
                 method.GetCustomAttributes(inherit: true).OfType<IAllowAnonymous>().Any());
+            var commandName = ClientName(attribute.Name ?? method.Name);
+            if (commands.TryGetValue(commandName, out var other))
+            {
+                // A method hidden by "new" in a derived class: the most derived one is the command, as for a property.
+                if (Hides(method, other.Method))
+                    commands[commandName] = command;
+                else if (!Hides(other.Method, method))
+                    throw new InvalidOperationException(
+                        $"{type.FullName} has two commands named '{commandName}' ({other.Method.DeclaringType?.Name}.{other.Method.Name} and " +
+                        $"{method.DeclaringType?.Name}.{method.Name}): which one a client calls must not depend on the order of reflection. Name them apart (RouteableCommand(Name = ...)).");
+                continue;
+            }
+            commands[commandName] = command;
         }
 
         return new TypeShape(type, [.. state], state.ToDictionary(m => m.Name, StringComparer.Ordinal), commands, classAuthorize, classAnonymous);
     }
+
+    // Whether "derived" hides "hidden" with "new": same name, same parameters, declared in a class that derives from the other's.
+    private static bool Hides(MethodInfo derived, MethodInfo hidden)
+        => derived.Name == hidden.Name
+           && derived.DeclaringType is { } derivedType && hidden.DeclaringType is { } hiddenType && derivedType != hiddenType
+           && derivedType.IsSubclassOf(hiddenType)
+           && derived.GetParameters().Select(p => p.ParameterType).SequenceEqual(hidden.GetParameters().Select(p => p.ParameterType));
 
     private static CommandReturn ReturnKindOf(Type type)
     {

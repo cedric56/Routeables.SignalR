@@ -11,7 +11,11 @@ namespace Routeables.SignalR;
 /// <param name="Message">Why.</param>
 /// <param name="Code">What kind of problem (<see cref="RouteableErrorCodes"/>).</param>
 /// <param name="Retry">The state changed while it was read (from another thread): reading it again may succeed.</param>
-public sealed record RouteableProjectionIssue(string Property, string Message, string Code, bool Retry = false);
+/// <param name="Exception">
+/// What was thrown while the property was read, if anything. Its message is in <paramref name="Message"/>: the hub sends to the client a message
+/// without it, unless detailed errors are on (<see cref="RouteablesOptions.DetailedErrors"/>), and logs the exception.
+/// </param>
+public sealed record RouteableProjectionIssue(string Property, string Message, string Code, bool Retry = false, Exception? Exception = null);
 
 /// <summary>
 /// Whether the user may read a property of an object inside a state (not of the view model itself, which is filtered before): the client name of
@@ -60,8 +64,10 @@ public sealed class RouteableStateProjector
         {
             if (visible is not null && !visible(member.Property))
                 continue;
-            if (TryRead(viewModel, member.Property, out var value))
+            if (TryRead(viewModel, member.Property, out var value, out var failure))
                 state[member.Name] = ProjectAt(member.Name, member.Name, value, depth: 1, issues, guard);
+            else
+                issues?.Invoke(ReadFailure(member.Name, failure!));
         }
         return state;
     }
@@ -92,14 +98,14 @@ public sealed class RouteableStateProjector
         catch (InvalidOperationException exception)
         {
             // A collection changed while it was read: the change that did it is told too.
-            issues?.Invoke(new RouteableProjectionIssue(property, $"'{property}' changed while it was read: {exception.Message}", RouteableErrorCodes.Failed, Retry: true));
+            issues?.Invoke(new RouteableProjectionIssue(property, $"'{property}' changed while it was read: {exception.Message}", RouteableErrorCodes.Failed, Retry: true, exception));
             return null;
         }
         catch (Exception exception) when (exception is not OutOfMemoryException)
         {
             if (exception is TargetInvocationException { InnerException: { } inner })
                 exception = inner;
-            issues?.Invoke(new RouteableProjectionIssue(property, $"'{property}' could not be read: {exception.Message}", RouteableErrorCodes.Failed));
+            issues?.Invoke(new RouteableProjectionIssue(property, $"'{property}' could not be read: {exception.Message}", RouteableErrorCodes.Failed, Exception: exception));
             return null;
         }
     }
@@ -141,19 +147,27 @@ public sealed class RouteableStateProjector
         return sources;
     }
 
-    internal static bool TryRead(object instance, PropertyInfo property, out object? value)
+    internal static bool TryRead(object instance, PropertyInfo property, out object? value) => TryRead(instance, property, out value, out _);
+
+    internal static bool TryRead(object instance, PropertyInfo property, out object? value, out Exception? failure)
     {
         try
         {
             value = property.GetValue(instance);
+            failure = null;
             return true;
         }
-        catch (TargetInvocationException)
+        catch (TargetInvocationException exception)
         {
             value = null;
+            failure = exception.InnerException ?? exception;
             return false;
         }
     }
+
+    /// <summary>A getter of the view model threw: the property is not sent, and the client is told (the hub hides the message, see the issue).</summary>
+    internal static RouteableProjectionIssue ReadFailure(string property, Exception exception)
+        => new(property, $"'{property}' could not be read: {exception.Message}", RouteableErrorCodes.Failed, Exception: exception);
 
     private static string Join(string path, string name) => path.Length == 0 ? name : path + "." + name;
 

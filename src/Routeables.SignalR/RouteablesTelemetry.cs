@@ -24,6 +24,8 @@ public static class RouteablesTelemetry
 
     internal static readonly UpDownCounter<long> Sessions = Meter.CreateUpDownCounter<long>("routeables.signalr.sessions", "{session}", "Sessions attached to a connection.");
     internal static readonly UpDownCounter<long> DetachedSessions = Meter.CreateUpDownCounter<long>("routeables.signalr.sessions.detached", "{session}", "Sessions whose connection dropped, kept for the client to resume them.");
+    internal static readonly Counter<long> DetachedEvicted = Meter.CreateCounter<long>("routeables.signalr.sessions.evicted", "{session}", "Sessions waiting for their client that were disposed to stay within MaxDetachedSessions or MaxDetachedSessionsPerUser.");
+    internal static readonly Counter<long> Overflows = Meter.CreateCounter<long>("routeables.signalr.overflows", "{connection}", "Connections closed because their client let more than MaxPendingMessages wait.");
     internal static readonly Counter<long> Calls = Meter.CreateCounter<long>("routeables.signalr.calls", "{call}", "Calls of the clients.");
     internal static readonly Histogram<double> CallDuration = Meter.CreateHistogram<double>("routeables.signalr.call.duration", "ms", "How long a call took until the hub answered.");
     internal static readonly Counter<long> MessagesSent = Meter.CreateCounter<long>("routeables.signalr.messages.sent", "{message}", "Messages sent to the clients.");

@@ -21,5 +21,21 @@ public sealed class RouteableStateAttribute : Attribute
     /// Whether the client may set the property (<c>Set</c>, <c>SetOn</c>): it needs a public setter too. On a class, every property of the class that
     /// has a public setter. <see langword="false"/> by default: the client reads, the commands write.
     /// </summary>
-    public bool Settable { get; set; }
+    public bool Settable
+    {
+        get => _settable;
+        set
+        {
+            _settable = value;
+            SettableIsSet = true;
+        }
+    }
+
+    private bool _settable;
+
+    /// <summary>
+    /// Whether <see cref="Settable"/> was given. On a property, a given value wins over the class: <c>[RouteableState(Settable = false)]</c> keeps
+    /// one property of a class marked <c>[RouteableState(Settable = true)]</c> out of the reach of the client.
+    /// </summary>
+    public bool SettableIsSet { get; private set; }
 }

@@ -379,7 +379,19 @@ describe('targets', () => {
 
 describe('dialogs and notifications', () => {
   const dialog: Dialog = { id: 'd1', kind: 'message', title: 'T', header: null, body: 'B', footer: null, showProgress: false, buttons: ['Yes', 'No'] };
-  const toast: Toast = { id: 7, title: 'Saved', message: 'ok', type: 'Success', expirationSeconds: 6 };
+  const toast: Toast = { id: 7, title: 'Saved', message: 'ok', type: 'Success', expirationSeconds: null };
+
+  it('closes a notification after its time, unless told not to', async () => {
+    const { transport } = await connected();
+    transport.server.notified({ ...toast, id: 3, expirationSeconds: 0.01 });
+    await new Promise(resolve => setTimeout(resolve, 50));
+    assert.deepEqual(transport.called('Dismiss'), [[3, false]]);
+
+    const kept = await connected({ expireToasts: false });
+    kept.transport.server.notified({ ...toast, id: 4, expirationSeconds: 0.01 });
+    await new Promise(resolve => setTimeout(resolve, 50));
+    assert.deepEqual(kept.transport.called('Dismiss'), []);
+  });
 
   it('keeps the dialogs that wait, in order, and removes the one the server took the answer of', async () => {
     const { client, transport } = await connected();
@@ -477,6 +489,16 @@ describe('the connection', () => {
     transport.server.completed({ operation: 'op4', success: false, error: 'not known any more', code: 'lost' });
     await tick();
     assert.deepEqual(ended, { success: false, error: 'not known any more', code: 'lost' });
+  });
+
+  it('ends the calls that wait when the application disconnects', async () => {
+    const { client, transport } = await connected();
+    transport.replies.set('Invoke', { success: true, pending: true, operation: 'op2' });
+    const waiting = client.invoke('slow');
+    await tick();
+    await client.disconnect();
+    assert.equal((await waiting).code, 'disconnected');
+    assert.equal(client.isConnected, false);
   });
 
   it('starts again from the last route when the session could not be resumed', async () => {

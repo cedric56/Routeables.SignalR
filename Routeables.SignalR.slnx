@@ -33,6 +33,7 @@
   <Folder Name="/.github/">
     <File Path=".github/workflows/ci.yml" />
     <File Path=".github/workflows/release.yml" />
+    <File Path=".github/dependabot.yml" />
   </Folder>
   <Folder Name="/clients/">
     <!-- routeables_client, the Dart client: built and tested by Flutter (flutter test), not by Visual Studio. -->
@@ -47,7 +48,7 @@
     <!-- The Flutter sample: opened by Visual Studio Code or Android Studio, run by Flutter. -->
     <File Path="samples/Flutter/README.md" />
     <File Path="samples/Flutter/xanimals_flutter/pubspec.yaml" />
-    <Project Path="samples/Angular/XAnimals.AngularServer/XAnimals.AngularServer.csproj" />
+    <Project Path="samples/Server/XAnimals.Server.csproj" />
   </Folder>
   <Folder Name="/src/">
     <Project Path="src/Routeables.SignalR/Routeables.SignalR.csproj" />

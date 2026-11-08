@@ -35,6 +35,7 @@ class Recovery {
 }
 
 const Ack _sessionLost = Ack(success: false, error: 'The session was lost: the call may not have ended.', code: 'session-lost');
+const Ack _disconnected = Ack(success: false, error: 'The connection was closed: the call may not have ended.', code: 'disconnected');
 
 /// Holds what the server shows, and sends what the user does. It does not know Flutter's widgets: a widget subscribes and shows
 /// `page.state`; a layer of the app turns the subscriptions into a `ChangeNotifier`, a stream, a `ValueNotifier`.
@@ -51,12 +52,17 @@ class RouteablesClient {
   ///
   /// [recover] is what to do when the server could not resume the session after a reconnection (the view models are new, nothing is
   /// shown): by default the main router goes back to the route it showed. [recoverAutomatically] false does nothing (listen to
-  /// [onSessionLost]).
-  RouteablesClient(this.transport, {Future<void> Function(Recovery recovery)? recover, this.recoverAutomatically = true})
-      : _recover = recover {
+  /// [onSessionLost]). [expireToasts] false keeps a notification that has an expiration until the application dismisses it.
+  RouteablesClient(
+    this.transport, {
+    Future<void> Function(Recovery recovery)? recover,
+    this.recoverAutomatically = true,
+    this.expireToasts = true,
+  }) : _recover = recover {
     transport.onConnectionChange((connected) {
       if (!connected) {
-        // The pages stay on screen: the session is resumed when the connection comes back, or recovered.
+        // The pages and the calls that wait stay: the session is resumed when the connection comes back (by itself, or by connect() once
+        // SignalR stopped retrying), and the calls end then; or it is recovered, and they end as lost.
         _setConnected(false);
         return;
       }
@@ -68,6 +74,9 @@ class RouteablesClient {
 
   final RouteableTransport transport;
   final bool recoverAutomatically;
+
+  /// Whether a notification that has an expiration is closed by the client after it ([dismiss]).
+  final bool expireToasts;
   final Future<void> Function(Recovery recovery)? _recover;
 
   final Map<String, Page?> _pages = {};
@@ -124,7 +133,22 @@ class RouteablesClient {
     await _hello();
   }
 
-  Future<void> disconnect() => transport.stop();
+  /// Closes the connection: the application is done with it. The calls that wait complete with `code: 'disconnected'`; the pages stay.
+  Future<void> disconnect() async {
+    await transport.stop();
+    _setConnected(false);
+    _abandonCalls(_disconnected);
+  }
+
+  // The calls that wait will not hear of their end: they complete with the given failure.
+  void _abandonCalls(Ack ack) {
+    final waiting = [..._operations.values];
+    _operations.clear();
+    _early.clear();
+    for (final completer in waiting) {
+      if (!completer.isCompleted) completer.complete(ack);
+    }
+  }
 
   // ---------------------------------------------------------------- what the user does
 
@@ -253,11 +277,7 @@ class RouteablesClient {
       _instances.clear();
       _setDialogs(const []);
       _setToasts(const []);
-      final waiting = [..._operations.values];
-      _operations.clear();
-      for (final completer in waiting) {
-        completer.complete(_sessionLost);
-      }
+      _abandonCalls(_sessionLost);
     }
 
     _setConnected(true);
@@ -437,6 +457,13 @@ class RouteablesClient {
   void _onToast(Toast toast) {
     if (_toasts.any((t) => t.id == toast.id)) return;
     _setToasts([..._toasts, toast]);
+    // A notification closes by itself after its time.
+    final seconds = toast.expirationSeconds;
+    if (expireToasts && seconds != null) {
+      Timer(Duration(milliseconds: (seconds * 1000).round()), () {
+        if (_toasts.any((t) => t.id == toast.id)) unawaited(dismiss(toast));
+      });
+    }
   }
 
   void _setPage(String target, Page? page) {

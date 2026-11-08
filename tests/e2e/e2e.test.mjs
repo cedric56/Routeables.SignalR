@@ -20,6 +20,7 @@ const assembly = process.env.E2E_SERVER
 
 let server;
 let address;
+const transports = new WeakMap();
 
 before(async () => {
   server = spawn('dotnet', [assembly], { stdio: ['ignore', 'pipe', 'inherit'] });
@@ -42,6 +43,7 @@ async function open(user, roles = '') {
   const query = user ? `?user=${encodeURIComponent(user)}&roles=${encodeURIComponent(roles)}` : '';
   const transport = signalRTransport(`${address}/routeables${query}`, { logLevel: 6 /* LogLevel.None */ });
   const client = new RouteablesClient(transport);
+  transports.set(client, transport);
   await client.connect();
   return client;
 }
@@ -164,8 +166,9 @@ describe('over a real SignalR connection', () => {
       const asking = client.invoke('askAsync');
       await until(() => client.dialogs.length === 1, 'the dialog');
 
-      // The connection closes, and the same client connects again: it says hello with the token of its session.
-      await client.disconnect();
+      // The connection closes under the client (not disconnect(): the application is not done), and the client connects again: it says
+      // hello with the token of its session and the calls it waits for.
+      await transports.get(client).stop();
       await client.connect();
 
       await until(() => client.page?.generation > 1, 'the page sent again');

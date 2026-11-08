@@ -74,7 +74,7 @@ public sealed class RouteableCommandInvoker
                     await ((ValueTask)result!).ConfigureAwait(true);
                     break;
                 case CommandReturn.ValueTaskOf:
-                    await (Task)result!.GetType().GetMethod(nameof(ValueTask<int>.AsTask))!.Invoke(result, null)!;
+                    await (Task)AsTaskOf(result!.GetType()).Invoke(result, null)!;
                     break;
             }
             return Outcome.Ok;
@@ -208,13 +208,20 @@ public sealed class RouteableCommandInvoker
         }
     }
 
+    // The reflection a call needs, found once per type.
+    private static readonly System.Collections.Concurrent.ConcurrentDictionary<Type, MethodInfo> AsTasks = new();
+    private static readonly System.Collections.Concurrent.ConcurrentDictionary<Type, (MethodInfo Method, ParameterInfo[] Parameters)[]> ExecuteAsyncs = new();
+
+    private static MethodInfo AsTaskOf(Type valueTaskType)
+        => AsTasks.GetOrAdd(valueTaskType, static t => t.GetMethod(nameof(ValueTask<int>.AsTask))!);
+
     private static MethodInfo? FindExecuteAsync(Type type, object? parameter)
     {
-        foreach (var method in type.GetMethods(BindingFlags.Public | BindingFlags.Instance))
+        var candidates = ExecuteAsyncs.GetOrAdd(type, static t => [.. t.GetMethods(BindingFlags.Public | BindingFlags.Instance)
+            .Where(m => m.Name == "ExecuteAsync" && typeof(Task).IsAssignableFrom(m.ReturnType) && !m.IsGenericMethodDefinition)
+            .Select(m => (m, m.GetParameters()))]);
+        foreach (var (method, parameters) in candidates)
         {
-            if (method.Name != "ExecuteAsync" || !typeof(Task).IsAssignableFrom(method.ReturnType) || method.IsGenericMethodDefinition)
-                continue;
-            var parameters = method.GetParameters();
             if (parameters.Length == 0 && parameter is null)
                 return method;
             if (parameters.Length == 1 && (parameter is null ? !parameters[0].ParameterType.IsValueType || Nullable.GetUnderlyingType(parameters[0].ParameterType) is not null : parameters[0].ParameterType.IsInstanceOfType(parameter)))

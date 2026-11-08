@@ -53,6 +53,7 @@ public class RouteablesHub(IServiceProvider services, RouteableSessions sessions
                 $"The client speaks the protocol {hello.Protocol}, the server {RouteableProtocol.Version}: update @routeables/client.");
 
         var current = Session;
+        current.Greeted = true;   // a client that never says Hello is not waited for when its connection drops
         if (!string.IsNullOrEmpty(hello.Resume) && hello.Resume != current.Token)
         {
             var context = Context;
@@ -123,103 +124,235 @@ public class RouteablesHub(IServiceProvider services, RouteableSessions sessions
 /// </remarks>
 public sealed class RouteableSessions : IAsyncDisposable
 {
-    private readonly ConcurrentDictionary<string, RouteableSession> _sessions = new(StringComparer.Ordinal);
-    private readonly ConcurrentDictionary<string, Detached> _detached = new(StringComparer.Ordinal);
+    // Every move of a session (a connection that opens, drops or resumes it, the end of its grace) is made under _gate, so that a client that
+    // comes back while its old connection is being closed, or before the server noticed it dropped, always finds its session.
+    private readonly object _gate = new();
+    private readonly ConcurrentDictionary<string, RouteableSession> _sessions = new(StringComparer.Ordinal);   // connection → session
+    private readonly Dictionary<string, string> _connectionOf = new(StringComparer.Ordinal);                  // token → its connection
+    private readonly Dictionary<string, Detached> _detached = new(StringComparer.Ordinal);                     // token → session that waits
     private readonly TimeSpan _grace;
+    private readonly int _maxDetached;
+    private readonly int _maxDetachedPerUser;
     private readonly ILogger _logger;
+    private long _order;
 
     /// <summary>Creates the registry.</summary>
     public RouteableSessions(IServiceProvider services)
     {
         ArgumentNullException.ThrowIfNull(services);
-        _grace = services.GetService<RouteablesOptions>()?.ReconnectGracePeriod ?? TimeSpan.FromSeconds(30);
+        var options = services.GetService<RouteablesOptions>() ?? new RouteablesOptions();
+        _grace = options.ReconnectGracePeriod;
+        _maxDetached = options.MaxDetachedSessions;
+        _maxDetachedPerUser = options.MaxDetachedSessionsPerUser;
         _logger = services.GetService<ILoggerFactory>()?.CreateLogger<RouteableSessions>() ?? NullLogger<RouteableSessions>.Instance;
     }
 
-    private sealed record Detached(RouteableSession Session, Timer Expiry);
+    private sealed record Detached(RouteableSession Session, Timer Expiry, long Order);
 
     internal void Add(string connectionId, RouteableSession session)
     {
-        _sessions[connectionId] = session;
-        RouteablesTelemetry.Sessions.Add(1);
+        RouteableSession? replaced;
+        lock (_gate)
+        {
+            if (_sessions.TryGetValue(connectionId, out replaced))
+                _connectionOf.Remove(replaced.Token);
+            _sessions[connectionId] = session;
+            _connectionOf[session.Token] = connectionId;
+        }
+        if (replaced is null)
+            RouteablesTelemetry.Sessions.Add(1);
+        else
+            _ = replaced.DisposeAsync().AsTask();
     }
 
     internal RouteableSession? Get(string connectionId) => _sessions.TryGetValue(connectionId, out var session) ? session : null;
 
-    /// <summary>The connection closed: its session waits for the client, or is disposed when no grace is given.</summary>
+    /// <summary>
+    /// The connection closed: its session waits for the client, when the client said <c>Hello</c> and may resume it, or is disposed. The sessions
+    /// that wait are bounded (<see cref="RouteablesOptions.MaxDetachedSessions"/>, <see cref="RouteablesOptions.MaxDetachedSessionsPerUser"/>):
+    /// beyond, the one that waits for the longest is disposed.
+    /// </summary>
     internal async Task DisconnectAsync(string connectionId)
     {
-        if (!_sessions.TryRemove(connectionId, out var session))
-            return;
-        RouteablesTelemetry.Sessions.Add(-1);
-
-        if (_grace <= TimeSpan.Zero || session.IsDisposed)
+        RouteableSession? session;
+        var disposed = new List<RouteableSession>();
+        lock (_gate)
         {
-            await session.DisposeAsync().ConfigureAwait(false);
-            return;
+            if (!_sessions.TryRemove(connectionId, out session))
+                return;
+            RouteablesTelemetry.Sessions.Add(-1);
+            if (!_connectionOf.TryGetValue(session.Token, out var current) || current != connectionId)
+                return;   // another connection resumed it already
+            _connectionOf.Remove(session.Token);
+
+            if (_grace <= TimeSpan.Zero || session.IsDisposed || !session.Greeted || session.UserKey is null || _maxDetached == 0)
+                disposed.Add(session);
+            else
+            {
+                session.Detach();
+                disposed.AddRange(MakeRoomFor(session.UserKey));
+                var timer = new Timer(static state =>
+                {
+                    var (self, token) = ((RouteableSessions, string))state!;
+                    _ = self.ExpireAsync(token);
+                }, (this, session.Token), Timeout.Infinite, Timeout.Infinite);
+                _detached[session.Token] = new Detached(session, timer, ++_order);
+                RouteablesTelemetry.DetachedSessions.Add(1);
+                timer.Change(_grace, Timeout.InfiniteTimeSpan);
+            }
         }
-
-        session.Detach();
-        var timer = new Timer(static state =>
-        {
-            var (self, token) = ((RouteableSessions, string))state!;
-            _ = self.ExpireAsync(token);
-        }, (this, session.Token), Timeout.Infinite, Timeout.Infinite);
-        _detached[session.Token] = new Detached(session, timer);
-        RouteablesTelemetry.DetachedSessions.Add(1);
-        timer.Change(_grace, Timeout.InfiniteTimeSpan);
+        foreach (var gone in disposed)
+            await DisposeQuietlyAsync(gone).ConfigureAwait(false);
     }
 
-    /// <summary>Gives a session that waits to a new connection, when the token is known and the user is the same.</summary>
+    // Under _gate: the sessions that wait for the longest leave room for one more, overall and for its user (an anonymous one has no user to count).
+    private List<RouteableSession> MakeRoomFor(string userKey)
+    {
+        var evicted = new List<RouteableSession>();
+        void Evict(Func<Detached, bool> which)
+        {
+            var oldest = _detached.Values.Where(which).MinBy(d => d.Order)!;
+            _detached.Remove(oldest.Session.Token);
+            oldest.Expiry.Dispose();
+            RouteablesTelemetry.DetachedSessions.Add(-1);
+            RouteablesTelemetry.DetachedEvicted.Add(1);
+            evicted.Add(oldest.Session);
+        }
+
+        while (_detached.Count >= _maxDetached)
+            Evict(_ => true);
+        if (userKey.Length > 0)
+            while (_detached.Values.Count(d => d.Session.UserKey == userKey) >= _maxDetachedPerUser)
+                Evict(d => d.Session.UserKey == userKey);
+        if (evicted.Count > 0)
+            _logger.LogWarning("{Count} session(s) waiting for their client were disposed to keep the number of waiting sessions within its limits.", evicted.Count);
+        return evicted;
+    }
+
+    /// <summary>
+    /// Gives a session to a new connection, when the token is known and the user is the same: a session whose connection dropped, or one whose
+    /// connection the server still holds (the client came back before the server noticed): that connection is then closed.
+    /// </summary>
     internal async Task<RouteableSession?> ResumeAsync(string token, string connectionId, IRouteableClient client, ClaimsPrincipal? user, Action? abort)
     {
-        if (!_detached.TryGetValue(token, out var detached))
-            return null;
-        if (detached.Session.UserKey != RouteableSession.KeyOf(user))
+        RouteableSession session;
+        RouteableSession? fresh;
+        Timer? expiry = null;
+        RouteableSession? stolenFrom = null;
+        var key = RouteableSession.KeyOf(user);
+        lock (_gate)
         {
-            _logger.LogWarning("A connection tried to resume the session of another user.");
-            return null;
-        }
-        if (!_detached.TryRemove(new KeyValuePair<string, Detached>(token, detached)))
-            return null;   // resumed or expired meanwhile
+            if (_detached.TryGetValue(token, out var detached))
+            {
+                if (!SameUser(detached.Session, key))
+                    return null;
+                _detached.Remove(token);
+                expiry = detached.Expiry;
+                session = detached.Session;
+                RouteablesTelemetry.DetachedSessions.Add(-1);
+            }
+            else if (_connectionOf.TryGetValue(token, out var held) && held != connectionId && _sessions.TryGetValue(held, out var attached))
+            {
+                if (!SameUser(attached, key))
+                    return null;
+                _sessions.TryRemove(held, out _);   // the old connection no longer reaches it; its end will not touch it
+                RouteablesTelemetry.Sessions.Add(-1);
+                session = attached;
+                stolenFrom = attached;
+            }
+            else
+                return null;
 
-        await detached.Expiry.DisposeAsync().ConfigureAwait(false);
-        RouteablesTelemetry.DetachedSessions.Add(-1);
-
-        // The session made for the new connection is replaced by the one that is resumed.
-        if (_sessions.TryGetValue(connectionId, out var fresh))
-            await fresh.DisposeAsync().ConfigureAwait(false);
-        else
+            // The session made for the new connection is replaced by the one that is resumed.
+            _sessions.TryRemove(connectionId, out fresh);
+            if (fresh is not null)
+            {
+                _connectionOf.Remove(fresh.Token);
+                RouteablesTelemetry.Sessions.Add(-1);
+            }
+            _sessions[connectionId] = session;
+            _connectionOf[token] = connectionId;
             RouteablesTelemetry.Sessions.Add(1);
-        _sessions[connectionId] = detached.Session;
+        }
 
-        await detached.Session.AttachAsync(client, connectionId, user, abort).ConfigureAwait(false);
-        return detached.Session;
+        if (expiry is not null)
+            await expiry.DisposeAsync().ConfigureAwait(false);
+        if (fresh is not null)
+            await DisposeQuietlyAsync(fresh).ConfigureAwait(false);
+        if (stolenFrom is not null)
+        {
+            _logger.LogInformation("A session was resumed while the server still held its old connection: that connection is closed.");
+            stolenFrom.Abort();
+            stolenFrom.Detach();
+        }
+        await session.AttachAsync(client, connectionId, user, abort).ConfigureAwait(false);
+        return session;
+
+        bool SameUser(RouteableSession candidate, string? userKey)
+        {
+            if (candidate.UserKey is not null && candidate.UserKey == userKey)
+                return true;
+            _logger.LogWarning("A connection tried to resume a session it may not resume (another user, or a user without a stable identifier).");
+            return false;
+        }
     }
 
     private async Task ExpireAsync(string token)
     {
-        if (!_detached.TryRemove(token, out var detached))
-            return;
-        RouteablesTelemetry.DetachedSessions.Add(-1);
+        Detached? detached;
+        lock (_gate)
+        {
+            if (!_detached.Remove(token, out detached))
+                return;
+            RouteablesTelemetry.DetachedSessions.Add(-1);
+        }
         await detached.Expiry.DisposeAsync().ConfigureAwait(false);
-        try { await detached.Session.DisposeAsync().ConfigureAwait(false); }
-        catch (Exception exception) { _logger.LogError(exception, "A session could not be disposed."); }
+        await DisposeQuietlyAsync(detached.Session).ConfigureAwait(false);
+    }
+
+    private async Task DisposeQuietlyAsync(RouteableSession session)
+    {
+        try { await session.DisposeAsync().ConfigureAwait(false); }
+        catch (Exception exception) when (exception is not OutOfMemoryException) { _logger.LogError(exception, "A session could not be disposed."); }
+    }
+
+    /// <summary>
+    /// Evaluates again what the users of the sessions may see (<c>[Authorize]</c> on the view models, <c>[RouteableAuthorize]</c> on the properties,
+    /// at any depth), and sends every target again: call it when permissions changed (a role withdrawn, a resource shared). The calls (commands,
+    /// properties set, routes) are authorized at every call already.
+    /// </summary>
+    /// <param name="users">The users whose sessions are evaluated again; every session when <see langword="null"/>.</param>
+    public Task ReauthorizeAsync(Func<ClaimsPrincipal?, bool>? users = null)
+    {
+        List<RouteableSession> sessions;
+        lock (_gate)
+            sessions = [.. _sessions.Values.Distinct()];
+        return Task.WhenAll(sessions.Where(s => users is null || users(s.User)).Select(s => s.ReauthorizeAsync()));
     }
 
     /// <summary>How many connections have a session.</summary>
     public int Count => _sessions.Count;
 
     /// <summary>How many sessions wait for their client to come back.</summary>
-    public int DetachedCount => _detached.Count;
+    public int DetachedCount
+    {
+        get
+        {
+            lock (_gate)
+                return _detached.Count;
+        }
+    }
 
     /// <inheritdoc />
     public async ValueTask DisposeAsync()
     {
-        foreach (var token in _detached.Keys.ToList())
+        List<string> tokens;
+        lock (_gate)
+            tokens = [.. _detached.Keys];
+        foreach (var token in tokens)
             await ExpireAsync(token).ConfigureAwait(false);
         foreach (var connection in _sessions.Keys.ToList())
             if (_sessions.TryRemove(connection, out var session))
-                await session.DisposeAsync().ConfigureAwait(false);
+                await DisposeQuietlyAsync(session).ConfigureAwait(false);
     }
 }

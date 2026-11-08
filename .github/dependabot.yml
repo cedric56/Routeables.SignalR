@@ -1,0 +1,28 @@
+# Weekly updates of what this repository depends on. The GitHub Actions are kept on their latest tags; the samples and the clients on
+# their latest compatible versions. A major version (Angular, Flutter's packages) arrives as its own pull request, to be tried on purpose.
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule: { interval: weekly }
+
+  - package-ecosystem: nuget
+    directories: [/src/Routeables.SignalR, /tests/Routeables.SignalR.Test, /tests/Routeables.SignalR.Test.Angular, /tests/Routeables.SignalR.E2E.Server, /samples/Angular/XAnimals.AngularServer]
+    schedule: { interval: weekly }
+    groups:
+      nuget: { patterns: ['*'] }
+
+  - package-ecosystem: npm
+    directories:
+      - /clients/typescript
+      - /samples/Angular/XAnimals.Angular
+      - /samples/Vue/XAnimals.Vue
+      - /samples/React/XAnimals.React
+      - /tests/samples
+    schedule: { interval: weekly }
+    groups:
+      npm-minor: { update-types: [minor, patch] }
+
+  - package-ecosystem: pub
+    directories: [/clients/dart, /samples/Flutter/xanimals_flutter]
+    schedule: { interval: weekly }

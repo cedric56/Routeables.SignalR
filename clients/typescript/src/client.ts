@@ -33,9 +33,12 @@ export interface RouteablesClientOptions {
    * application listens to `onSessionLost`).
    */
   recover?: ((recovery: Recovery) => void | Promise<void>) | false;
+  /** Whether a notification that has an expiration is closed by the client after it (`dismiss`). `true` by default. */
+  expireToasts?: boolean;
 }
 
 const SESSION_LOST: Ack = { success: false, error: 'The session was lost: the call may not have ended.', code: 'session-lost' };
+const DISCONNECTED: Ack = { success: false, error: 'The connection was closed: the call may not have ended.', code: 'disconnected' };
 
 /**
  * Holds what the server shows, and sends what the user does. It does not know Angular or Vue: a component subscribes
@@ -73,7 +76,8 @@ export class RouteablesClient {
   constructor(private readonly transport: RouteableTransport, private readonly options: RouteablesClientOptions = {}) {
     transport.onConnectionChange(connected => {
       if (!connected) {
-        // The pages stay on screen: the session is resumed when the connection comes back, or recovered.
+        // The pages and the calls that wait stay: the session is resumed when the connection comes back (by itself, or by connect() once
+        // SignalR stopped retrying), and the calls end then; or it is recovered, and they end as lost.
         this.setConnected(false);
         return;
       }
@@ -120,8 +124,19 @@ export class RouteablesClient {
     await this.hello();
   }
 
-  disconnect(): Promise<void> {
-    return this.transport.stop();
+  /** Closes the connection: the application is done with it. The calls that wait end with `{ code: 'disconnected' }`; the pages stay. */
+  async disconnect(): Promise<void> {
+    await this.transport.stop();
+    this.setConnected(false);
+    this.abandonCalls(DISCONNECTED);
+  }
+
+  // The calls that wait will not hear of their end: they end with the given failure.
+  private abandonCalls(ack: Ack): void {
+    const waiting = [...this.operations.values()];
+    this.operations.clear();
+    this.early.clear();
+    for (const settle of waiting) settle(ack);
   }
 
   // ---------------------------------------------------------------- what the user does
@@ -259,10 +274,7 @@ export class RouteablesClient {
       this.instances.clear();
       this.setDialogs([]);
       this.setToasts([]);
-      for (const [operation, settle] of this.operations) {
-        settle(SESSION_LOST);
-        this.operations.delete(operation);
-      }
+      this.abandonCalls(SESSION_LOST);
     }
 
     this.setConnected(true);
@@ -418,6 +430,11 @@ export class RouteablesClient {
   private onToast(toast: Toast): void {
     if (this.toastList.some(t => t.id === toast.id)) return;
     this.setToasts([...this.toastList, toast]);
+    // A notification closes by itself after its time.
+    if (this.options.expireToasts !== false && toast.expirationSeconds !== null)
+      setTimeout(() => {
+        if (this.toastList.some(t => t.id === toast.id)) void this.dismiss(toast, false);
+      }, toast.expirationSeconds * 1000);
   }
 
   private setPage(target: string, page: Page | null): void {

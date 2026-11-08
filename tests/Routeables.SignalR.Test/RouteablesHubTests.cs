@@ -72,10 +72,24 @@ public class RouteablesHubTests
 
         await hub.OnConnectedAsync();
         Assert.Equal(1, sessions.Count);
+        await hub.Hello(new RouteableHello(RouteableProtocol.Version));
 
         await hub.OnDisconnectedAsync(null);
         Assert.Equal(0, sessions.Count);
         Assert.Equal(1, sessions.DetachedCount);   // kept for the client to resume it
+    }
+
+    [Fact]
+    public async Task A_connection_that_never_said_hello_is_not_waited_for()
+    {
+        await using var provider = Services();
+        var sessions = provider.GetRequiredService<RouteableSessions>();
+        var hub = Connect(provider, sessions, "c1", new RecordingClient());
+
+        await hub.OnConnectedAsync();
+        await hub.OnDisconnectedAsync(null);
+        Assert.Equal(0, sessions.Count);
+        Assert.Equal(0, sessions.DetachedCount);
     }
 
     [Fact]

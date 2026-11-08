@@ -105,7 +105,14 @@ public sealed class RouteableSession : IAsyncDisposable
     internal RouteableAuthorizer Authorizer { get; }
     internal SessionDispatcher Dispatcher { get; }
     internal Outbound Outbound { get; }
-    internal string UserKey { get; }
+    /// <summary>Who may resume the session: <see langword="null"/> when nobody may (a user authenticated without a stable identifier).</summary>
+    internal string? UserKey { get; }
+
+    /// <summary>The user of the connection the session is attached to.</summary>
+    public ClaimsPrincipal? User => _connection.User;
+
+    /// <summary>Whether the client said <c>Hello</c>: only such a session waits for its client when the connection drops.</summary>
+    internal bool Greeted { get; set; }
 
     // ---------------------------------------------------------------- targets
 
@@ -385,10 +392,30 @@ public sealed class RouteableSession : IAsyncDisposable
 
     private void OnToast(RouteableToast toast) => Dispatcher.Run(() => { FlushTurn(); Outbound.Toast(toast); });
 
-    private void OnModalOpened(object viewModel) => Dispatcher.Run(() => Put(RouteableTargets.Modal, new WatchedTarget(RouteableTargets.Modal, this, null, viewModel)));
+    // The modals open, the last one on top: the client shows the one on top. A modal opened from another one covers it; when it closes, the
+    // one under it is shown again (a new generation of the target), still awaited by the command that opened it.
+    private readonly List<object> _modals = [];
 
-    private void OnModalClosed() => Dispatcher.Run(() =>
+    private void OnModalOpened(object viewModel) => Dispatcher.Run(() =>
     {
+        _modals.Add(viewModel);
+        Put(RouteableTargets.Modal, new WatchedTarget(RouteableTargets.Modal, this, null, viewModel));
+    });
+
+    private void OnModalClosed(object viewModel) => Dispatcher.Run(() =>
+    {
+        var index = _modals.FindLastIndex(m => ReferenceEquals(m, viewModel));
+        if (index < 0)
+            return;
+        _modals.RemoveAt(index);
+        if (index < _modals.Count)
+            return;   // a modal under the one shown closed: the one shown stays
+
+        if (_modals.Count > 0)
+        {
+            Put(RouteableTargets.Modal, new WatchedTarget(RouteableTargets.Modal, this, null, _modals[^1]));
+            return;
+        }
         if (!RemoveTarget(RouteableTargets.Modal, out var modal))
             return;
         var generation = modal.Generation;
@@ -427,15 +454,43 @@ public sealed class RouteableSession : IAsyncDisposable
 
     internal void Unhandled(Exception exception) => _logger.LogError(exception, "An exception was not observed in a session.");
 
+    internal bool DetailedErrors => _invoker.DetailedErrors;
+
+    internal void LogProjectionFailure(Exception exception, string target, string property)
+        => _logger.LogError(exception, "The property {Property} of the target '{Target}' could not be read.", property, target);
+
     // ---------------------------------------------------------------- reconnection
 
-    internal static string KeyOf(ClaimsPrincipal? user)
+    /// <summary>
+    /// Who a user is, to resume a session: the empty string for an anonymous user (the token is the only key), the scheme, the issuer and the
+    /// identifier of an authenticated one (<c>NameIdentifier</c>, else <c>sub</c>), and <see langword="null"/> when an authenticated user has no
+    /// identifier: such a session cannot be resumed, rather than be confused with the session of another user without one.
+    /// </summary>
+    internal static string? KeyOf(ClaimsPrincipal? user)
     {
         var identity = user?.Identity;
         if (identity is not { IsAuthenticated: true })
             return string.Empty;
-        var id = user!.FindFirst(ClaimTypes.NameIdentifier)?.Value ?? user.FindFirst("sub")?.Value ?? identity.Name ?? string.Empty;
-        return identity.AuthenticationType + "|" + id;
+        var claim = user!.FindFirst(ClaimTypes.NameIdentifier) ?? user.FindFirst("sub");
+        if (claim is null || string.IsNullOrWhiteSpace(claim.Value))
+            return null;
+        var scheme = identity.AuthenticationType ?? string.Empty;
+        return $"{scheme.Length}:{scheme}|{claim.Issuer.Length}:{claim.Issuer}|{claim.Value}";
+    }
+
+    /// <summary>
+    /// Evaluates again what the user may see and sends every target again: a view model the user may not see any more is closed, a property
+    /// the user may not read any more is no longer sent (and the reverse). <see cref="RouteableSessions.ReauthorizeAsync"/> does it for many sessions.
+    /// </summary>
+    public Task ReauthorizeAsync()
+    {
+        if (IsDisposed)
+            return Task.CompletedTask;
+        return Dispatcher.InvokeAsync(() =>
+        {
+            foreach (var target in _targets.Values.ToList())
+                target.Resend();
+        });
     }
 
     /// <summary>The connection dropped: the session keeps its view models and waits for the client.</summary>

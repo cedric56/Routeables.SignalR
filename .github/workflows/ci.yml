@@ -143,7 +143,8 @@ jobs:
         working-directory: Routeables.SignalR
 
   # The web samples draw the view models of the Angular sample server: their types and their builds are checked here, then each one is
-  # driven in Chrome against the real server (tests/samples/smoke.mjs).
+  # driven in Chrome against the real server (tests/samples/smoke.mjs). Vue and React are served as built (vite preview); Angular by its
+  # development server, which proxies the hub as in development.
   web-samples:
     name: Web sample (${{ matrix.sample.name }})
     runs-on: ubuntu-24.04
@@ -152,8 +153,9 @@ jobs:
       fail-fast: false
       matrix:
         sample:
-          - { name: Vue, path: samples/Vue/XAnimals.Vue, port: 5173 }
-          - { name: React, path: samples/React/XAnimals.React, port: 5174 }
+          - { name: Angular, path: samples/Angular/XAnimals.Angular, port: 4200, serve: 'npx ng serve --port 4200' }
+          - { name: Vue, path: samples/Vue/XAnimals.Vue, port: 5173, serve: 'npx vite preview --port 5173 --strictPort' }
+          - { name: React, path: samples/React/XAnimals.React, port: 5174, serve: 'npx vite preview --port 5174 --strictPort' }
 
     steps:
       - name: Checkout Routeables.SignalR
@@ -190,8 +192,8 @@ jobs:
         run: |
           dotnet build samples/Angular/XAnimals.AngularServer -c Release
           nohup dotnet samples/Angular/XAnimals.AngularServer/bin/Release/net10.0/XAnimals.AngularServer.dll > "$RUNNER_TEMP/server.log" 2>&1 &
-          (cd ${{ matrix.sample.path }} && nohup npx vite preview --port ${{ matrix.sample.port }} --strictPort > "$RUNNER_TEMP/app.log" 2>&1 &)
-          for i in $(seq 60); do curl -sf http://localhost:5090/routeables/negotiate?negotiateVersion=1 -X POST > /dev/null && curl -sf http://localhost:${{ matrix.sample.port }} > /dev/null && exit 0; sleep 1; done
+          (cd ${{ matrix.sample.path }} && nohup ${{ matrix.sample.serve }} > "$RUNNER_TEMP/app.log" 2>&1 &)
+          for i in $(seq 120); do curl -sf http://localhost:5090/routeables/negotiate?negotiateVersion=1 -X POST > /dev/null && curl -sf http://localhost:${{ matrix.sample.port }} > /dev/null && exit 0; sleep 1; done
           cat "$RUNNER_TEMP/server.log" "$RUNNER_TEMP/app.log"; exit 1
         working-directory: Routeables.SignalR
 
@@ -211,10 +213,12 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      # A release line, not the moving stable channel: a new Flutter never breaks this build by surprise. Move it on purpose.
       - name: Setup Flutter
         uses: subosito/flutter-action@v2
         with:
           channel: stable
+          flutter-version: 3.47.x
           cache: true
 
       - name: Client
@@ -232,25 +236,3 @@ jobs:
           flutter test
           flutter build web
         working-directory: samples/Flutter/xanimals_flutter
-
-  angular-sample:
-    name: Angular sample
-    runs-on: ubuntu-24.04
-    timeout-minutes: 10
-
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Setup Node
-        uses: actions/setup-node@v4
-        with:
-          node-version: 22
-
-      - name: Install
-        run: npm ci --no-audit --no-fund
-        working-directory: samples/Angular/XAnimals.Angular
-
-      - name: Build
-        run: npx ng build
-        working-directory: samples/Angular/XAnimals.Angular

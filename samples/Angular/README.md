@@ -24,6 +24,8 @@ npm install
 npm start
 ```
 
+> **A sample, not a template for production.** `XAnimals.AngularServer` accepts any connection, without authentication, and allows the pages of the machine (any `localhost` origin, with credentials) so that every web sample and Flutter web reach it. Do not copy its `Program.cs` as it is: protect the hub (`MapRouteables().RequireAuthorization()`), allow only your own origins, and go through the checklist of [SECURITY.md](../../SECURITY.md).
+
 Open http://localhost:4200. Use the side panel; reload on `/dogs/Afghan%20Hound` or `/tabs`: the address is a route. Open Features and press "Lock for 5 seconds": the menu locks, and unlocks by itself when the server says so.
 
 ## In Visual Studio
