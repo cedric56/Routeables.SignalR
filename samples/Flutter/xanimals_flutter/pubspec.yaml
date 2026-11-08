@@ -1,5 +1,5 @@
 name: xanimals_flutter
-description: The XAnimals sample drawn by Flutter, against the server of the Angular sample (XAnimals.AngularServer), through Routeables.SignalR.
+description: The XAnimals sample drawn by Flutter, against the sample server (samples/Server, XAnimals.Server), through Routeables.SignalR.
 publish_to: none
 version: 1.0.0
 

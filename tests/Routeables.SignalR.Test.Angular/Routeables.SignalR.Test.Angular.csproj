@@ -1,7 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
   <!--
-    The server of the Angular sample (samples/Angular/XAnimals.AngularServer) seen as the Angular app sees it: a session per connection,
+    The server of the samples (samples/Server) seen as an app sees it: a session per connection,
     the messages it receives, the calls it makes. No browser: the pages, the commands, the dialogs and the modal are checked where the
     app gets them. The client side is tested in clients/typescript (npm test).
   -->
@@ -27,7 +27,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\..\samples\Angular\XAnimals.AngularServer\XAnimals.Server.csproj" />
+    <ProjectReference Include="..\..\samples\Server\XAnimals.Server.csproj" />
     <ProjectReference Include="..\..\src\Routeables.SignalR\Routeables.SignalR.csproj" />
   </ItemGroup>
 

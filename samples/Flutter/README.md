@@ -3,7 +3,7 @@
 The same view models and the same server as the [Angular sample](../Angular), drawn by a Flutter app: on the web, on Windows, macOS or Linux, on Android or iOS. The server runs the view models; the app receives their state and sends what the user does, through [routeables_client](../../clients/dart), the Dart client of Routeables.SignalR. Every page of the menu is there: the animal lists and details, History, Regions, Adopt a pet, Dialogs (messages, content and task dialogs, notifications, the note modal), Features (guard, lock, measures), Members, Tabs and About, with the side menu and the theme button.
 
 ```
-Flutter app (xanimals_flutter)  ──SignalR──▶  XAnimals.AngularServer
+Flutter app (xanimals_flutter)  ──SignalR──▶  XAnimals.Server (samples/Server)
   draws page.state of each target              Routeables.SignalR: one router, one set of regions and one set of
   app.goTo('/cats/Abyssinian')                 view models per connection
   app.run('', state['pushCommand'])            the view models of XAnimals.ViewModels
@@ -16,7 +16,7 @@ You need the .NET 10 SDK and Flutter 3.24 or later.
 
 ```bash
 # 1. the server, on http://localhost:5090
-dotnet run --project samples/Angular/XAnimals.AngularServer
+dotnet run --project samples/Server
 
 # 2. once: the platform folders (flutter create), and what lets them reach a server in plain HTTP
 cd samples/Flutter/xanimals_flutter
@@ -35,7 +35,7 @@ The app reaches the hub at `http://localhost:5090/routeables`, or `http://10.0.2
 flutter run --dart-define=ROUTEABLES_URL=http://192.168.1.10:5090/routeables
 ```
 
-A phone needs the address of the machine on the network, and a server that listens on it: `dotnet run --project samples/Angular/XAnimals.AngularServer --urls http://0.0.0.0:5090`.
+A phone needs the address of the machine on the network, and a server that listens on it: `dotnet run --project samples/Server --urls http://0.0.0.0:5090`.
 
 `tool/setup.dart` runs `flutter create` (which keeps `lib`, `test` and `pubspec.yaml`), then allows plain HTTP: `usesCleartextTraffic` on Android, the network client entitlement on macOS, local networking on iOS. These are for a sample that talks to a server on this machine; an application in production uses HTTPS.
 

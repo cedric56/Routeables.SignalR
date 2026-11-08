@@ -7,7 +7,7 @@ updates:
     schedule: { interval: weekly }
 
   - package-ecosystem: nuget
-    directories: [/src/Routeables.SignalR, /tests/Routeables.SignalR.Test, /tests/Routeables.SignalR.Test.Angular, /tests/Routeables.SignalR.E2E.Server, /samples/Angular/XAnimals.AngularServer]
+    directories: [/src/Routeables.SignalR, /tests/Routeables.SignalR.Test, /tests/Routeables.SignalR.Test.Angular, /tests/Routeables.SignalR.E2E.Server, /samples/Server]
     schedule: { interval: weekly }
     groups:
       nuget: { patterns: ['*'] }

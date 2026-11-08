@@ -6,6 +6,11 @@
     <Version Condition="'$(VersionSuffix)' != ''">$(VersionPrefix)-$(VersionSuffix)</Version>
     <!-- Where the Routeables repository is checked out: next to this one by default. The projects reference its sources. -->
     <RouteablesRoot Condition="'$(RouteablesRoot)' == ''">$(MSBuildThisFileDirectory)..\Routeables\</RouteablesRoot>
+    <!--
+      As a full path without "..": the projects of Routeables reference one another by their own relative paths, and NuGet in Visual Studio must see
+      one project under one path. "Routeables.SignalR\..\Routeables\samples\..." and "Routeables\samples\..." were two projects to it (NU1105).
+    -->
+    <RouteablesRoot>$([MSBuild]::NormalizeDirectory('$(RouteablesRoot)'))</RouteablesRoot>
   </PropertyGroup>
 
   <PropertyGroup>

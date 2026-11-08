@@ -6,7 +6,7 @@ using Routeables.Services;
 using Routeables.SignalR;
 using XAnimals.Common;
 
-namespace XAnimals.AngularServer;
+namespace XAnimals.Server;
 
 /// <summary>An entry of the menu, as the app draws it.</summary>
 /// <param name="Name">What the entry is called.</param>

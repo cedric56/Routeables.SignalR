@@ -1,9 +1,9 @@
 ﻿using Routeables.SignalR;
-using XAnimals.AngularServer;
+using XAnimals.Server;
 using XAnimals.ViewModels;
 
 // The content root is the folder of the server, not the current directory: appsettings.json is found wherever the server is started from
-// (Visual Studio, dotnet run, its exe, or `dotnet path/to/XAnimals.AngularServer.dll` from another folder as the CI does).
+// (Visual Studio, dotnet run, its exe, or `dotnet path/to/XAnimals.Server.dll` from another folder as the CI does).
 var builder = WebApplication.CreateBuilder(new WebApplicationOptions { Args = args, ContentRootPath = AppContext.BaseDirectory });
 
 // The address is http://localhost:5090 (appsettings.json): the dev servers of the web samples proxy /routeables there.

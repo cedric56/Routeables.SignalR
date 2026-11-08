@@ -18,7 +18,7 @@ export default defineConfig({
     port: 5173,
     // The client sources are in clients/typescript.
     fs: { allow: [here('../../..')] },
-    // /routeables is the hub of Routeables.SignalR: the server of the Angular sample (XAnimals.AngularServer) answers it.
+    // /routeables is the hub of Routeables.SignalR: the sample server (samples/Server, XAnimals.Server) answers it.
     proxy: { '/routeables': { target: 'http://localhost:5090', ws: true, changeOrigin: false } },
   },
 });

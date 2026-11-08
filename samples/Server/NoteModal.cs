@@ -2,7 +2,7 @@
 using Routeables.SignalR;
 using XAnimals.ViewModels;
 
-namespace XAnimals.AngularServer;
+namespace XAnimals.Server;
 
 /// <summary>
 /// The view of <see cref="NoteViewModel"/> for the Angular app: the view model goes to the browser as the page of the target

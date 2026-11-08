@@ -4,7 +4,7 @@ using Routeables.SignalR;
 using IRouter = Routeables.Abstraction.IRouter;
 using XAnimals.ViewModels;
 
-namespace XAnimals.AngularServer;
+namespace XAnimals.Server;
 
 /// <summary>
 /// The pets of the Adopt a pet page, watched as <c>$pets</c>: every page of the history of the region "adopt", up to the current one.

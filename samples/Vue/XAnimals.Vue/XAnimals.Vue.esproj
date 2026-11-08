@@ -3,7 +3,7 @@
   <!--
     Opens the Vue app in Visual Studio: Solution Explorer shows its files, F5 runs "npm start" and debugs it in the browser
     (.vscode/launch.json), Visual Studio runs "npm install" when node_modules is missing.
-    The hub is answered by XAnimals.AngularServer (http://localhost:5090): start both with the launch profile "Vue + server"
+    The hub is answered by XAnimals.Server (http://localhost:5090): start both with the launch profile "Vue + server"
     (Routeables.SignalR.slnLaunch), or set them as startup projects.
   -->
   <PropertyGroup>

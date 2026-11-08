@@ -58,8 +58,8 @@ jobs:
         run: dotnet test --project tests/Routeables.SignalR.Test/Routeables.SignalR.Test.csproj --no-build -c ${{ env.CONFIGURATION }}
         working-directory: Routeables.SignalR
 
-      # The server of the Angular sample, driven the way the Angular application drives it.
-      - name: Angular sample server
+      # The server of the samples, driven the way an application drives it.
+      - name: Sample server
         run: dotnet test --project tests/Routeables.SignalR.Test.Angular/Routeables.SignalR.Test.Angular.csproj --no-build -c ${{ env.CONFIGURATION }}
         working-directory: Routeables.SignalR
 
@@ -142,7 +142,7 @@ jobs:
         run: node --test tests/e2e/e2e.test.mjs
         working-directory: Routeables.SignalR
 
-  # The web samples draw the view models of the Angular sample server: their types and their builds are checked here, then each one is
+  # The web samples draw the view models of the sample server (samples/Server): their types and their builds are checked here, then each one is
   # driven in Chrome against the real server (tests/samples/smoke.mjs). Vue and React are served as built (vite preview); Angular by its
   # development server, which proxies the hub as in development.
   web-samples:
@@ -190,8 +190,8 @@ jobs:
 
       - name: Start the server and the app
         run: |
-          dotnet build samples/Angular/XAnimals.AngularServer -c Release
-          nohup dotnet samples/Angular/XAnimals.AngularServer/bin/Release/net10.0/XAnimals.AngularServer.dll > "$RUNNER_TEMP/server.log" 2>&1 &
+          dotnet build samples/Server -c Release
+          nohup dotnet samples/Server/bin/Release/net10.0/XAnimals.Server.dll > "$RUNNER_TEMP/server.log" 2>&1 &
           (cd ${{ matrix.sample.path }} && nohup ${{ matrix.sample.serve }} > "$RUNNER_TEMP/app.log" 2>&1 &)
           for i in $(seq 120); do curl -sf http://localhost:5090/routeables/negotiate?negotiateVersion=1 -X POST > /dev/null && curl -sf http://localhost:${{ matrix.sample.port }} > /dev/null && exit 0; sleep 1; done
           cat "$RUNNER_TEMP/server.log" "$RUNNER_TEMP/app.log"; exit 1

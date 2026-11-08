@@ -2,7 +2,7 @@
   "name": "routeables-samples-smoke",
   "private": true,
   "type": "module",
-  "description": "Drives the web samples in Chrome against XAnimals.AngularServer.",
+  "description": "Drives the web samples in Chrome against XAnimals.Server.",
   "scripts": {
     "smoke": "node smoke.mjs"
   },

@@ -3,7 +3,7 @@ using Routeables.SignalR;
 using XAnimals.ViewModels;
 using IRouter = Routeables.Abstraction.IRouter;
 
-namespace XAnimals.AngularServer;
+namespace XAnimals.Server;
 
 /// <summary>The "view" of a route on this server: nothing. The state of the view model is what the front end receives.</summary>
 internal sealed class AnimalsPage;

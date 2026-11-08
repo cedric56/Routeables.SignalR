@@ -1,7 +1,7 @@
 ﻿using System.Text.Json;
 using Microsoft.Extensions.DependencyInjection;
 using Routeables.SignalR;
-using XAnimals.AngularServer;
+using XAnimals.Server;
 using XAnimals.ViewModels;
 
 namespace Routeables.Tests.Angular;
@@ -155,7 +155,7 @@ internal sealed class Connection : IAsyncDisposable
     public ValueTask DisposeAsync() => Session.DisposeAsync();
 }
 
-/// <summary>The server of the Angular sample, seen as the app sees it.</summary>
+/// <summary>The server of the samples (samples/Server), seen as an app sees it.</summary>
 public class AngularServerTests : IAsyncLifetime
 {
     private ServiceProvider _provider = null!;

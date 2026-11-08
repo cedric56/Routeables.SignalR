@@ -1,8 +1,8 @@
-// Drives a web sample in Chrome against XAnimals.AngularServer, as a user would: the lists, the search, a detail, a dialog, the modal,
+// Drives a web sample in Chrome against XAnimals.Server, as a user would: the lists, the search, a detail, a dialog, the modal,
 // a notification, the history and its region, the four regions, the tabs, the adoption, the lock of the menu, the theme, the back button
 // and a reload. Every web sample draws the same classes (public/css), so the same test drives them all.
 //
-//   dotnet run --project samples/Angular/XAnimals.AngularServer          (http://localhost:5090)
+//   dotnet run --project samples/Server          (http://localhost:5090)
 //   npm --prefix samples/React/XAnimals.React run build && npm --prefix samples/React/XAnimals.React run preview
 //   npm --prefix tests/samples ci && node tests/samples/smoke.mjs http://localhost:5174
 //

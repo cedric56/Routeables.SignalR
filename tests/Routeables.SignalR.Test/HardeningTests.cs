@@ -146,7 +146,7 @@ public class HardeningTests
     }
 
     [Fact]
-    public void A_dialog_without_buttons_is_answered_with_0_only_and_open_notifications_are_bounded()
+    public async Task A_dialog_without_buttons_is_answered_with_0_only_and_open_notifications_are_bounded()
     {
         var interactions = new RemoteInteractions();
         RouteableDialog? asked = null;
@@ -154,7 +154,7 @@ public class HardeningTests
         var answer = interactions.AskAsync("message", "Done", null, "Saved", null, false, []);
         Assert.False(interactions.Answer(asked!.Id, 1));
         Assert.True(interactions.Answer(asked.Id, 0));
-        Assert.Equal(0, answer.Result);
+        Assert.Equal(0, await answer);
 
         for (var i = 0; i < 100; i++)
             interactions.Notify("t", "m", RouteableNotificationType.Information, null, null, null);

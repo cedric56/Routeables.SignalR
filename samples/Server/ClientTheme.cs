@@ -1,7 +1,7 @@
 ﻿using System.ComponentModel;
 using Routeables.Services;
 
-namespace XAnimals.AngularServer;
+namespace XAnimals.Server;
 
 /// <summary>The theme a view model asked for (<see cref="IRouteableRequestedThemeService"/>), kept for the connection; the shell tells the app.</summary>
 internal sealed class ClientTheme : IRouteableRequestedThemeService

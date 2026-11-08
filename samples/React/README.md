@@ -3,7 +3,7 @@
 The same view models and the same server as the [Angular sample](../Angular), drawn by a React 19 app. The server runs the view models; the browser receives their state and sends what the user does. Every page of the menu is there: the animal lists and details, History, Regions, Adopt a pet, Dialogs (messages, content and task dialogs, notifications, the note modal), Features (guard, lock, measures), Members, Tabs and About, with the same side panel and theme button as the other web samples.
 
 ```
-React app (xanimals-react)  ──SignalR──▶  XAnimals.AngularServer
+React app (xanimals-react)  ──SignalR──▶  XAnimals.Server (samples/Server)
   shows page.state of each target       Routeables.SignalR: one router, one set of regions and one set of
   goTo('/cats/Abyssinian')              view models per connection
   run('', state.pushCommand)            the view models of XAnimals.ViewModels
@@ -18,7 +18,7 @@ Two terminals. You need the .NET 10 SDK and Node 22.12 or later.
 
 ```bash
 # 1. the server, on http://localhost:5090
-dotnet run --project samples/Angular/XAnimals.AngularServer
+dotnet run --project samples/Server
 
 # 2. the app, on http://localhost:5174 (it proxies /routeables to the server)
 cd samples/React/XAnimals.React
@@ -32,7 +32,7 @@ Open http://localhost:5174. Use the side panel; reload on `/dogs/Afghan%20Hound`
 
 ## In Visual Studio
 
-Open `Routeables.SignalR.slnx`: the app is the project `XAnimals.React` (`XAnimals.React.esproj`). Choose the launch profile **React + server** in the toolbar (`Routeables.SignalR.slnLaunch`) and press F5: Visual Studio starts XAnimals.AngularServer on http://localhost:5090, runs `npm start` and opens http://localhost:5174 in Edge or Chrome with the debugger attached (`.vscode/launch.json`). It runs `npm install` when `node_modules` is missing. **All web apps + server** starts every web sample against the same server.
+Open `Routeables.SignalR.slnx`: the app is the project `XAnimals.React` (`XAnimals.React.esproj`). Choose the launch profile **React + server** in the toolbar (`Routeables.SignalR.slnLaunch`) and press F5: Visual Studio starts XAnimals.Server on http://localhost:5090, runs `npm start` and opens http://localhost:5174 in Edge or Chrome with the debugger attached (`.vscode/launch.json`). It runs `npm install` when `node_modules` is missing. **All web apps + server** starts every web sample against the same server.
 
 ## What is worth reading
 

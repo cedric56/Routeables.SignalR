@@ -3,7 +3,7 @@
 The same view models and the same server as the [Angular sample](../Angular), drawn by a Vue 3 app. The server runs the view models; the browser receives their state and sends what the user does. Every page of the menu is there: the animal lists and details, History, Regions, Adopt a pet, Dialogs (messages, content and task dialogs, notifications, the note modal), Features (guard, lock, measures), Members, Tabs and About, with the same side panel and theme button as the other web samples.
 
 ```
-Vue app (xanimals-vue)  ──SignalR──▶  XAnimals.AngularServer
+Vue app (xanimals-vue)  ──SignalR──▶  XAnimals.Server (samples/Server)
   shows page.state of each target       Routeables.SignalR: one router, one set of regions and one set of
   goTo('/cats/Abyssinian')              view models per connection
   run('', state.pushCommand)            the view models of XAnimals.ViewModels
@@ -18,7 +18,7 @@ Two terminals. You need the .NET 10 SDK and Node 20.19, 22.12 or later.
 
 ```bash
 # 1. the server, on http://localhost:5090
-dotnet run --project samples/Angular/XAnimals.AngularServer
+dotnet run --project samples/Server
 
 # 2. the app, on http://localhost:5173 (it proxies /routeables to the server)
 cd samples/Vue/XAnimals.Vue
@@ -32,7 +32,7 @@ Open http://localhost:5173. Use the side panel; reload on `/dogs/Afghan%20Hound`
 
 ## In Visual Studio
 
-Open `Routeables.SignalR.slnx`: the app is the project `XAnimals.Vue` (`XAnimals.Vue.esproj`, the JavaScript project system of Visual Studio). Choose the launch profile **Vue + server** in the toolbar (it comes from `Routeables.SignalR.slnLaunch`) and press F5: Visual Studio starts XAnimals.AngularServer on http://localhost:5090, runs `npm start` and opens http://localhost:5173 in Edge or Chrome with the debugger attached (`.vscode/launch.json`). It runs `npm install` when `node_modules` is missing. **All web apps + server** starts every web sample (Angular, Vue, React) against the same server.
+Open `Routeables.SignalR.slnx`: the app is the project `XAnimals.Vue` (`XAnimals.Vue.esproj`, the JavaScript project system of Visual Studio). Choose the launch profile **Vue + server** in the toolbar (it comes from `Routeables.SignalR.slnLaunch`) and press F5: Visual Studio starts XAnimals.Server on http://localhost:5090, runs `npm start` and opens http://localhost:5173 in Edge or Chrome with the debugger attached (`.vscode/launch.json`). It runs `npm install` when `node_modules` is missing. **All web apps + server** starts every web sample (Angular, Vue, React) against the same server.
 
 Visual Studio 2022 17.14 or later (or Visual Studio 2026) with the "Node.js development" or "ASP.NET and web development" workload, and Node.js 22.
 

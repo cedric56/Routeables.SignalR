@@ -51,10 +51,11 @@ await client.invoke('approveAsync', 42);   // resolves when the command has ende
 | [src/Routeables.SignalR](src/Routeables.SignalR) | The server library (`AddRouteablesSignalR`, `MapRouteables`). |
 | [clients/typescript](clients/typescript) | `@routeables/client`, the client; it does not depend on Angular or Vue. |
 | [clients/dart](clients/dart) | `routeables_client`, the client for Dart and Flutter, with the same protocol and the same guarantees. |
-| [samples/Angular](samples/Angular) | The Angular application and its server, XAnimals.AngularServer. |
+| [samples/Server](samples/Server) | XAnimals.Server, the ASP.NET Core server every sample talks to. |
+| [samples/Angular](samples/Angular) | The Angular application. |
 | [samples/Vue](samples/Vue), [samples/React](samples/React) | The same application in Vue and React, against the same server. |
 | [samples/Flutter](samples/Flutter) | The same application in Flutter: web, desktop and mobile. |
-| [tests](tests) | The tests of the sessions, the hub, the security, the protocol, the reconnection and the Angular sample server; [tests/e2e](tests/e2e) drives a real Kestrel and SignalR server from Node; [tests/samples](tests/samples) drives every web sample in Chrome. |
+| [tests](tests) | The tests of the sessions, the hub, the security, the protocol, the reconnection and the sample server; [tests/e2e](tests/e2e) drives a real Kestrel and SignalR server from Node; [tests/samples](tests/samples) drives every web sample in Chrome. |
 
 ## Build
 
@@ -67,7 +68,7 @@ cd Routeables.SignalR
 dotnet build Routeables.SignalR.slnx
 ```
 
-Needs the .NET 10 SDK and Node.js 22. Routeables is expected in `../Routeables`; set `-p:RouteablesRoot=<path>\` (with the trailing separator) to use another place. The Angular sample server also uses the view models of the XAnimals samples of Routeables (`samples/Bases`).
+Needs the .NET 10 SDK and Node.js 22. Routeables is expected in `../Routeables`; set `-p:RouteablesRoot=<path>\` (with the trailing separator) to use another place. The sample server also uses the view models of the XAnimals samples of Routeables (`samples/Bases`).
 
 The CI builds against one revision of Routeables (`ROUTEABLES_REF` in [.github/workflows/ci.yml](.github/workflows/ci.yml)), so that a change of Routeables never breaks this build by surprise: move it on purpose. To build against the published packages of Routeables instead of its sources, give their version: `dotnet build -p:RouteablesVersion=2.0.0` (the release does so: the NuGet package depends on packages only).
 
@@ -83,7 +84,7 @@ Every web sample is the same application (the XAnimals pages, the menu, the regi
 | [Flutter](samples/Flutter) | Flutter (web, Windows, macOS, Linux, Android, iOS) | http://localhost:5179 on the web (`flutter run -d chrome --web-port 5179`) |
 
 ```
-dotnet run --project samples/Angular/XAnimals.AngularServer          # the server, on http://localhost:5090
+dotnet run --project samples/Server          # the server, on http://localhost:5090
 cd samples/React/XAnimals.React && npm install && npm start          # or any other sample folder
 ```
 

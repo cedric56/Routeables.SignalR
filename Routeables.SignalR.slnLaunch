@@ -3,7 +3,7 @@
     "Name": "Angular + server",
     "Projects": [
       {
-        "Path": "samples\\Angular\\XAnimals.AngularServer\\XAnimals.Server.csproj",
+        "Path": "samples\\Server\\XAnimals.Server.csproj",
         "Action": "Start"
       },
       {
@@ -16,7 +16,7 @@
     "Name": "Vue + server",
     "Projects": [
       {
-        "Path": "samples\\Angular\\XAnimals.AngularServer\\XAnimals.Server.csproj",
+        "Path": "samples\\Server\\XAnimals.Server.csproj",
         "Action": "Start"
       },
       {
@@ -29,7 +29,7 @@
     "Name": "React + server",
     "Projects": [
       {
-        "Path": "samples\\Angular\\XAnimals.AngularServer\\XAnimals.Server.csproj",
+        "Path": "samples\\Server\\XAnimals.Server.csproj",
         "Action": "Start"
       },
       {
@@ -42,7 +42,7 @@
     "Name": "All web apps + server",
     "Projects": [
       {
-        "Path": "samples\\Angular\\XAnimals.AngularServer\\XAnimals.Server.csproj",
+        "Path": "samples\\Server\\XAnimals.Server.csproj",
         "Action": "Start"
       },
       {

@@ -13,6 +13,10 @@
       <Deploy />
     </Project>
   </Folder>
+  <Folder Name="/samples/Server/">
+    <File Path="samples/Server/README.md" />
+    <Project Path="samples/Server/XAnimals.Server.csproj" />
+  </Folder>
   <Folder Name="/samples/Vue/">
     <File Path="samples/Vue/README.md" />
     <Project Path="samples/Vue/XAnimals.Vue/XAnimals.Vue.esproj">
@@ -48,7 +52,6 @@
     <!-- The Flutter sample: opened by Visual Studio Code or Android Studio, run by Flutter. -->
     <File Path="samples/Flutter/README.md" />
     <File Path="samples/Flutter/xanimals_flutter/pubspec.yaml" />
-    <Project Path="samples/Server/XAnimals.Server.csproj" />
   </Folder>
   <Folder Name="/src/">
     <Project Path="src/Routeables.SignalR/Routeables.SignalR.csproj" />

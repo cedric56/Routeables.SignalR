@@ -62,12 +62,12 @@ The first version meant for production. It changes the protocol (2) and some def
 ### Client for Dart and Flutter (`routeables_client`)
 
 - A port of `@routeables/client` to Dart, on the SignalR client for Dart (signalr_netcore): the same protocol, the same guarantees, the same tests (with the changes of the TypeScript client above). Not published on pub.dev yet.
-- A Flutter sample (web, desktop, mobile) against the server of the Angular sample, which allows the pages of the machine (CORS) for Flutter web.
+- A Flutter sample (web, desktop, mobile) against the sample server, which allows the pages of the machine (CORS) for Flutter web.
 
 ### Build and distribution
 
 - Builds against the current Routeables (`GetEntries` / `IMenuEntry`); the CI pins the revision of Routeables (`ROUTEABLES_REF`).
-- The CounterServer sample is removed: the web samples show the library.
+- The CounterServer sample is removed: the web samples show the library. The server of the samples is `samples/Server` (XAnimals.Server), shared by Angular, Vue, React and Flutter; it was `samples/Angular/XAnimals.AngularServer`.
 - A React web sample, beside Angular and Vue: the same application against the same server, each built and driven in Chrome by the CI (`tests/samples/smoke.mjs`).
 - `-p:RouteablesVersion=…` builds and packs against the Routeables packages; a release workflow publishes the NuGet and npm packages from a tag, after installing the NuGet package in an empty application.
 - `npm ci` with lockfiles; the npm package is packed and installed in an empty project in the CI.

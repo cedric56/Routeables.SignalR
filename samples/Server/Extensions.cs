@@ -6,7 +6,7 @@ using Routeables.SignalR;
 using XAnimals.Common;
 using XAnimals.ViewModels;
 
-namespace XAnimals.AngularServer;
+namespace XAnimals.Server;
 
 internal static class Extensions
 {
@@ -16,7 +16,7 @@ internal static class Extensions
     /// written for this server (the shell, the pets) carry <c>[RouteableState]</c> themselves.
     /// </summary>
     public static RouteablesOptions AddAnimalsExposure(this RouteablesOptions options)
-        => options.ExposeTypes(type => type.Namespace is { } ns && ns.StartsWith("XAnimals.", StringComparison.Ordinal) && ns != "XAnimals.AngularServer", settable: true);
+        => options.ExposeTypes(type => type.Namespace is { } ns && ns.StartsWith("XAnimals.", StringComparison.Ordinal) && ns != "XAnimals.Server", settable: true);
 
     /// <summary>
     /// Everything the Angular app needs besides <c>AddRouteablesSignalR</c>: the view models of the sample, their routes (no view on
