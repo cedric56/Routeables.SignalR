@@ -244,7 +244,8 @@ export class RouteablesClient {
 
   private async hello(): Promise<void> {
     const previous = this.session;
-    const welcome = await this.transport.call<Welcome>('Hello', { protocol: PROTOCOL, resume: previous });
+    // The calls that go on are named: a resumed session tells again the end of those that ended while the connection was gone.
+    const welcome = await this.transport.call<Welcome>('Hello', { protocol: PROTOCOL, resume: previous, waiting: [...this.operations.keys()] });
     if (!welcome.success) {
       const message = welcome.error ?? `The server speaks the protocol ${welcome.protocol}, this client ${PROTOCOL}.`;
       this.fail('Hello', undefined, new Error(message), 'protocol');

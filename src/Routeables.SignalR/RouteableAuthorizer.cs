@@ -1,4 +1,5 @@
 using System.Reflection;
+using System.Runtime.CompilerServices;
 using System.Security.Claims;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.Extensions.DependencyInjection;
@@ -67,6 +68,10 @@ internal sealed class RouteableAuthorizer(IServiceProvider services, RouteableCo
         return hidden;
     }
 
+    /// <summary>Whether reading <paramref name="member"/> of an object of the state asks for an authorization.</summary>
+    public static bool Guards(TypeShape shape, StateMember member)
+        => !member.AllowAnonymous && (shape.Authorize.Length > 0 || member.Authorize.Length > 0);
+
     public async ValueTask<bool> AuthorizeAsync(object resource, IReadOnlyCollection<IAuthorizeData> data)
     {
         if (data.Count == 0)
@@ -81,4 +86,74 @@ internal sealed class RouteableAuthorizer(IServiceProvider services, RouteableCo
         var result = await _service.AuthorizeAsync(connection.User, resource, policy).ConfigureAwait(true);
         return result.Succeeded;
     }
+}
+
+/// <summary>
+/// What the user may read of the objects inside the state of a target: the properties of a nested type that ask for an authorization
+/// (<c>[Authorize]</c> or <c>[RouteableAuthorize]</c> on the type or on the property), as for a command at the same path.
+/// </summary>
+/// <remarks>
+/// The projection does not wait, the authorization of ASP.NET Core does: a property is decided once for each object, and until it is decided it is
+/// not sent. <see cref="DecideAsync"/> decides what the projection met and tells which properties of the view model have something more to show.
+/// The decisions belong to a page: <see cref="Clear"/> forgets them when another page (or the same one sent again) is shown.
+/// </remarks>
+internal sealed class NestedReadAccess(RouteableAuthorizer authorizer)
+{
+    // By object for a reference type (a policy may look at the object), by type for a value type (each reading boxes a new one).
+    private ConditionalWeakTable<object, Dictionary<StateMember, bool>> _decisions = new();
+    private readonly List<(string Property, object Owner, TypeShape Shape, StateMember Member)> _unknown = [];
+
+    public bool HasUnknown => _unknown.Count > 0;
+
+    /// <summary>The guard given to the projection.</summary>
+    public bool Allows(string property, object owner, TypeShape shape, StateMember member)
+    {
+        if (!RouteableAuthorizer.Guards(shape, member))
+            return true;
+        if (_decisions.TryGetValue(KeyOf(owner, shape), out var decided) && decided.TryGetValue(member, out var allowed))
+            return allowed;
+        _unknown.Add((property, owner, shape, member));
+        return false;   // not decided yet: not sent
+    }
+
+    /// <summary>Decides what the projections met since the last call.</summary>
+    /// <returns>The client names of the properties of the view model in which something the user may read was hidden.</returns>
+    public async ValueTask<HashSet<string>> DecideAsync(Action<Exception> unhandled)
+    {
+        var decisions = _decisions;
+        var reveal = new HashSet<string>(StringComparer.Ordinal);
+        while (_unknown.Count > 0)
+        {
+            var unknown = _unknown.ToArray();
+            _unknown.Clear();
+            foreach (var (property, owner, shape, member) in unknown)
+            {
+                var decided = decisions.GetValue(KeyOf(owner, shape), static _ => new Dictionary<StateMember, bool>());
+                if (!decided.TryGetValue(member, out var allowed))
+                {
+                    try { allowed = await authorizer.CanUseAsync(owner, shape, member).ConfigureAwait(true); }
+                    catch (Exception exception) when (exception is not OutOfMemoryException)
+                    {
+                        unhandled(exception);
+                        allowed = false;   // a policy that fails never opens a door
+                    }
+                    decided[member] = allowed;
+                }
+                if (allowed)
+                    reveal.Add(property);
+            }
+            if (!ReferenceEquals(decisions, _decisions))
+                return [];   // forgotten meanwhile: another page
+        }
+        return reveal;
+    }
+
+    /// <summary>Forgets the decisions (another page, or the same one sent again: the user is asked again).</summary>
+    public void Clear()
+    {
+        _decisions = new();
+        _unknown.Clear();
+    }
+
+    private static object KeyOf(object owner, TypeShape shape) => owner.GetType().IsValueType ? shape : owner;
 }

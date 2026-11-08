@@ -14,6 +14,12 @@ namespace Routeables.SignalR;
 public sealed record RouteableProjectionIssue(string Property, string Message, string Code, bool Retry = false);
 
 /// <summary>
+/// Whether the user may read a property of an object inside a state (not of the view model itself, which is filtered before): the client name of
+/// the property of the view model that holds the object, the object, its shape and its property. It is asked during the projection, which does not wait.
+/// </summary>
+internal delegate bool ReadGuard(string property, object owner, TypeShape shape, StateMember member);
+
+/// <summary>
 /// Turns a view model into what a client can hold: a dictionary of the properties the schema exposes, and the list of its commands.
 /// A value is a scalar, a list, or a dictionary of the same kind; what cannot be sent (delegates, tasks, types, the services a view model holds)
 /// is left out. A command (<see cref="ICommand"/>) is sent as <c>{ "$command": path, "canExecute": bool }</c>: the client gives the path back to run
@@ -39,7 +45,14 @@ public sealed class RouteableStateProjector
     /// <param name="viewModel">The view model.</param>
     /// <param name="issues">Told of what could not be sent; the value is then <see langword="null"/>.</param>
     /// <param name="visible">Which properties of the view model the user may see; all when <see langword="null"/>.</param>
+    /// <remarks>
+    /// The authorization of the properties of the objects inside the state (<c>[Authorize]</c>, <c>[RouteableAuthorize]</c> on a nested type or
+    /// one of its properties) is not applied here: the hub applies it to what it sends.
+    /// </remarks>
     public IReadOnlyDictionary<string, object?> Project(object viewModel, Action<RouteableProjectionIssue>? issues = null, Func<PropertyInfo, bool>? visible = null)
+        => Project(viewModel, issues, visible, guard: null);
+
+    internal IReadOnlyDictionary<string, object?> Project(object viewModel, Action<RouteableProjectionIssue>? issues, Func<PropertyInfo, bool>? visible, ReadGuard? guard)
     {
         ArgumentNullException.ThrowIfNull(viewModel);
         var state = new Dictionary<string, object?>(StringComparer.Ordinal);
@@ -48,7 +61,7 @@ public sealed class RouteableStateProjector
             if (visible is not null && !visible(member.Property))
                 continue;
             if (TryRead(viewModel, member.Property, out var value))
-                state[member.Name] = ProjectProperty(member.Name, value, issues);
+                state[member.Name] = ProjectAt(member.Name, member.Name, value, depth: 1, issues, guard);
         }
         return state;
     }
@@ -61,7 +74,7 @@ public sealed class RouteableStateProjector
         => ProjectAt(property, property, value, depth: 1, issues);
 
     /// <summary>A value at <paramref name="path"/> inside the property <paramref name="property"/> (an item of a list), as a client holds it.</summary>
-    internal object? ProjectAt(string property, string path, object? value, int depth, Action<RouteableProjectionIssue>? issues)
+    internal object? ProjectAt(string property, string path, object? value, int depth, Action<RouteableProjectionIssue>? issues, ReadGuard? guard = null)
     {
         if (value is null)
             return null;
@@ -69,7 +82,7 @@ public sealed class RouteableStateProjector
         var budget = new Budget(Options.MaxStateNodes);
         try
         {
-            return ProjectValue(value, depth, new HashSet<object>(ReferenceEqualityComparer.Instance), path, budget);
+            return ProjectValue(value, depth, new HashSet<object>(ReferenceEqualityComparer.Instance), path, budget, property, guard);
         }
         catch (LimitException limit)
         {
@@ -144,7 +157,7 @@ public sealed class RouteableStateProjector
 
     private static string Join(string path, string name) => path.Length == 0 ? name : path + "." + name;
 
-    private object? ProjectValue(object value, int depth, HashSet<object> seen, string path, Budget budget)
+    private object? ProjectValue(object value, int depth, HashSet<object> seen, string path, Budget budget, string property, ReadGuard? guard)
     {
         budget.Spend();
         var type = value.GetType();
@@ -168,7 +181,7 @@ public sealed class RouteableStateProjector
                 foreach (DictionaryEntry entry in dictionary)
                 {
                     var key = Convert.ToString(entry.Key, System.Globalization.CultureInfo.InvariantCulture) ?? string.Empty;
-                    map[key] = entry.Value is null ? null : ProjectValue(entry.Value, depth + 1, seen, Join(path, key), budget);
+                    map[key] = entry.Value is null ? null : ProjectValue(entry.Value, depth + 1, seen, Join(path, key), budget, property, guard);
                 }
                 return map;
             }
@@ -182,17 +195,20 @@ public sealed class RouteableStateProjector
                 {
                     if (list.Count >= Options.MaxCollectionItems)
                         throw new LimitException($"it holds more than {Options.MaxCollectionItems} items (RouteablesOptions.MaxCollectionItems): page it");
-                    list.Add(item is null ? null : ProjectValue(item, depth + 1, seen, Join(path, list.Count.ToString(System.Globalization.CultureInfo.InvariantCulture)), budget));
+                    list.Add(item is null ? null : ProjectValue(item, depth + 1, seen, Join(path, list.Count.ToString(System.Globalization.CultureInfo.InvariantCulture)), budget, property, guard));
                 }
                 return list;
             }
 
             var state = new Dictionary<string, object?>(StringComparer.Ordinal);
-            foreach (var member in _schema.Shape(type).State)
+            var shape = _schema.Shape(type);
+            foreach (var member in shape.State)
             {
+                if (guard is not null && !guard(property, value, shape, member))
+                    continue;   // the user may not read it: it is not sent at all
                 if (!TryRead(value, member.Property, out var propertyValue))
                     continue;
-                state[member.Name] = propertyValue is null ? null : ProjectValue(propertyValue, depth + 1, seen, Join(path, member.Name), budget);
+                state[member.Name] = propertyValue is null ? null : ProjectValue(propertyValue, depth + 1, seen, Join(path, member.Name), budget, property, guard);
             }
             return state;
         }

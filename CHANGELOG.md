@@ -8,6 +8,7 @@ The first version meant for production. It changes the protocol (2) and some def
 
 - **Explicit exposure by default.** Only properties marked `[RouteableState]` (or classes marked with it, or types accepted by `RouteablesOptions.ExposeTypes`) are sent; only those marked `[RouteableState(Settable = true)]` can be set by the client. Before, every public property was sent and every public setter could be called. `RouteableExposure.Public` restores that, as a deliberate choice.
 - **Authorization of commands, properties and pages**, at every call, with ASP.NET Core's authorization: `[Authorize]` / `[AllowAnonymous]` on a `[RouteableCommand]` method or a view model class, `[RouteableAuthorize]` on a property. A route guard (`RouteableAuthorizationGuard`) cancels a route change to a view model the user may not see, and such a view model is never sent. The commands a user may not call are left out of the page.
+- **Authorization of the objects inside a state**: `[Authorize]` on a nested type and `[RouteableAuthorize]` on its properties apply to what is sent (the page, its changes, the items added to a list), as they applied to the commands at the same path. Before, only the properties of the view model itself were filtered: a protected property of a nested object was sent to every user.
 - An `ICommand` is reachable only through an exposed property: it was reachable through any public property.
 - `RequireAuthenticatedUser` closes anonymous connections; the documentation shows `MapRouteables().RequireAuthorization()`.
 - What a client sends is checked before it is read: size, number of values, depth, number of arguments, length of names. No input makes the hub throw.
@@ -31,6 +32,8 @@ The first version meant for production. It changes the protocol (2) and some def
 - Limits of a state: `MaxCollectionItems`, `MaxStateNodes` (the property is sent as `null` and the client told why); a throwing getter or enumerator no longer stops a page.
 - The reflection is cached per type; a change resubscribes only the property that changed.
 - **Resumable sessions**: a session waits `ReconnectGracePeriod` (30 s) for its client, which resumes it with `Hello` — view models, state, dialogs that wait, and what was told meanwhile. Only by the same user.
+- **The end of a call is never lost**: the client names in `Hello` the calls it still waits for, and the resumed session tells their end again after the state — a `Completed` told while the connection was gone, or lost with it. Before, it was dropped with the oldest messages beyond 256, or lost when the connection failed as it was written, and the call never resolved. The session keeps the end of its last 256 calls; an older one ends as `lost`.
+- The options are checked when the hub is registered (`RouteablesOptions.Problems()`): a limit that is not positive, a negative duration or contradictory limits stop the application at startup.
 - Logs, an activity per call, and metrics (`RouteablesTelemetry`, meter and source `Routeables.SignalR`).
 
 ### Client (`@routeables/client`)
@@ -40,6 +43,7 @@ The first version meant for production. It changes the protocol (2) and some def
 - Removes a dialog or a notification once the server took the answer; keeps it when the answer did not reach the server.
 - `onError` for calls that did not reach the server and watches that were refused.
 - Keeps the pages while reconnecting, resumes the session, and recovers a lost one (`recover`, `onSessionLost`).
+- Names the calls it waits for when it resumes its session, so that their end is never lost.
 
 ### Client for Dart and Flutter (`routeables_client`)
 

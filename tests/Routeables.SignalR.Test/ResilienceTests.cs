@@ -19,7 +19,7 @@ public class ResilienceTests
         return services.BuildServiceProvider();
     }
 
-    private static RouteablesHub Hub(ServiceProvider provider, string connection, RecordingClient client, ClaimsPrincipal? user = null)
+    private static RouteablesHub Hub(ServiceProvider provider, string connection, IRouteableClient client, ClaimsPrincipal? user = null)
         => new(provider, provider.GetRequiredService<RouteableSessions>())
         {
             Context = new FakeHubContext(connection, user),
@@ -90,10 +90,72 @@ public class ResilienceTests
         var after = new RecordingClient();
         var second = Hub(provider, "c2", after);
         await second.OnConnectedAsync();
-        Assert.True((await second.Hello(new RouteableHello(RouteableProtocol.Version, welcome.Session))).Resumed);
+        Assert.True((await second.Hello(new RouteableHello(RouteableProtocol.Version, welcome.Session, [slow.Operation!]))).Resumed);
 
+        // The end of the call comes after the state it changed.
         Assert.Contains(after.Completed, c => c.Operation == slow.Operation && c.Success);
         Assert.Equal(1, Assert.Single(after.Navigated).State["value"]);
+        Assert.True(after.All.ToList().FindIndex(m => m is RouteableNavigated) < after.All.ToList().FindIndex(m => m is RouteableCompleted));
+    }
+
+    [Fact]
+    public async Task The_end_of_a_call_lost_with_the_connection_is_told_again_to_the_client_that_waits_for_it()
+    {
+        await using var provider = Services(o => o.CommandGrace = TimeSpan.FromMilliseconds(20));
+        var before = new RecordingClient();
+        var dropping = new DroppingClient(before);
+        var first = Hub(provider, "c1", dropping);
+        await first.OnConnectedAsync();
+        var welcome = await first.Hello(new RouteableHello(RouteableProtocol.Version));
+        await first.GoTo("/stream");
+
+        // The connection fails as the end of the call is written: the client never reads it.
+        dropping.FailCompleted = true;
+        var slow = await first.Invoke("slowAsync", [JsonDocument.Parse("50").RootElement]);
+        Assert.True(slow.Pending);
+        var running = await first.Invoke("slowAsync", [JsonDocument.Parse("600").RootElement]);
+        Assert.True(running.Pending);
+        await Task.Delay(250, TestContext.Current.CancellationToken);
+        Assert.Empty(before.Completed);
+        await first.OnDisconnectedAsync(new IOException("network"));
+
+        var after = new RecordingClient();
+        var second = Hub(provider, "c2", after);
+        await second.OnConnectedAsync();
+        var resumed = await second.Hello(new RouteableHello(RouteableProtocol.Version, welcome.Session, [slow.Operation!, running.Operation!, "op999"]));
+        Assert.True(resumed.Resumed);
+
+        // The call that ended is told again; one the session does not know ends as lost; the one that runs ends later, once.
+        Assert.Contains(after.Completed, c => c.Operation == slow.Operation && c.Success);
+        Assert.Contains(after.Completed, c => c.Operation == "op999" && !c.Success && c.Code == RouteableErrorCodes.Lost);
+        Assert.DoesNotContain(after.Completed, c => c.Operation == running.Operation);
+        Assert.True(await TestSchema.EventuallyAsync(() => after.Completed.Any(c => c.Operation == running.Operation && c.Success)));
+        Assert.Single(after.Completed, c => c.Operation == running.Operation);
+
+        // A client that does not wait for it any more is not told again.
+        await second.OnDisconnectedAsync(null);
+        var third = new RecordingClient();
+        var hub = Hub(provider, "c3", third);
+        await hub.OnConnectedAsync();
+        Assert.True((await hub.Hello(new RouteableHello(RouteableProtocol.Version, welcome.Session))).Resumed);
+        Assert.Empty(third.Completed);
+        await hub.OnDisconnectedAsync(null);
+    }
+
+    /// <summary>A connection that fails while the end of a call is written.</summary>
+    private sealed class DroppingClient(RecordingClient inner) : IRouteableClient
+    {
+        private readonly IRouteableClient _inner = inner;
+
+        public bool FailCompleted { get; set; }
+
+        public Task Navigated(RouteableNavigated message) => _inner.Navigated(message);
+        public Task Changed(RouteableChanged message) => _inner.Changed(message);
+        public Task Failed(RouteableFailure message) => _inner.Failed(message);
+        public Task DialogRequested(RouteableDialog message) => _inner.DialogRequested(message);
+        public Task Notified(RouteableToast message) => _inner.Notified(message);
+        public Task Closed(RouteableClosed message) => _inner.Closed(message);
+        public Task Completed(RouteableCompleted message) => FailCompleted ? Task.FromException(new IOException("the connection dropped")) : _inner.Completed(message);
     }
 
     [Fact]

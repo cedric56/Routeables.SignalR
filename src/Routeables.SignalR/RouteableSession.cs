@@ -36,8 +36,13 @@ public sealed class RouteableSession : IAsyncDisposable
     private readonly CancellationTokenSource _lifetime = new();
     private readonly ILogger _logger;
     private readonly Action? _abort;
+    private readonly Dictionary<string, RouteableCompleted?> _operations = new(StringComparer.Ordinal);
+    private readonly Queue<string> _ended = new();
     private long _nextOperation;
     private int _disposed;
+
+    // The calls that went on: null while they run, then their end, kept for the last ones to tell it again to a client that resumes the session.
+    private const int RememberedOperations = 256;
 
     /// <summary>Creates the session of one connection.</summary>
     /// <param name="services">The application services; the session opens its own scope.</param>
@@ -349,6 +354,8 @@ public sealed class RouteableSession : IAsyncDisposable
     private RouteableAck GoOn(string method, Task<RouteableAck> running)
     {
         var operation = "op" + Interlocked.Increment(ref _nextOperation).ToString(System.Globalization.CultureInfo.InvariantCulture);
+        lock (_operations)
+            _operations[operation] = null;
         _ = running.ContinueWith(async task =>
         {
             var ack = await Settle(task).ConfigureAwait(false);
@@ -357,7 +364,15 @@ public sealed class RouteableSession : IAsyncDisposable
             Dispatcher.Post(_ =>
             {
                 FlushTurn();
-                Outbound.Completed(new RouteableCompleted(operation, ack.Success, ack.Error, ack.Code));
+                var completed = new RouteableCompleted(operation, ack.Success, ack.Error, ack.Code);
+                lock (_operations)
+                {
+                    _operations[operation] = completed;
+                    _ended.Enqueue(operation);
+                    while (_ended.Count > RememberedOperations)
+                        _operations.Remove(_ended.Dequeue());
+                }
+                Outbound.Completed(completed);
             }, null);
         }, CancellationToken.None, TaskContinuationOptions.None, TaskScheduler.Default).Unwrap();
         _logger.LogDebug("The call {Method} goes on as {Operation}.", method, operation);
@@ -442,6 +457,32 @@ public sealed class RouteableSession : IAsyncDisposable
             foreach (var dialog in _interactions.PendingDialogs)
                 Outbound.Dialog(dialog);
         });
+
+    /// <summary>
+    /// The client resumed the session and still waits for the end of <paramref name="waiting"/>: the end of each one that ended is told again, after
+    /// the state sent again; one that still runs ends later; one the session forgot ends as <see cref="RouteableErrorCodes.Lost"/>.
+    /// </summary>
+    internal Task TellEndsAsync(IReadOnlyList<string>? waiting)
+    {
+        if (waiting is null || waiting.Count == 0)
+            return Task.CompletedTask;
+        return Dispatcher.InvokeAsync(() =>
+        {
+            FlushTurn();
+            foreach (var operation in waiting.Take(RememberedOperations * 4).Distinct(StringComparer.Ordinal))
+            {
+                if (string.IsNullOrEmpty(operation) || operation.Length > 64)
+                    continue;
+                RouteableCompleted? completed;
+                bool known;
+                lock (_operations)
+                    known = _operations.TryGetValue(operation, out completed);
+                if (known && completed is null)
+                    continue;   // it still runs
+                Outbound.Completed(completed ?? new RouteableCompleted(operation, false, "The end of this call is not known any more: it may have run.", RouteableErrorCodes.Lost));
+            }
+        });
+    }
 
     // The connection the session is attached to now: the one it was created for, or the one that resumed it.
     private Action? _abortOverride;

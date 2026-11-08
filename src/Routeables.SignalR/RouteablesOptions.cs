@@ -92,6 +92,47 @@ public sealed class RouteablesOptions
     /// </summary>
     public bool RequireAuthenticatedUser { get; set; }
 
+    /// <summary>
+    /// What is wrong with these options: a limit that is not positive, a duration that is negative, limits that contradict each other.
+    /// <c>AddRouteablesSignalR</c> refuses them (<see cref="InvalidOperationException"/>), so that the application does not start with them.
+    /// </summary>
+    public IReadOnlyList<string> Problems()
+    {
+        var problems = new List<string>();
+        void AtLeast(string name, long value, long minimum)
+        {
+            if (value < minimum)
+                problems.Add($"{name} is {value}: it must be {minimum} or more.");
+        }
+
+        if (!Enum.IsDefined(Exposure))
+            problems.Add($"Exposure is {(int)Exposure}: it is not a {nameof(RouteableExposure)}.");
+        AtLeast(nameof(MaxTargets), MaxTargets, 0);
+        AtLeast(nameof(MaxDepth), MaxDepth, 1);
+        AtLeast(nameof(MaxCollectionItems), MaxCollectionItems, 1);
+        AtLeast(nameof(MaxStateNodes), MaxStateNodes, 1);
+        AtLeast(nameof(MaxArgumentLength), MaxArgumentLength, 1);
+        AtLeast(nameof(MaxArgumentItems), MaxArgumentItems, 1);
+        AtLeast(nameof(MaxArgumentDepth), MaxArgumentDepth, 1);
+        AtLeast(nameof(MaxPendingMessages), MaxPendingMessages, 1);
+        if (MaxDepth > 64)
+            problems.Add($"MaxDepth is {MaxDepth}: it must be 64 or less (a state is read recursively).");
+        if (MaxStateNodes >= 1 && MaxCollectionItems > MaxStateNodes)
+            problems.Add($"MaxCollectionItems ({MaxCollectionItems}) is larger than MaxStateNodes ({MaxStateNodes}): a collection that fits would still not be sent.");
+        if (CommandGrace < TimeSpan.Zero || CommandGrace == Timeout.InfiniteTimeSpan)
+            problems.Add($"CommandGrace is {CommandGrace}: it must be zero or more, and finite.");
+        if (ReconnectGracePeriod < TimeSpan.Zero || ReconnectGracePeriod == Timeout.InfiniteTimeSpan)
+            problems.Add($"ReconnectGracePeriod is {ReconnectGracePeriod}: it must be zero or more, and finite.");
+        return problems;
+    }
+
+    internal void Validate()
+    {
+        var problems = Problems();
+        if (problems.Count > 0)
+            throw new InvalidOperationException("The options of Routeables.SignalR are not valid: " + string.Join(" ", problems));
+    }
+
     internal (bool Exposed, bool Settable) ExposedType(Type type)
     {
         var exposed = false;

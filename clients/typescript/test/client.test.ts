@@ -194,7 +194,7 @@ describe('what the user does', () => {
     const { transport } = await connected();
 
     assert.equal(transport.calls[0]!.method, 'Hello');
-    assert.deepEqual(transport.called('Hello'), [[{ protocol: PROTOCOL, resume: null }]]);
+    assert.deepEqual(transport.called('Hello'), [[{ protocol: PROTOCOL, resume: null, waiting: [] }]]);
   });
 
   it('refuses to go on with a server of another protocol', async () => {
@@ -453,11 +453,30 @@ describe('the connection', () => {
     await tick();
 
     assert.deepEqual(states, [false, true]);
-    assert.deepEqual(transport.called('Hello').at(-1), [{ protocol: PROTOCOL, resume: 's1' }]);
+    assert.deepEqual(transport.called('Hello').at(-1), [{ protocol: PROTOCOL, resume: 's1', waiting: [] }]);
     assert.equal(client.page!.route, '/cats');
     assert.equal(client.dialogs.length, 1);
     assert.deepEqual(transport.called('Watch'), [['history']]);   // the resumed session watches it already
     assert.deepEqual(transport.called('GoTo'), []);
+  });
+
+  it('names the calls it waits for when it resumes its session, and gets their end then', async () => {
+    const { client, transport } = await connected();
+    transport.replies.set('Invoke', { success: true, pending: true, operation: 'op4' });
+    let ended: Ack | null = null;
+    void client.invoke('slow').then(ack => { ended = ack; });
+    await tick();
+
+    transport.changeConnection(false);
+    transport.welcome = { success: true, protocol: PROTOCOL, session: 's1', resumed: true };
+    transport.changeConnection(true);
+    await tick();
+    assert.deepEqual(transport.called('Hello').at(-1), [{ protocol: PROTOCOL, resume: 's1', waiting: ['op4'] }]);
+    assert.equal(ended, null);
+
+    transport.server.completed({ operation: 'op4', success: false, error: 'not known any more', code: 'lost' });
+    await tick();
+    assert.deepEqual(ended, { success: false, error: 'not known any more', code: 'lost' });
   });
 
   it('starts again from the last route when the session could not be resumed', async () => {

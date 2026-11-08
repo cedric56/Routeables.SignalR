@@ -22,6 +22,7 @@ public static class Extensions
     /// <param name="services">The service collection.</param>
     /// <param name="configure">More registrations, such as the services the view models ask for.</param>
     /// <param name="options">The options (what crosses the network, the limits, the reconnection).</param>
+    /// <exception cref="InvalidOperationException">The options are not valid (<see cref="RouteablesOptions.Problems"/>).</exception>
     [RequiresUnreferencedCode(ReflectionMessage)]
     [RequiresDynamicCode(ReflectionMessage)]
     public static IServiceCollection AddRouteablesSignalR(this IServiceCollection services, Action<IServiceCollection>? configure = null, Action<RouteablesOptions>? options = null)
@@ -35,6 +36,7 @@ public static class Extensions
     /// <param name="services">The service collection.</param>
     /// <param name="configure">More registrations, such as the services the view models ask for.</param>
     /// <param name="options">The options (what crosses the network, the limits, the reconnection).</param>
+    /// <exception cref="InvalidOperationException">The options are not valid (<see cref="RouteablesOptions.Problems"/>).</exception>
     [RequiresUnreferencedCode(ReflectionMessage)]
     [RequiresDynamicCode(ReflectionMessage)]
     public static IServiceCollection AddRouteablesSignalR<TMain>(this IServiceCollection services, Action<IServiceCollection>? configure = null, Action<RouteablesOptions>? options = null)
@@ -44,6 +46,7 @@ public static class Extensions
 
         var settings = new RouteablesOptions();
         options?.Invoke(settings);
+        settings.Validate();   // the application does not start with limits that make no sense
         services.AddSingleton(settings);
         services.AddSingleton(new RouteableSchema(settings));
 

@@ -151,7 +151,12 @@ public sealed record RouteableCompleted(string Operation, bool Success, string? 
 /// <summary>What a client says first, and again after each reconnection.</summary>
 /// <param name="Protocol">The protocol it speaks (<see cref="RouteableProtocol.Version"/>).</param>
 /// <param name="Resume">The <see cref="RouteableWelcome.Session"/> of the connection that dropped, to get its view models back.</param>
-public sealed record RouteableHello(int Protocol, string? Resume = null);
+/// <param name="Waiting">
+/// With <see cref="Resume"/>: the calls that went on (<see cref="RouteableAck.Operation"/>) whose end the client still waits for. When the session is
+/// resumed, the end of each one that ended is told again (<see cref="IRouteableClient.Completed"/>), after the state; one that goes on ends later.
+/// A <see cref="IRouteableClient.Completed"/> told while the connection was gone, or lost with it, is never lost for the client.
+/// </param>
+public sealed record RouteableHello(int Protocol, string? Resume = null, IReadOnlyList<string>? Waiting = null);
 
 /// <summary>The answer to <see cref="RouteableHello"/>.</summary>
 /// <param name="Success">Whether the client may go on (it speaks the protocol of the server).</param>

@@ -233,8 +233,9 @@ class RouteablesClient {
 
   Future<void> _hello() async {
     final previous = _session;
+    // The calls that go on are named: a resumed session tells again the end of those that ended while the connection was gone.
     final welcome = asMap(await transport.call('Hello', [
-      {'protocol': protocolVersion, 'resume': previous},
+      {'protocol': protocolVersion, 'resume': previous, 'waiting': [..._operations.keys]},
     ]));
     if (welcome['success'] != true) {
       final message = welcome['error'] as String? ?? 'The server speaks the protocol ${welcome['protocol']}, this client $protocolVersion.';

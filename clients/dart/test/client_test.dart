@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter_test/flutter_test.dart';
 import 'package:routeables_client/routeables_client.dart';
 
@@ -219,7 +221,7 @@ void main() {
       expect(transport.calls.first.$1, 'Hello');
       expect(transport.called('Hello'), [
         [
-          {'protocol': protocolVersion, 'resume': null},
+          {'protocol': protocolVersion, 'resume': null, 'waiting': <String>[]},
         ],
       ]);
     });
@@ -502,12 +504,38 @@ void main() {
 
       expect(states, [false, true]);
       expect(transport.called('Hello').last, [
-        {'protocol': protocolVersion, 'resume': 's1'},
+        {'protocol': protocolVersion, 'resume': 's1', 'waiting': <String>[]},
       ]);
       expect(client.page!.route, '/cats');
       expect(client.dialogs.length, 1);
       expect(transport.called('Watch'), [['history']]); // the resumed session watches it already
       expect(transport.called('GoTo'), isEmpty);
+    });
+
+    test('names the calls it waits for when it resumes its session, and gets their end then', () async {
+      final (client, transport) = await connected();
+      transport.replies['Invoke'] = {'success': true, 'pending': true, 'operation': 'op4'};
+      Ack? ended;
+      unawaited(client.invoke('slow').then((ack) => ended = ack));
+      await tick();
+
+      transport.changeConnection(false);
+      transport.welcome = {'success': true, 'protocol': protocolVersion, 'session': 's1', 'resumed': true};
+      transport.changeConnection(true);
+      await tick();
+      expect(transport.called('Hello').last, [
+        {
+          'protocol': protocolVersion,
+          'resume': 's1',
+          'waiting': ['op4'],
+        },
+      ]);
+      expect(ended, isNull);
+
+      transport.server.completed({'operation': 'op4', 'success': false, 'error': 'not known any more', 'code': 'lost'});
+      await tick();
+      expect(ended?.success, isFalse);
+      expect(ended?.code, 'lost');
     });
 
     test('starts again from the last route when the session could not be resumed', () async {

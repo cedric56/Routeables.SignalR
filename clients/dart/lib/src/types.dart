@@ -162,6 +162,7 @@ class Ack {
   final String? error;
 
   /// What kind of failure: "not-found", "unauthorized", "invalid-argument", "failed", "cancelled", "limit", "disabled", "protocol",
+  /// "lost" when the server forgot the end of a call the client waited for across a reconnection (the call may have run),
   /// "transport" when the call did not reach the server, "session-lost" when the session ended before the call.
   final String? code;
 

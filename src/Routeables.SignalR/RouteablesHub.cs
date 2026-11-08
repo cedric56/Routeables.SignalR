@@ -59,6 +59,7 @@ public class RouteablesHub(IServiceProvider services, RouteableSessions sessions
             var resumed = await sessions.ResumeAsync(hello.Resume, Context.ConnectionId, Clients.Caller, Context.User, context.Abort).ConfigureAwait(false);
             if (resumed is not null)
             {
+                await resumed.TellEndsAsync(hello.Waiting).ConfigureAwait(false);
                 await resumed.FlushAsync().ConfigureAwait(false);
                 return new RouteableWelcome(true, RouteableProtocol.Version, resumed.Token, true);
             }

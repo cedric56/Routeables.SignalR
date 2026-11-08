@@ -7,8 +7,9 @@ namespace Routeables.SignalR;
 /// The messages of a session to its client, in one ordered stream. A message is sent once the one before it was written; while a slow client
 /// lets messages wait, the changes of a target are merged into the one that waits, a message of an older page is dropped, and beyond
 /// <see cref="RouteablesOptions.MaxPendingMessages"/> the connection is given up (<c>overflow</c>). The version of a change is given when it leaves,
-/// so merged changes never leave a hole the client would take for a lost message. Without a client (the connection dropped), the state is not
-/// kept (it is sent again when the session is resumed) and the other messages wait, a few of them.
+/// so merged changes never leave a hole the client would take for a lost message. Without a client (the connection dropped), the state, the dialogs
+/// and the ends of calls are not kept (the session sends them again when it is resumed, the ends of calls those the client says it waits for) and
+/// the notifications wait, the last ones.
 /// </summary>
 internal sealed class Outbound(Func<string, long> generationOf, Action overflow, int maxPending, ILogger logger)
 {
@@ -54,7 +55,7 @@ internal sealed class Outbound(Func<string, long> generationOf, Action overflow,
 
     public void Toast(RouteableToast message) => Enqueue(new Message(Kind.Other, null, 0, c => c.Notified(message)));
 
-    public void Completed(RouteableCompleted message) => Enqueue(new Message(Kind.Other, null, 0, c => c.Completed(message)));
+    public void Completed(RouteableCompleted message) => Enqueue(new Message(Kind.Completed, null, 0, c => c.Completed(message)));
 
     /// <summary>Completes once every message given so far has been written (or dropped).</summary>
     public Task DrainedAsync()
@@ -92,7 +93,8 @@ internal sealed class Outbound(Func<string, long> generationOf, Action overflow,
 
             if (_client is null)
             {
-                // The state is sent again when the session is resumed; a dialog too (it is still waiting). The rest waits for the client.
+                // The state is sent again when the session is resumed; a dialog too (it is still waiting); the end of a call too, when the client
+                // says it waits for it (RouteableSession.TellEndsAsync): it is never dropped with the oldest notifications. The rest waits for the client.
                 if (message.Kind is Kind.Other)
                 {
                     if (_detached.Count >= MaxDetachedMessages)
@@ -228,7 +230,7 @@ internal sealed class Outbound(Func<string, long> generationOf, Action overflow,
         }
     }
 
-    private enum Kind { Navigated, Changed, Closed, Dialog, Other }
+    private enum Kind { Navigated, Changed, Closed, Dialog, Completed, Other }
 
     private sealed class Message(Kind kind, string? target, long generation, Func<IRouteableClient, Task>? send)
     {

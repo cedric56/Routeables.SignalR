@@ -51,6 +51,7 @@ Three barriers, evaluated with the authorization of ASP.NET Core (`IAuthorizatio
 - **The hub.** Protect the endpoint as any other: `app.MapRouteables().RequireAuthorization()`. `options.RequireAuthenticatedUser = true` also closes an anonymous connection that would reach it.
 - **The view model.** `[Authorize]` on the class: the route guard that `AddRouteablesSignalR` registers cancels a route change to it, whoever asked for it (the client or a command), and a view model the user may not see is never sent, whatever showed it (a region, a registered target). A registered target (`AddRouteableTarget`) follows the same rule.
 - **The member.** `[Authorize]` on a `[RouteableCommand]` method; `[RouteableAuthorize]` on a property (ASP.NET Core's attribute cannot go on a property): the property is neither sent nor set, and the command it holds not called, for a user who does not meet it. `[AllowAnonymous]` lets anybody through, as in ASP.NET Core. The commands a user may not call are left out of the list the page sends.
+- **The objects inside a state.** The same attributes apply at any depth: on a nested type (`[Authorize]` on the class) or on one of its properties (`[RouteableAuthorize]`), a property is not sent to a user who does not meet them — in the page, in a change, in an item added to a list — and a command it holds cannot be called. A nested object the user may not read at all is sent empty. The decision is taken once per object and per page (the policy receives the object as its resource); an object met for the first time in a change is sent without what is not decided yet, then again once it is.
 
 When a member asks for authorization and no authorization service is registered, it is refused: an absent service never opens a door. `AddRouteablesSignalR` registers `AddAuthorizationCore()`; add your policies as usual.
 
@@ -68,7 +69,7 @@ One `RouteableSession` per connection: a router with its history, and the view m
 
 **Calls that go on.** A command or a route change that lasts longer than `CommandGrace` (800 ms), or that asks the visitor something (a dialog, a modal, a page that asks before it is left), is answered `pending` with an operation id; `Completed` tells its end, with its success or its failure. SignalR runs the calls of a client one after the other: this is what lets the answer to a dialog reach the server while the command or the route change that asked it waits.
 
-**Its reconnection.** When the connection drops, the session waits `ReconnectGracePeriod` (30 s) for its client. The client says `Hello` with the token of its session on the new connection: the session is resumed — its view models, the state of every target (sent again), the dialogs that wait, and what was told while it was away (a `Completed`, a notification). Only the user the session was created for may resume it. After the grace period the session is disposed, and the client starts a new one (`@routeables/client` opens the last route again).
+**Its reconnection.** When the connection drops, the session waits `ReconnectGracePeriod` (30 s) for its client. The client says `Hello` with the token of its session on the new connection: the session is resumed — its view models, the state of every target (sent again), the dialogs that wait, a notification told while it was away, and the end of each call the client still waits for (it names them in `Hello`): a `Completed` told while the connection was gone, or lost with it, is told again after the state. The session keeps the end of its last 256 calls; the end of an older one is told as `lost` (the call may have run). Only the user the session was created for may resume it. After the grace period the session is disposed, and the client starts a new one (`@routeables/client` opens the last route again).
 
 ## Targets
 
@@ -87,7 +88,7 @@ They do not depend on SignalR (`IRouteableClient`, `RouteableNavigated`, `Routea
 
 | Client to server | Does |
 | --- | --- |
-| `Hello({ protocol, resume })` | First, and after each reconnection: the protocol of the client, and the token of the session to resume. Answers `{ success, protocol, session, resumed }`. |
+| `Hello({ protocol, resume, waiting })` | First, and after each reconnection: the protocol of the client, the token of the session to resume, and the operations of the calls it still waits for. Answers `{ success, protocol, session, resumed }`. |
 | `GoTo(route)` / `GoToIn(target, route)` | Goes to a route, as an address bar would; in a region for `GoToIn`. |
 | `Invoke(command, arguments)` / `InvokeOn(target, command, arguments)` | Calls a command. SignalR has no optional parameters: always send `arguments`, `[]` when there are none. |
 | `Set(property, value)` / `SetOn(target, property, value)` | Sets a settable property. A type that converts from a string (`RouteTransition`) is set with a string. |
@@ -152,6 +153,8 @@ builder.Services.AddRouteablesSignalR(services => ..., options =>
     options.DetailedErrors = null;                                 // Development only
 });
 ```
+
+The options are checked when the hub is registered: a limit that is not positive, a negative or infinite duration, a `MaxCollectionItems` larger than `MaxStateNodes` throw an `InvalidOperationException` that lists every problem (`RouteablesOptions.Problems()`), so the application does not start with them.
 
 ## Observability
 

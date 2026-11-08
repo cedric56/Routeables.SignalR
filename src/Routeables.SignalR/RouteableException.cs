@@ -48,4 +48,10 @@ public static class RouteableErrorCodes
 
     /// <summary>The client and the server do not speak the same protocol.</summary>
     public const string Protocol = "protocol";
+
+    /// <summary>
+    /// The end of a call that went on is not known any more: the client waited for it across a reconnection and the session had forgotten it
+    /// (it keeps the end of the last calls only). The call may have run.
+    /// </summary>
+    public const string Lost = "lost";
 }

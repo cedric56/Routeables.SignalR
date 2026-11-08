@@ -30,7 +30,11 @@ internal sealed class WatchedTarget : IDisposable
     private readonly List<PendingPatch> _pending = [];
     private readonly HashSet<string> _reported = new(StringComparer.Ordinal);
     private readonly Dictionary<string, int> _retries = new(StringComparer.Ordinal);
+    private readonly Dictionary<string, int> _reveals = new(StringComparer.Ordinal);
+    private readonly NestedReadAccess _nested;
+    private readonly ReadGuard _guard;
     private HashSet<PropertyInfo> _hidden = [];
+    private bool _deciding;
     private object? _viewModel;
     private string _route = string.Empty;
     private bool _visible;
@@ -43,6 +47,8 @@ internal sealed class WatchedTarget : IDisposable
         _session = session;
         _router = router;
         _viewModel = viewModel;
+        _nested = new NestedReadAccess(session.Authorizer);
+        _guard = _nested.Allows;
     }
 
     public string Name { get; }
@@ -95,6 +101,8 @@ internal sealed class WatchedTarget : IDisposable
         _pending.Clear();
         _reported.Clear();
         _retries.Clear();
+        _reveals.Clear();
+        _nested.Clear();
         _viewModel = viewModel;
         _route = route;
         _visible = false;
@@ -108,6 +116,19 @@ internal sealed class WatchedTarget : IDisposable
             allowed = await _session.Authorizer.CanSeeAsync(viewModel, shape).ConfigureAwait(true);
             hidden = allowed ? await _session.Authorizer.HiddenAsync(viewModel, shape).ConfigureAwait(true) : [];
             commands = allowed ? await AllowedCommandsAsync(viewModel, shape).ConfigureAwait(true) : [];
+
+            // The properties of the objects inside the state that ask for an authorization: decided before the page is sent, so that it is sent
+            // whole. A projection meets them, they are decided, and what they hold may hold more (bounded by the depth of a state).
+            for (var round = 0; allowed && round <= _session.Schema.Options.MaxDepth; round++)
+            {
+                var seen = hidden;
+                _session.Projector.Project(viewModel, null, property => !seen.Contains(property), _guard);
+                if (!_nested.HasUnknown)
+                    break;
+                await _nested.DecideAsync(_session.Unhandled).ConfigureAwait(true);
+                if (_disposed || generation != Generation)
+                    return;
+            }
         }
         catch (Exception exception)
         {
@@ -132,9 +153,49 @@ internal sealed class WatchedTarget : IDisposable
         _visible = true;
         Subscribe(viewModel);
 
-        var state = _session.Projector.Project(viewModel, issue => Report(issue), property => !_hidden.Contains(property));
+        var state = _session.Projector.Project(viewModel, issue => Report(issue), property => !_hidden.Contains(property), _guard);
         _session.BeforeMessage();
         _session.Outbound.Navigated(new RouteableNavigated(route, viewModel.GetType().Name, state, commands, Name, generation, InstanceOf(viewModel)));
+        DecideLater();
+    }
+
+    // Something the projection met was not decided (it was not sent): it is decided, and the properties of the view model that hold what the user
+    // may read are sent again. An object made anew at each reading is never decided: it is sent again a few times per change, then left hidden.
+    private void DecideLater()
+    {
+        if (_deciding || !_nested.HasUnknown)
+            return;
+        _deciding = true;
+        // A turn of its own: a decision may be taken at once, and what it sends again is then told at the end of that turn.
+        _session.Dispatcher.Post(_ => _ = DecideLaterAsync(), null);
+    }
+
+    private async Task DecideLaterAsync()
+    {
+        var generation = Generation;
+        HashSet<string> reveal;
+        try { reveal = await _nested.DecideAsync(_session.Unhandled).ConfigureAwait(true); }
+        catch (Exception exception) when (exception is not OutOfMemoryException)
+        {
+            _session.Unhandled(exception);
+            return;   // what was not decided stays hidden
+        }
+        finally { _deciding = false; }
+
+        if (generation != Generation || _viewModel is not { } viewModel || !IsCurrent(viewModel))
+            return;
+        var shape = _session.Schema.Shape(viewModel.GetType());
+        var any = false;
+        foreach (var name in reveal)
+        {
+            if (!shape.ByName.TryGetValue(name, out var member) || (_reveals[name] = _reveals.GetValueOrDefault(name) + 1) > 3)
+                continue;
+            RecordSet(member);
+            any = true;
+        }
+        if (any)
+            _session.MarkPending(this);
+        DecideLater();   // what a projection met while this was decided
     }
 
     private async Task<IReadOnlyList<string>> AllowedCommandsAsync(object viewModel, TypeShape shape)
@@ -230,12 +291,14 @@ internal sealed class WatchedTarget : IDisposable
         var shape = _session.Schema.Shape(viewModel.GetType());
         if (string.IsNullOrEmpty(propertyName))
         {
+            _reveals.Clear();
             foreach (var member in shape.State)
                 RecordSet(member);
             _resubscribeAll = true;
         }
         else if (shape.State.FirstOrDefault(m => m.Property.Name == propertyName) is { } member)
         {
+            _reveals.Remove(member.Name);
             RecordSet(member);
             _resubscribe.Add(member.Name);
         }
@@ -252,6 +315,7 @@ internal sealed class WatchedTarget : IDisposable
         }
         if (!IsCurrent(viewModel))
             return;
+        _reveals.Remove(member.Name);
 
         // An item of a list held by the property: only that item is sent again.
         if (source is not ICommand
@@ -259,7 +323,7 @@ internal sealed class WatchedTarget : IDisposable
             && IndexOf(list, source) is var index and >= 0)
         {
             var path = member.Name + "." + index.ToString(System.Globalization.CultureInfo.InvariantCulture);
-            var item = _session.Projector.ProjectAt(member.Name, path, source, depth: 2, issue => Report(issue));
+            var item = _session.Projector.ProjectAt(member.Name, path, source, depth: 2, issue => Report(issue), _guard);
             RecordPatch(member, new RouteablePatch(RouteablePatch.Set, [member.Name, index], item), coalesceLast: true);
         }
         else
@@ -279,6 +343,7 @@ internal sealed class WatchedTarget : IDisposable
         }
         if (!IsCurrent(viewModel))
             return;
+        _reveals.Remove(member.Name);
 
         if (Splices(viewModel, member, source, e) is { } splices)
             foreach (var splice in splices)
@@ -327,7 +392,7 @@ internal sealed class WatchedTarget : IDisposable
             for (var i = 0; i < items.Count; i++)
             {
                 var path = member.Name + "." + (index + i).ToString(System.Globalization.CultureInfo.InvariantCulture);
-                projected.Add(_session.Projector.ProjectAt(member.Name, path, items[i], depth: 2, issue => Report(issue)));
+                projected.Add(_session.Projector.ProjectAt(member.Name, path, items[i], depth: 2, issue => Report(issue), _guard));
             }
         return new RouteablePatch(RouteablePatch.Splice, [member.Name], projected, index, remove);
     }
@@ -404,13 +469,14 @@ internal sealed class WatchedTarget : IDisposable
             }
             if (!RouteableStateProjector.TryRead(viewModel, pending.Member.Property, out var value))
                 continue;
-            var projected = _session.Projector.ProjectProperty(pending.Member.Name, value, issue => Report(issue));
+            var projected = _session.Projector.ProjectAt(pending.Member.Name, pending.Member.Name, value, depth: 1, issue => Report(issue), _guard);
             RouteablePatches.Add(patches, new RouteablePatch(RouteablePatch.Set, [pending.Member.Name], projected));
         }
         _pending.Clear();
 
         if (patches.Count > 0)
             _session.Outbound.Changed(Name, Generation, patches);
+        DecideLater();
     }
 
     private void Report(RouteableProjectionIssue issue)

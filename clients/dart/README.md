@@ -47,7 +47,7 @@ The modal is a page of the target `modalTarget`; it becomes `null` when it close
 
 ## Reconnection
 
-When the connection drops, the pages stay and `onConnection(false)` is told. When it comes back, the client says `Hello` with the token of its session and the server resumes it: the pages are sent again (same `sequence`), the dialogs that wait come back, and the calls that were running complete when they end. When the server cannot resume it, what was shown is cleared, the calls that waited complete with `code: 'session-lost'`, `onSessionLost` is told, and the main router goes back to the last route (pass `recover:` to do something else, or `recoverAutomatically: false`).
+When the connection drops, the pages stay and `onConnection(false)` is told. When it comes back, the client says `Hello` with the token of its session and the server resumes it: the pages are sent again (same `sequence`), the dialogs that wait come back, and the calls that were running complete when they end — the client names them in `Hello`, so an end told while the connection was gone is told again (`code: 'lost'` if the server forgot it). When the server cannot resume it, what was shown is cleared, the calls that waited complete with `code: 'session-lost'`, `onSessionLost` is told, and the main router goes back to the last route (pass `recover:` to do something else, or `recoverAutomatically: false`).
 
 ## Transport
 
