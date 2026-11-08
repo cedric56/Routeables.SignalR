@@ -180,7 +180,7 @@ class RouteablesClient {
   void Function() subscribeTo(String target, PageListener listener) {
     final listeners = _pageListeners.putIfAbsent(target, () => <PageListener>{});
     // A listener is a closure: the same function given twice is two subscriptions, as two widgets would make.
-    final entry = (Page? page) => listener(page);
+    void entry(Page? page) => listener(page);
     listeners.add(entry);
     _watch(target);
     listener(pageOf(target));
@@ -375,7 +375,7 @@ class RouteablesClient {
     _setPage(
       target,
       Page(
-        sequence: sameInstance ? current!.sequence : ++_sequence,
+        sequence: sameInstance ? current.sequence : ++_sequence,
         target: target,
         route: route,
         viewModel: message['viewModel'] as String? ?? '',

@@ -2,10 +2,12 @@
 using XAnimals.AngularServer;
 using XAnimals.ViewModels;
 
-var builder = WebApplication.CreateBuilder(args);
+// The content root is the folder of the server, not the current directory: appsettings.json is found wherever the server is started from
+// (Visual Studio, dotnet run, its exe, or `dotnet path/to/XAnimals.AngularServer.dll` from another folder as the CI does).
+var builder = WebApplication.CreateBuilder(new WebApplicationOptions { Args = args, ContentRootPath = AppContext.BaseDirectory });
 
-// The address is http://localhost:5090 (appsettings.json), whether the server is started by Visual Studio, dotnet run or its exe:
-// the Angular and Vue dev servers proxy /routeables there. --urls or ASPNETCORE_URLS choose another one.
+// The address is http://localhost:5090 (appsettings.json): the dev servers of the web samples proxy /routeables there.
+// --urls or ASPNETCORE_URLS choose another one.
 
 // The view models of the sample, served to a JavaScript front end. There is no view on the server: a route is registered
 // with its view model alone, and the Angular app draws the state that the server sends. Dialogs, notifications and the note
