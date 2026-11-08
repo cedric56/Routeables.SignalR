@@ -50,7 +50,7 @@ The first version meant for production. It changes the protocol (2) and some def
 
 - Builds against the current Routeables (`GetEntries` / `IMenuEntry`); the CI pins the revision of Routeables (`ROUTEABLES_REF`).
 - The CounterServer sample is removed: the web samples show the library.
-- Web samples in React, Svelte, SolidJS, Lit and TypeScript without a framework, beside Angular and Vue: the same application against the same server, each built and driven in Chrome by the CI (`tests/samples/smoke.mjs`).
+- A React web sample, beside Angular and Vue: the same application against the same server, each built and driven in Chrome by the CI (`tests/samples/smoke.mjs`).
 - `-p:RouteablesVersion=…` builds and packs against the Routeables packages; a release workflow publishes the NuGet and npm packages from a tag, after installing the NuGet package in an empty application.
 - `npm ci` with lockfiles; the npm package is packed and installed in an empty project in the CI.
 - End-to-end tests over a real Kestrel and SignalR server, driven by the client from Node.

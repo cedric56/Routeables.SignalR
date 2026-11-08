@@ -154,10 +154,6 @@ jobs:
         sample:
           - { name: Vue, path: samples/Vue/XAnimals.Vue, port: 5173 }
           - { name: React, path: samples/React/XAnimals.React, port: 5174 }
-          - { name: Svelte, path: samples/Svelte/XAnimals.Svelte, port: 5175 }
-          - { name: Solid, path: samples/Solid/XAnimals.Solid, port: 5176 }
-          - { name: Lit, path: samples/Lit/XAnimals.Lit, port: 5177 }
-          - { name: Vanilla, path: samples/Vanilla/XAnimals.Vanilla, port: 5178 }
 
     steps:
       - name: Checkout Routeables.SignalR

@@ -6,37 +6,9 @@
       <Deploy />
     </Project>
   </Folder>
-  <Folder Name="/samples/Lit/">
-    <File Path="samples/Lit/README.md" />
-    <Project Path="samples/Lit/XAnimals.Lit/XAnimals.Lit.esproj">
-      <Build />
-      <Deploy />
-    </Project>
-  </Folder>
   <Folder Name="/samples/React/">
     <File Path="samples/React/README.md" />
     <Project Path="samples/React/XAnimals.React/XAnimals.React.esproj">
-      <Build />
-      <Deploy />
-    </Project>
-  </Folder>
-  <Folder Name="/samples/Solid/">
-    <File Path="samples/Solid/README.md" />
-    <Project Path="samples/Solid/XAnimals.Solid/XAnimals.Solid.esproj">
-      <Build />
-      <Deploy />
-    </Project>
-  </Folder>
-  <Folder Name="/samples/Svelte/">
-    <File Path="samples/Svelte/README.md" />
-    <Project Path="samples/Svelte/XAnimals.Svelte/XAnimals.Svelte.esproj">
-      <Build />
-      <Deploy />
-    </Project>
-  </Folder>
-  <Folder Name="/samples/Vanilla/">
-    <File Path="samples/Vanilla/README.md" />
-    <Project Path="samples/Vanilla/XAnimals.Vanilla/XAnimals.Vanilla.esproj">
       <Build />
       <Deploy />
     </Project>

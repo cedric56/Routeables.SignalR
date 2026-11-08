@@ -36,7 +36,7 @@ Open `Routeables.SignalR.slnx`: the app is the project `XAnimals.React` (`XAnima
 
 ## What is worth reading
 
-- `src/routeables.ts`: the connection, the address bar that follows the page, the dialogs and the notifications, as one snapshot. The same file is in every web sample (React, Svelte, Solid, Lit, vanilla).
+- `src/routeables.ts`: the connection, the address bar that follows the page, the dialogs and the notifications, as one snapshot. The same file would serve any other framework: it only exposes a snapshot and a subscription.
 - `src/hooks.ts`: the snapshot through `useSyncExternalStore`, and `useTarget` for a region or a `$name` target.
 - `src/PageView.tsx`: the view model decides which page it is; this chooses the component. The `key` is the number of the page: another page starts a new component.
 - `src/Region.tsx`: a region zone, the way a `RouteableRegion` is on the other platforms.
