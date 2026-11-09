@@ -34,12 +34,12 @@ jobs:
     steps:
       # The projects reference the sources of Routeables, checked out next to this repository (RouteablesRoot, ../Routeables by default).
       - name: Checkout Routeables.SignalR
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           path: Routeables.SignalR
 
       - name: Checkout Routeables
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           repository: cedric56/Routeables
           ref: ${{ env.ROUTEABLES_REF }}
@@ -74,7 +74,7 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Setup Node
         uses: actions/setup-node@v4
@@ -109,12 +109,12 @@ jobs:
 
     steps:
       - name: Checkout Routeables.SignalR
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           path: Routeables.SignalR
 
       - name: Checkout Routeables
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           repository: cedric56/Routeables
           ref: ${{ env.ROUTEABLES_REF }}
@@ -159,12 +159,12 @@ jobs:
 
     steps:
       - name: Checkout Routeables.SignalR
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           path: Routeables.SignalR
 
       - name: Checkout Routeables
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           repository: cedric56/Routeables
           ref: ${{ env.ROUTEABLES_REF }}
@@ -211,7 +211,7 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       # A release line, not the moving stable channel: a new Flutter never breaks this build by surprise. Move it on purpose.
       - name: Setup Flutter
