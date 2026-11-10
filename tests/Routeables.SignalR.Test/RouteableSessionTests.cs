@@ -5,6 +5,8 @@ using SignalRDialog = Routeables.SignalR.RouteableDialog;
 using Routeables.Abstraction;
 using Routeables.Core;
 using Routeables.SignalR;
+using Routeables.Abstraction.Routing;
+using Routeables.Abstraction.Registrations;
 
 namespace Routeables.Tests.Remote;
 

@@ -1,6 +1,7 @@
 using System.Security.Claims;
 using System.Text.Json;
 using Routeables.Abstraction;
+using Routeables.Abstraction.Registrations;
 using Routeables.Core;
 using Routeables.SignalR;
 

@@ -5,6 +5,7 @@ using System.Text.Json;
 using System.Windows.Input;
 using Microsoft.AspNetCore.Authorization;
 using Routeables.Abstraction;
+using Routeables.Abstraction.Registrations;
 using Routeables.Core;
 using Routeables.SignalR;
 

@@ -5,6 +5,7 @@ using Microsoft.AspNetCore.Http.Features;
 using Microsoft.AspNetCore.SignalR;
 using Microsoft.Extensions.DependencyInjection;
 using Routeables.Abstraction;
+using Routeables.Abstraction.Registrations;
 using Routeables.Core;
 using Routeables.Routing;
 using Routeables.SignalR;

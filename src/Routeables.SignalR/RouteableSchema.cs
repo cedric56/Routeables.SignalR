@@ -6,6 +6,7 @@ using System.Text.Json.Serialization;
 using System.Windows.Input;
 using Microsoft.AspNetCore.Authorization;
 using Routeables.Abstraction;
+using Routeables.Abstraction.Routing;
 
 namespace Routeables.SignalR;
 

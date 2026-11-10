@@ -1,7 +1,8 @@
 ﻿using Routeables.Abstraction;
+using Routeables.Abstraction.Registrations;
 using Routeables.SignalR;
 using XAnimals.ViewModels;
-using IRouter = Routeables.Abstraction.IRouter;
+using IRouter = Routeables.Abstraction.Routing.IRouter;
 
 namespace XAnimals.Server;
 

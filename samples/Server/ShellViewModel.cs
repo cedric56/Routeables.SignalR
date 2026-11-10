@@ -2,6 +2,7 @@
 using System.ComponentModel;
 using System.Windows.Input;
 using Routeables.Abstraction;
+using Routeables.Abstraction.Bases;
 using Routeables.Services;
 using Routeables.SignalR;
 using XAnimals.Common;
@@ -27,10 +28,10 @@ internal sealed class ShellViewModel : INotifyPropertyChanged, IDisposable
     // The Birds module has views for the other platforms only.
     private static readonly string[] Unserved = ["/birds"];
 
-    private readonly IMainViewModel _main;
+    private readonly IRouteableMenuViewModel _main;
     private readonly ClientTheme _theme;
 
-    public ShellViewModel(IMainViewModel main, ClientTheme theme)
+    public ShellViewModel(IRouteableMenuViewModel main, ClientTheme theme)
     {
         _main = main;
         _theme = theme;

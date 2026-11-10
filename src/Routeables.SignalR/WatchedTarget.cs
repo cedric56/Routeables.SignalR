@@ -5,6 +5,7 @@ using System.Reflection;
 using System.Runtime.CompilerServices;
 using System.Windows.Input;
 using Routeables.Abstraction;
+using Routeables.Abstraction.Routing;
 
 namespace Routeables.SignalR;
 

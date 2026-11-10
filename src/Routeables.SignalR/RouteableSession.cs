@@ -7,6 +7,7 @@ using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 using Routeables.Abstraction;
+using Routeables.Abstraction.Routing;
 
 namespace Routeables.SignalR;
 

@@ -1,6 +1,8 @@
 ﻿using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Routeables.Abstraction;
+using Routeables.Abstraction.Guards;
+using Routeables.Abstraction.Registrations;
 using Routeables.Services;
 using Routeables.SignalR;
 using XAnimals.Common;

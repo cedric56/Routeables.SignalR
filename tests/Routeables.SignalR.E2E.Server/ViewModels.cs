@@ -3,6 +3,7 @@ using System.ComponentModel;
 using System.Runtime.CompilerServices;
 using Microsoft.AspNetCore.Authorization;
 using Routeables.Abstraction;
+using Routeables.Abstraction.Lifecycle;
 using Routeables.Services;
 using Routeables.SignalR;
 

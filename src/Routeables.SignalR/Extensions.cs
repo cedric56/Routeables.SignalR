@@ -5,6 +5,9 @@ using Microsoft.AspNetCore.Routing;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Routeables.Abstraction;
+using Routeables.Abstraction.Bases;
+using Routeables.Abstraction.Guards;
+using Routeables.Abstraction.Lifecycle;
 using Routeables.Core;
 using Routeables.Routing;
 using Routeables.Segments;
@@ -41,7 +44,7 @@ public static class Extensions
     [RequiresUnreferencedCode(ReflectionMessage)]
     [RequiresDynamicCode(ReflectionMessage)]
     public static IServiceCollection AddRouteablesSignalR<TMain>(this IServiceCollection services, Action<IServiceCollection>? configure = null, Action<RouteablesOptions>? options = null)
-        where TMain : class, IMainViewModel
+        where TMain : class, IRouteableMenuViewModel
     {
         ArgumentNullException.ThrowIfNull(services);
 
@@ -55,7 +58,7 @@ public static class Extensions
         services.AddAuthorizationCore();
         services.AddSingleton<RouteableSessions>();
         services.AddScoped<RouteableConnection>();
-        services.RegisterMainViewModel<TMain>(ServiceLifetime.Scoped);
+        services.RegisterMenuViewModel<TMain>(ServiceLifetime.Scoped);
         services.AddRouteCoordinator(ServiceLifetime.Scoped);
         services.AddScoped(_ => new RouteableHostLifetime(ServiceLifetime.Scoped));
         services.RegisterRouting(ServiceLifetime.Scoped);
