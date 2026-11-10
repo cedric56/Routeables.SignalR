@@ -43,12 +43,15 @@ await client.invoke('approveAsync', 42);   // resolves when the command has ende
 - **Dialogs, notifications and modals** that a view model awaits as on a desktop, without blocking the connection.
 - **Reconnection.** A session survives a dropped connection for 30 seconds and is resumed by its user: pages, state and the dialogs that wait.
 - **Observability.** Logs, an activity per call, and metrics (`Routeables.SignalR`).
+- **Offline data.** The Routeables Remote Protocol ([PROTOCOL-REMOTE.md](PROTOCOL-REMOTE.md)): documents that the .NET, TypeScript and Dart clients write without the server, restart with, and merge when the network is back (fields, sets, counters, text typed by two people at once), the server deciding what is admitted and what each user reads.
 
 ## What is in the repository
 
 | Folder | What it holds |
 | --- | --- |
-| [src/Routeables.SignalR](src/Routeables.SignalR) | The server library (`AddRouteablesSignalR`, `MapRouteables`). |
+| [src/Routeables.SignalR](src/Routeables.SignalR) | The server library (`AddRouteablesSignalR`, `MapRouteables`; `AddRouteablesReplication`, `MapRouteablesReplication`). |
+| [src/Routeables.Remote](src/Routeables.Remote) | The Routeables Remote Protocol: merge, client replica, server, stores. No dependency. |
+| [clients/fixtures](clients/fixtures) | A log written by the .NET implementation and what it merges into: the three clients must agree. |
 | [clients/typescript](clients/typescript) | `@routeables/client`, the client; it does not depend on Angular or Vue. |
 | [clients/dart](clients/dart) | `routeables_client`, the client for Dart and Flutter, with the same protocol and the same guarantees. |
 | [samples/Server](samples/Server) | XAnimals.Server, the ASP.NET Core server every sample talks to. |
@@ -99,12 +102,13 @@ Open `Routeables.SignalR.slnx` (Visual Studio 2022 17.14 or later, with the "ASP
 ```
 dotnet test --project tests/Routeables.SignalR.Test/Routeables.SignalR.Test.csproj
 dotnet test --project tests/Routeables.SignalR.Test.Angular/Routeables.SignalR.Test.Angular.csproj
+dotnet test --project tests/Routeables.Remote.Test/Routeables.Remote.Test.csproj
 npm --prefix clients/typescript ci && npm --prefix clients/typescript test
 
 # End to end: a real Kestrel and SignalR server, driven by the client from Node
 dotnet build tests/Routeables.SignalR.E2E.Server -c Release
 npm --prefix clients/typescript run build
-node --test tests/e2e/e2e.test.mjs
+node --test tests/e2e/e2e.test.mjs tests/e2e/replication.test.mjs
 
 # A web sample in Chrome, against the server (started as above, and the app built and served by `npm run preview`)
 npm --prefix tests/samples ci && node tests/samples/smoke.mjs http://localhost:5174
@@ -119,6 +123,7 @@ npm --prefix tests/samples ci && node tests/samples/smoke.mjs http://localhost:5
 - [src/Routeables.SignalR/README.md](src/Routeables.SignalR/README.md): the server — what crosses the network, authorization, the session, the messages, the limits, the options, deployment.
 - [clients/typescript/README.md](clients/typescript/README.md) and [clients/dart/README.md](clients/dart/README.md): the clients — order, answers, reconnection.
 - The README of each sample ([Angular](samples/Angular/README.md), [Vue](samples/Vue/README.md), [React](samples/React/README.md), [Flutter](samples/Flutter/README.md)).
+- [PROTOCOL-REMOTE.md](PROTOCOL-REMOTE.md): the Routeables Remote Protocol — merges, messages, guarantees, failures, limits.
 - [SECURITY.md](SECURITY.md): the security model and the checklist before production.
 - [VERSIONING.md](VERSIONING.md) and [CHANGELOG.md](CHANGELOG.md): versions, the protocol, releases.
 

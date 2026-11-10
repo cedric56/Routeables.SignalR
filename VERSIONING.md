@@ -1,8 +1,8 @@
 # Versions and releases
 
-## Two packages, one version
+## Three packages, one version
 
-The NuGet package `Routeables.SignalR` and the npm package `@routeables/client` are released together and carry the same version. A client and a server of the same version always work together.
+The NuGet packages `Routeables.SignalR` and `Routeables.Remote` and the npm package `@routeables/client` are released together and carry the same version. A client and a server of the same version always work together.
 
 The versions follow [Semantic Versioning](https://semver.org): a change that breaks an application (an API, a default, the protocol) is a major version; a feature is a minor version; a fix is a patch.
 
@@ -14,6 +14,12 @@ The messages between the client and the server have their own version, `Routeabl
 | --- | --- | --- |
 | 1 | before 2.0.0 (never released) | Pages and property changes, no versions. |
 | 2 | 2.0.0 | Generations and versions per target, patches, `Completed`, `Hello` and the resumption of a session, error codes. |
+
+The replication (PROTOCOL-REMOTE.md) has a version of its own, `RemoteProtocol.Version` and `REMOTE_PROTOCOL` (1), checked the same way by its `Hello`.
+
+| Remote protocol | Packages | What it brought |
+| --- | --- | --- |
+| 1 | 2.0.0 | Registers, sets, counters, text, deletion; push, pull, snapshot, `LogAdvanced`. |
 
 ## Routeables
 

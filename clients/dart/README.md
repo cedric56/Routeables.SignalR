@@ -53,6 +53,23 @@ When the SignalR client stops retrying, the client does not reconnect by itself 
 
 The package is not published on pub.dev yet (`publish_to: none`): depend on it by path or by git (`git: { url: https://github.com/cedric56/Routeables.SignalR.git, path: clients/dart }`).
 
+## Offline data (Routeables Remote Protocol)
+
+`Replica` holds documents written without the server and merges them with it (`MapRouteablesReplication` on the server,
+[PROTOCOL-REMOTE.md](../../PROTOCOL-REMOTE.md)), as `@routeables/client` does: the same merge, checked by the same fixture.
+
+```dart
+final channel = SignalRReplicationChannel('https://example.com/replication', accessTokenFactory: token);
+final replica = await Replica.open(storage, ['Note']);   // a ReplicaStorage: a file, shared preferences...
+const note = DocumentId('Note', 'n1');
+
+await replica.edit().create(note).replaceText(note, 'body', controller.text).commit();
+replica.find(note)?.text('body');                        // at once, offline
+replica.changed.listen((ids) => setState(() {}));
+channel.logAdvanced.listen((_) => replica.sync(channel));
+await replica.sync(channel);                             // when online; after a failure, call it again
+```
+
 ## Transport
 
 `RouteableTransport` is what the client needs from a connection. `SignalRTransport` uses [signalr_netcore](https://pub.dev/packages/signalr_netcore) (MIT): WebSockets, Server-Sent Events or long polling, automatic reconnection (`retryDelays`), and `accessTokenFactory` for a hub that requires authorization. The SignalR client for Dart does not send a `null` argument: a property is set to `null` only inside a list or a map. `applyPatch(state, patch)` is exported for a transport or a test that applies the patches itself.

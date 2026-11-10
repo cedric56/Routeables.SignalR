@@ -1,0 +1,4754 @@
+{
+  "comment": "Written by Routeables.Remote.Test (RRP_WRITE_FIXTURE=1). Merging \u0022log\u0022 in order, or reading \u0022snapshot\u0022, gives \u0022expected\u0022.",
+  "protocol": 1,
+  "log": {
+    "entries": [
+      {
+        "position": 1,
+        "change": {
+          "dot": {
+            "replica": "acf4df7d-6c9f-4841-8324-626191e18b57",
+            "seq": 1
+          },
+          "stamp": {
+            "wall": 1728000000000,
+            "counter": 0,
+            "replica": "acf4df7d-6c9f-4841-8324-626191e18b57"
+          },
+          "ops": [
+            {
+              "document": {
+                "collection": "Note",
+                "key": "n0"
+              },
+              "op": {
+                "op": "restore"
+              }
+            },
+            {
+              "document": {
+                "collection": "Note",
+                "key": "n0"
+              },
+              "op": {
+                "op": "insert",
+                "field": "body",
+                "after": null,
+                "text": "Hello"
+              }
+            }
+          ]
+        }
+      },
+      {
+        "position": 2,
+        "change": {
+          "dot": {
+            "replica": "acf4df7d-6c9f-4841-8324-626191e18b57",
+            "seq": 2
+          },
+          "stamp": {
+            "wall": 1728000000000,
+            "counter": 1,
+            "replica": "acf4df7d-6c9f-4841-8324-626191e18b57"
+          },
+          "ops": [
+            {
+              "document": {
+                "collection": "Person",
+                "key": "p2"
+              },
+              "op": {
+                "op": "remove",
+                "field": "tags",
+                "element": "\u0022t1\u0022",
+                "observed": []
+              }
+            }
+          ]
+        }
+      },
+      {
+        "position": 3,
+        "change": {
+          "dot": {
+            "replica": "acf4df7d-6c9f-4841-8324-626191e18b57",
+            "seq": 3
+          },
+          "stamp": {
+            "wall": 1728000000000,
+            "counter": 2,
+            "replica": "acf4df7d-6c9f-4841-8324-626191e18b57"
+          },
+          "ops": [
+            {
+              "document": {
+                "collection": "Person",
+                "key": "p0"
+              },
+              "op": {
+                "op": "add",
+                "field": "tags",
+                "element": "\u0022t2\u0022"
+              }
+            }
+          ]
+        }
+      },
+      {
+        "position": 4,
+        "change": {
+          "dot": {
+            "replica": "acf4df7d-6c9f-4841-8324-626191e18b57",
+            "seq": 4
+          },
+          "stamp": {
+            "wall": 1728000000001,
+            "counter": 0,
+            "replica": "acf4df7d-6c9f-4841-8324-626191e18b57"
+          },
+          "ops": [
+            {
+              "document": {
+                "collection": "Person",
+                "key": "p1"
+              },
+              "op": {
+                "op": "remove",
+                "field": "tags",
+                "element": "\u0022t1\u0022",
+                "observed": []
+              }
+            }
+          ]
+        }
+      },
+      {
+        "position": 5,
+        "change": {
+          "dot": {
+            "replica": "5fe6147a-2b9c-4ae9-a125-f01ca588cfe8",
+            "seq": 1
+          },
+          "stamp": {
+            "wall": 1728000000003,
+            "counter": 0,
+            "replica": "5fe6147a-2b9c-4ae9-a125-f01ca588cfe8"
+          },
+          "ops": [
+            {
+              "document": {
+                "collection": "Note",
+                "key": "n0"
+              },
+              "op": {
+                "op": "insert",
+                "field": "body",
+                "after": null,
+                "text": "h"
+              }
+            }
+          ]
+        }
+      },
+      {
+        "position": 6,
+        "change": {
+          "dot": {
+            "replica": "5fe6147a-2b9c-4ae9-a125-f01ca588cfe8",
+            "seq": 2
+          },
+          "stamp": {
+            "wall": 1728000000004,
+            "counter": 0,
+            "replica": "5fe6147a-2b9c-4ae9-a125-f01ca588cfe8"
+          },
+          "ops": [
+            {
+              "document": {
+                "collection": "Person",
+                "key": "p0"
+              },
+              "op": {
+                "op": "add",
+                "field": "tags",
+                "element": "\u0022t1\u0022"
+              }
+            }
+          ]
+        }
+      },
+      {
+        "position": 7,
+        "change": {
+          "dot": {
+            "replica": "5fe6147a-2b9c-4ae9-a125-f01ca588cfe8",
+            "seq": 3
+          },
+          "stamp": {
+            "wall": 1728000000004,
+            "counter": 1,
+            "replica": "5fe6147a-2b9c-4ae9-a125-f01ca588cfe8"
+          },
+          "ops": [
+            {
+              "document": {
+                "collection": "Note",
+                "key": "n0"
+              },
+              "op": {
+                "op": "insert",
+                "field": "body",
+                "after": null,
+                "text": "x"
+              }
+            }
+          ]
+        }
+      },
+      {
+        "position": 8,
+        "change": {
+          "dot": {
+            "replica": "5fe6147a-2b9c-4ae9-a125-f01ca588cfe8",
+            "seq": 4
+          },
+          "stamp": {
+            "wall": 1728000000004,
+            "counter": 2,
+            "replica": "5fe6147a-2b9c-4ae9-a125-f01ca588cfe8"
+          },
+          "ops": [
+            {
+              "document": {
+                "collection": "Person",
+                "key": "p2"
+              },
+              "op": {
+                "op": "set",
+                "field": "city",
+                "value": "\u0022c4\u0022"
+              }
+            }
+          ]
+        }
+      },
+      {
+        "position": 9,
+        "change": {
+          "dot": {
+            "replica": "5fe6147a-2b9c-4ae9-a125-f01ca588cfe8",
+            "seq": 5
+          },
+          "stamp": {
+            "wall": 1728000000004,
+            "counter": 3,
+            "replica": "5fe6147a-2b9c-4ae9-a125-f01ca588cfe8"
+          },
+          "ops": [
+            {
+              "document": {
+                "collection": "Person",
+                "key": "p1"
+              },
+              "op": {
+                "op": "delete"
+              }
+            }
+          ]
+        }
+      },
+      {
+        "position": 10,
+        "change": {
+          "dot": {
+            "replica": "5fe6147a-2b9c-4ae9-a125-f01ca588cfe8",
+            "seq": 6
+          },
+          "stamp": {
+            "wall": 1728000000004,
+            "counter": 4,
+            "replica": "5fe6147a-2b9c-4ae9-a125-f01ca588cfe8"
+          },
+          "ops": [
+            {
+              "document": {
+                "collection": "Person",
+                "key": "p2"
+              },
+              "op": {
+                "op": "add",
+                "field": "tags",
+                "element": "\u0022t2\u0022"
+              }
+            }
+          ]
+        }
+      },
+      {
+        "position": 11,
+        "change": {
+          "dot": {
+            "replica": "acf4df7d-6c9f-4841-8324-626191e18b57",
+            "seq": 5
+          },
+          "stamp": {
+            "wall": 1728000000003,
+            "counter": 0,
+            "replica": "acf4df7d-6c9f-4841-8324-626191e18b57"
+          },
+          "ops": [
+            {
+              "document": {
+                "collection": "Person",
+                "key": "p2"
+              },
+              "op": {
+                "op": "add",
+                "field": "tags",
+                "element": "\u0022t0\u0022"
+              }
+            }
+          ]
+        }
+      },
+      {
+        "position": 12,
+        "change": {
+          "dot": {
+            "replica": "acf4df7d-6c9f-4841-8324-626191e18b57",
+            "seq": 6
+          },
+          "stamp": {
+            "wall": 1728000000004,
+            "counter": 0,
+            "replica": "acf4df7d-6c9f-4841-8324-626191e18b57"
+          },
+          "ops": [
+            {
+              "document": {
+                "collection": "Note",
+                "key": "n0"
+              },
+              "op": {
+                "op": "erase",
+                "field": "body",
+                "spans": [
+                  {
+                    "dot": {
+                      "replica": "acf4df7d-6c9f-4841-8324-626191e18b57",
+                      "seq": 1
+                    },
+                    "index": 1,
+                    "offset": 3,
+                    "length": 2
+                  }
+                ]
+              }
+            }
+          ]
+        }
+      },
+      {
+        "position": 13,
+        "change": {
+          "dot": {
+            "replica": "acf4df7d-6c9f-4841-8324-626191e18b57",
+            "seq": 7
+          },
+          "stamp": {
+            "wall": 1728000000004,
+            "counter": 1,
+            "replica": "acf4df7d-6c9f-4841-8324-626191e18b57"
+          },
+          "ops": [
+            {
+              "document": {
+                "collection": "Person",
+                "key": "p1"
+              },
+              "op": {
+                "op": "add",
+                "field": "tags",
+                "element": "\u0022t2\u0022"
+              }
+            }
+          ]
+        }
+      },
+      {
+        "position": 14,
+        "change": {
+          "dot": {
+            "replica": "acf4df7d-6c9f-4841-8324-626191e18b57",
+            "seq": 8
+          },
+          "stamp": {
+            "wall": 1728000000005,
+            "counter": 0,
+            "replica": "acf4df7d-6c9f-4841-8324-626191e18b57"
+          },
+          "ops": [
+            {
+              "document": {
+                "collection": "Person",
+                "key": "p2"
+              },
+              "op": {
+                "op": "set",
+                "field": "city",
+                "value": null
+              }
+            }
+          ]
+        }
+      },
+      {
+        "position": 15,
+        "change": {
+          "dot": {
+            "replica": "56a1c6fa-d983-40b4-a96a-175f478de19b",
+            "seq": 1
+          },
+          "stamp": {
+            "wall": 1728000000000,
+            "counter": 0,
+            "replica": "56a1c6fa-d983-40b4-a96a-175f478de19b"
+          },
+          "ops": [
+            {
+              "document": {
+                "collection": "Note",
+                "key": "n0"
+              },
+              "op": {
+                "op": "insert",
+                "field": "body",
+                "after": null,
+                "text": "\u00FC"
+              }
+            }
+          ]
+        }
+      },
+      {
+        "position": 16,
+        "change": {
+          "dot": {
+            "replica": "56a1c6fa-d983-40b4-a96a-175f478de19b",
+            "seq": 2
+          },
+          "stamp": {
+            "wall": 1728000000004,
+            "counter": 0,
+            "replica": "56a1c6fa-d983-40b4-a96a-175f478de19b"
+          },
+          "ops": [
+            {
+              "document": {
+                "collection": "Person",
+                "key": "p2"
+              },
+              "op": {
+                "op": "add",
+                "field": "tags",
+                "element": "\u0022t1\u0022"
+              }
+            }
+          ]
+        }
+      },
+      {
+        "position": 17,
+        "change": {
+          "dot": {
+            "replica": "56a1c6fa-d983-40b4-a96a-175f478de19b",
+            "seq": 3
+          },
+          "stamp": {
+            "wall": 1728000000004,
+            "counter": 1,
+            "replica": "56a1c6fa-d983-40b4-a96a-175f478de19b"
+          },
+          "ops": [
+            {
+              "document": {
+                "collection": "Person",
+                "key": "p2"
+              },
+              "op": {
+                "op": "add",
+                "field": "tags",
+                "element": "\u0022t0\u0022"
+              }
+            }
+          ]
+        }
+      },
+      {
+        "position": 18,
+        "change": {
+          "dot": {
+            "replica": "56a1c6fa-d983-40b4-a96a-175f478de19b",
+            "seq": 4
+          },
+          "stamp": {
+            "wall": 1728000000004,
+            "counter": 2,
+            "replica": "56a1c6fa-d983-40b4-a96a-175f478de19b"
+          },
+          "ops": [
+            {
+              "document": {
+                "collection": "Note",
+                "key": "n0"
+              },
+              "op": {
+                "op": "insert",
+                "field": "body",
+                "after": {
+                  "dot": {
+                    "replica": "56a1c6fa-d983-40b4-a96a-175f478de19b",
+                    "seq": 1
+                  },
+                  "index": 0,
+                  "offset": 0
+                },
+                "text": "k"
+              }
+            }
+          ]
+        }
+      },
+      {
+        "position": 19,
+        "change": {
+          "dot": {
+            "replica": "56a1c6fa-d983-40b4-a96a-175f478de19b",
+            "seq": 5
+          },
+          "stamp": {
+            "wall": 1728000000004,
+            "counter": 3,
+            "replica": "56a1c6fa-d983-40b4-a96a-175f478de19b"
+          },
+          "ops": [
+            {
+              "document": {
+                "collection": "Note",
+                "key": "n0"
+              },
+              "op": {
+                "op": "insert",
+                "field": "body",
+                "after": {
+                  "dot": {
+                    "replica": "56a1c6fa-d983-40b4-a96a-175f478de19b",
+                    "seq": 4
+                  },
+                  "index": 0,
+                  "offset": 0
+                },
+                "text": "\u00FC"
+              }
+            }
+          ]
+        }
+      },
+      {
+        "position": 20,
+        "change": {
+          "dot": {
+            "replica": "56a1c6fa-d983-40b4-a96a-175f478de19b",
+            "seq": 6
+          },
+          "stamp": {
+            "wall": 1728000000004,
+            "counter": 4,
+            "replica": "56a1c6fa-d983-40b4-a96a-175f478de19b"
+          },
+          "ops": [
+            {
+              "document": {
+                "collection": "Person",
+                "key": "p1"
+              },
+              "op": {
+                "op": "add",
+                "field": "tags",
+                "element": "\u0022t2\u0022"
+              }
+            }
+          ]
+        }
+      },
+      {
+        "position": 21,
+        "change": {
+          "dot": {
+            "replica": "56a1c6fa-d983-40b4-a96a-175f478de19b",
+            "seq": 7
+          },
+          "stamp": {
+            "wall": 1728000000005,
+            "counter": 0,
+            "replica": "56a1c6fa-d983-40b4-a96a-175f478de19b"
+          },
+          "ops": [
+            {
+              "document": {
+                "collection": "Person",
+                "key": "p1"
+              },
+              "op": {
+                "op": "increment",
+                "field": "visits",
+                "delta": 0
+              }
+            }
+          ]
+        }
+      },
+      {
+        "position": 22,
+        "change": {
+          "dot": {
+            "replica": "56a1c6fa-d983-40b4-a96a-175f478de19b",
+            "seq": 8
+          },
+          "stamp": {
+            "wall": 1728000000005,
+            "counter": 1,
+            "replica": "56a1c6fa-d983-40b4-a96a-175f478de19b"
+          },
+          "ops": [
+            {
+              "document": {
+                "collection": "Person",
+                "key": "p2"
+              },
+              "op": {
+                "op": "restore"
+              }
+            },
+            {
+              "document": {
+                "collection": "Person",
+                "key": "p2"
+              },
+              "op": {
+                "op": "set",
+                "field": "name",
+                "value": "\u0022n48\u0022"
+              }
+            }
+          ]
+        }
+      },
+      {
+        "position": 23,
+        "change": {
+          "dot": {
+            "replica": "56a1c6fa-d983-40b4-a96a-175f478de19b",
+            "seq": 9
+          },
+          "stamp": {
+            "wall": 1728000000007,
+            "counter": 0,
+            "replica": "56a1c6fa-d983-40b4-a96a-175f478de19b"
+          },
+          "ops": [
+            {
+              "document": {
+                "collection": "Person",
+                "key": "p1"
+              },
+              "op": {
+                "op": "restore"
+              }
+            },
+            {
+              "document": {
+                "collection": "Person",
+                "key": "p1"
+              },
+              "op": {
+                "op": "set",
+                "field": "name",
+                "value": "\u0022n37\u0022"
+              }
+            }
+          ]
+        }
+      },
+      {
+        "position": 24,
+        "change": {
+          "dot": {
+            "replica": "56a1c6fa-d983-40b4-a96a-175f478de19b",
+            "seq": 10
+          },
+          "stamp": {
+            "wall": 1728000000007,
+            "counter": 1,
+            "replica": "56a1c6fa-d983-40b4-a96a-175f478de19b"
+          },
+          "ops": [
+            {
+              "document": {
+                "collection": "Note",
+                "key": "n0"
+              },
+              "op": {
+                "op": "erase",
+                "field": "body",
+                "spans": [
+                  {
+                    "dot": {
+                      "replica": "56a1c6fa-d983-40b4-a96a-175f478de19b",
+                      "seq": 5
+                    },
+                    "index": 0,
+                    "offset": 0,
+                    "length": 1
+                  }
+                ]
+              }
+            },
+            {
+              "document": {
+                "collection": "Note",
+                "key": "n0"
+              },
+              "op": {
+                "op": "insert",
+                "field": "body",
+                "after": {
+                  "dot": {
+                    "replica": "56a1c6fa-d983-40b4-a96a-175f478de19b",
+                    "seq": 4
+                  },
+                  "index": 0,
+                  "offset": 0
+                },
+                "text": "\u00E9"
+              }
+            }
+          ]
+        }
+      },
+      {
+        "position": 25,
+        "change": {
+          "dot": {
+            "replica": "56a1c6fa-d983-40b4-a96a-175f478de19b",
+            "seq": 11
+          },
+          "stamp": {
+            "wall": 1728000000008,
+            "counter": 1,
+            "replica": "56a1c6fa-d983-40b4-a96a-175f478de19b"
+          },
+          "ops": [
+            {
+              "document": {
+                "collection": "Person",
+                "key": "p0"
+              },
+              "op": {
+                "op": "set",
+                "field": "city",
+                "value": "\u0022c2\u0022"
+              }
+            }
+          ]
+        }
+      },
+      {
+        "position": 26,
+        "change": {
+          "dot": {
+            "replica": "56a1c6fa-d983-40b4-a96a-175f478de19b",
+            "seq": 12
+          },
+          "stamp": {
+            "wall": 1728000000008,
+            "counter": 2,
+            "replica": "56a1c6fa-d983-40b4-a96a-175f478de19b"
+          },
+          "ops": [
+            {
+              "document": {
+                "collection": "Person",
+                "key": "p2"
+              },
+              "op": {
+                "op": "increment",
+                "field": "visits",
+                "delta": 3
+              }
+            }
+          ]
+        }
+      },
+      {
+        "position": 27,
+        "change": {
+          "dot": {
+            "replica": "56a1c6fa-d983-40b4-a96a-175f478de19b",
+            "seq": 13
+          },
+          "stamp": {
+            "wall": 1728000000008,
+            "counter": 3,
+            "replica": "56a1c6fa-d983-40b4-a96a-175f478de19b"
+          },
+          "ops": [
+            {
+              "document": {
+                "collection": "Person",
+                "key": "p2"
+              },
+              "op": {
+                "op": "set",
+                "field": "city",
+                "value": "\u0022c2\u0022"
+              }
+            }
+          ]
+        }
+      },
+      {
+        "position": 28,
+        "change": {
+          "dot": {
+            "replica": "56a1c6fa-d983-40b4-a96a-175f478de19b",
+            "seq": 14
+          },
+          "stamp": {
+            "wall": 1728000000008,
+            "counter": 4,
+            "replica": "56a1c6fa-d983-40b4-a96a-175f478de19b"
+          },
+          "ops": [
+            {
+              "document": {
+                "collection": "Note",
+                "key": "n0"
+              },
+              "op": {
+                "op": "insert",
+                "field": "body",
+                "after": null,
+                "text": "u"
+              }
+            }
+          ]
+        }
+      },
+      {
+        "position": 29,
+        "change": {
+          "dot": {
+            "replica": "56a1c6fa-d983-40b4-a96a-175f478de19b",
+            "seq": 15
+          },
+          "stamp": {
+            "wall": 1728000000009,
+            "counter": 0,
+            "replica": "56a1c6fa-d983-40b4-a96a-175f478de19b"
+          },
+          "ops": [
+            {
+              "document": {
+                "collection": "Note",
+                "key": "n0"
+              },
+              "op": {
+                "op": "erase",
+                "field": "body",
+                "spans": [
+                  {
+                    "dot": {
+                      "replica": "56a1c6fa-d983-40b4-a96a-175f478de19b",
+                      "seq": 10
+                    },
+                    "index": 1,
+                    "offset": 0,
+                    "length": 1
+                  }
+                ]
+              }
+            }
+          ]
+        }
+      },
+      {
+        "position": 30,
+        "change": {
+          "dot": {
+            "replica": "56a1c6fa-d983-40b4-a96a-175f478de19b",
+            "seq": 16
+          },
+          "stamp": {
+            "wall": 1728000000009,
+            "counter": 1,
+            "replica": "56a1c6fa-d983-40b4-a96a-175f478de19b"
+          },
+          "ops": [
+            {
+              "document": {
+                "collection": "Note",
+                "key": "n0"
+              },
+              "op": {
+                "op": "erase",
+                "field": "body",
+                "spans": [
+                  {
+                    "dot": {
+                      "replica": "56a1c6fa-d983-40b4-a96a-175f478de19b",
+                      "seq": 4
+                    },
+                    "index": 0,
+                    "offset": 0,
+                    "length": 1
+                  }
+                ]
+              }
+            },
+            {
+              "document": {
+                "collection": "Note",
+                "key": "n0"
+              },
+              "op": {
+                "op": "insert",
+                "field": "body",
+                "after": {
+                  "dot": {
+                    "replica": "56a1c6fa-d983-40b4-a96a-175f478de19b",
+                    "seq": 1
+                  },
+                  "index": 0,
+                  "offset": 0
+                },
+                "text": "\u00E9"
+              }
+            }
+          ]
+        }
+      },
+      {
+        "position": 31,
+        "change": {
+          "dot": {
+            "replica": "56a1c6fa-d983-40b4-a96a-175f478de19b",
+            "seq": 17
+          },
+          "stamp": {
+            "wall": 1728000000010,
+            "counter": 0,
+            "replica": "56a1c6fa-d983-40b4-a96a-175f478de19b"
+          },
+          "ops": [
+            {
+              "document": {
+                "collection": "Person",
+                "key": "p2"
+              },
+              "op": {
+                "op": "delete"
+              }
+            }
+          ]
+        }
+      },
+      {
+        "position": 32,
+        "change": {
+          "dot": {
+            "replica": "5fe6147a-2b9c-4ae9-a125-f01ca588cfe8",
+            "seq": 7
+          },
+          "stamp": {
+            "wall": 1728000000004,
+            "counter": 7,
+            "replica": "5fe6147a-2b9c-4ae9-a125-f01ca588cfe8"
+          },
+          "ops": [
+            {
+              "document": {
+                "collection": "Person",
+                "key": "p2"
+              },
+              "op": {
+                "op": "increment",
+                "field": "visits",
+                "delta": -2
+              }
+            }
+          ]
+        }
+      },
+      {
+        "position": 33,
+        "change": {
+          "dot": {
+            "replica": "5fe6147a-2b9c-4ae9-a125-f01ca588cfe8",
+            "seq": 8
+          },
+          "stamp": {
+            "wall": 1728000000004,
+            "counter": 8,
+            "replica": "5fe6147a-2b9c-4ae9-a125-f01ca588cfe8"
+          },
+          "ops": [
+            {
+              "document": {
+                "collection": "Person",
+                "key": "p1"
+              },
+              "op": {
+                "op": "increment",
+                "field": "visits",
+                "delta": 3
+              }
+            }
+          ]
+        }
+      },
+      {
+        "position": 34,
+        "change": {
+          "dot": {
+            "replica": "5fe6147a-2b9c-4ae9-a125-f01ca588cfe8",
+            "seq": 9
+          },
+          "stamp": {
+            "wall": 1728000000005,
+            "counter": 0,
+            "replica": "5fe6147a-2b9c-4ae9-a125-f01ca588cfe8"
+          },
+          "ops": [
+            {
+              "document": {
+                "collection": "Person",
+                "key": "p2"
+              },
+              "op": {
+                "op": "add",
+                "field": "tags",
+                "element": "\u0022t2\u0022"
+              }
+            }
+          ]
+        }
+      },
+      {
+        "position": 35,
+        "change": {
+          "dot": {
+            "replica": "5fe6147a-2b9c-4ae9-a125-f01ca588cfe8",
+            "seq": 10
+          },
+          "stamp": {
+            "wall": 1728000000006,
+            "counter": 0,
+            "replica": "5fe6147a-2b9c-4ae9-a125-f01ca588cfe8"
+          },
+          "ops": [
+            {
+              "document": {
+                "collection": "Person",
+                "key": "p1"
+              },
+              "op": {
+                "op": "increment",
+                "field": "visits",
+                "delta": -2
+              }
+            }
+          ]
+        }
+      },
+      {
+        "position": 36,
+        "change": {
+          "dot": {
+            "replica": "5fe6147a-2b9c-4ae9-a125-f01ca588cfe8",
+            "seq": 11
+          },
+          "stamp": {
+            "wall": 1728000000006,
+            "counter": 1,
+            "replica": "5fe6147a-2b9c-4ae9-a125-f01ca588cfe8"
+          },
+          "ops": [
+            {
+              "document": {
+                "collection": "Person",
+                "key": "p0"
+              },
+              "op": {
+                "op": "increment",
+                "field": "visits",
+                "delta": 1
+              }
+            }
+          ]
+        }
+      },
+      {
+        "position": 37,
+        "change": {
+          "dot": {
+            "replica": "5fe6147a-2b9c-4ae9-a125-f01ca588cfe8",
+            "seq": 12
+          },
+          "stamp": {
+            "wall": 1728000000008,
+            "counter": 0,
+            "replica": "5fe6147a-2b9c-4ae9-a125-f01ca588cfe8"
+          },
+          "ops": [
+            {
+              "document": {
+                "collection": "Note",
+                "key": "n0"
+              },
+              "op": {
+                "op": "insert",
+                "field": "body",
+                "after": {
+                  "dot": {
+                    "replica": "acf4df7d-6c9f-4841-8324-626191e18b57",
+                    "seq": 1
+                  },
+                  "index": 1,
+                  "offset": 0
+                },
+                "text": "c"
+              }
+            }
+          ]
+        }
+      },
+      {
+        "position": 38,
+        "change": {
+          "dot": {
+            "replica": "5fe6147a-2b9c-4ae9-a125-f01ca588cfe8",
+            "seq": 13
+          },
+          "stamp": {
+            "wall": 1728000000008,
+            "counter": 1,
+            "replica": "5fe6147a-2b9c-4ae9-a125-f01ca588cfe8"
+          },
+          "ops": [
+            {
+              "document": {
+                "collection": "Note",
+                "key": "n0"
+              },
+              "op": {
+                "op": "erase",
+                "field": "body",
+                "spans": [
+                  {
+                    "dot": {
+                      "replica": "acf4df7d-6c9f-4841-8324-626191e18b57",
+                      "seq": 1
+                    },
+                    "index": 1,
+                    "offset": 0,
+                    "length": 1
+                  },
+                  {
+                    "dot": {
+                      "replica": "5fe6147a-2b9c-4ae9-a125-f01ca588cfe8",
+                      "seq": 12
+                    },
+                    "index": 0,
+                    "offset": 0,
+                    "length": 1
+                  }
+                ]
+              }
+            }
+          ]
+        }
+      },
+      {
+        "position": 39,
+        "change": {
+          "dot": {
+            "replica": "5fe6147a-2b9c-4ae9-a125-f01ca588cfe8",
+            "seq": 14
+          },
+          "stamp": {
+            "wall": 1728000000010,
+            "counter": 0,
+            "replica": "5fe6147a-2b9c-4ae9-a125-f01ca588cfe8"
+          },
+          "ops": [
+            {
+              "document": {
+                "collection": "Note",
+                "key": "n0"
+              },
+              "op": {
+                "op": "erase",
+                "field": "body",
+                "spans": [
+                  {
+                    "dot": {
+                      "replica": "acf4df7d-6c9f-4841-8324-626191e18b57",
+                      "seq": 1
+                    },
+                    "index": 1,
+                    "offset": 1,
+                    "length": 1
+                  }
+                ]
+              }
+            }
+          ]
+        }
+      },
+      {
+        "position": 40,
+        "change": {
+          "dot": {
+            "replica": "5fe6147a-2b9c-4ae9-a125-f01ca588cfe8",
+            "seq": 15
+          },
+          "stamp": {
+            "wall": 1728000000010,
+            "counter": 1,
+            "replica": "5fe6147a-2b9c-4ae9-a125-f01ca588cfe8"
+          },
+          "ops": [
+            {
+              "document": {
+                "collection": "Person",
+                "key": "p1"
+              },
+              "op": {
+                "op": "increment",
+                "field": "visits",
+                "delta": -2
+              }
+            }
+          ]
+        }
+      },
+      {
+        "position": 41,
+        "change": {
+          "dot": {
+            "replica": "5fe6147a-2b9c-4ae9-a125-f01ca588cfe8",
+            "seq": 16
+          },
+          "stamp": {
+            "wall": 1728000000010,
+            "counter": 2,
+            "replica": "5fe6147a-2b9c-4ae9-a125-f01ca588cfe8"
+          },
+          "ops": [
+            {
+              "document": {
+                "collection": "Person",
+                "key": "p1"
+              },
+              "op": {
+                "op": "add",
+                "field": "tags",
+                "element": "\u0022t0\u0022"
+              }
+            }
+          ]
+        }
+      },
+      {
+        "position": 42,
+        "change": {
+          "dot": {
+            "replica": "5fe6147a-2b9c-4ae9-a125-f01ca588cfe8",
+            "seq": 17
+          },
+          "stamp": {
+            "wall": 1728000000010,
+            "counter": 3,
+            "replica": "5fe6147a-2b9c-4ae9-a125-f01ca588cfe8"
+          },
+          "ops": [
+            {
+              "document": {
+                "collection": "Person",
+                "key": "p0"
+              },
+              "op": {
+                "op": "set",
+                "field": "city",
+                "value": "\u0022c2\u0022"
+              }
+            }
+          ]
+        }
+      },
+      {
+        "position": 43,
+        "change": {
+          "dot": {
+            "replica": "5fe6147a-2b9c-4ae9-a125-f01ca588cfe8",
+            "seq": 18
+          },
+          "stamp": {
+            "wall": 1728000000010,
+            "counter": 4,
+            "replica": "5fe6147a-2b9c-4ae9-a125-f01ca588cfe8"
+          },
+          "ops": [
+            {
+              "document": {
+                "collection": "Person",
+                "key": "p0"
+              },
+              "op": {
+                "op": "increment",
+                "field": "visits",
+                "delta": 4
+              }
+            }
+          ]
+        }
+      },
+      {
+        "position": 44,
+        "change": {
+          "dot": {
+            "replica": "5fe6147a-2b9c-4ae9-a125-f01ca588cfe8",
+            "seq": 19
+          },
+          "stamp": {
+            "wall": 1728000000010,
+            "counter": 5,
+            "replica": "5fe6147a-2b9c-4ae9-a125-f01ca588cfe8"
+          },
+          "ops": [
+            {
+              "document": {
+                "collection": "Note",
+                "key": "n0"
+              },
+              "op": {
+                "op": "insert",
+                "field": "body",
+                "after": {
+                  "dot": {
+                    "replica": "acf4df7d-6c9f-4841-8324-626191e18b57",
+                    "seq": 1
+                  },
+                  "index": 1,
+                  "offset": 3
+                },
+                "text": "q"
+              }
+            }
+          ]
+        }
+      },
+      {
+        "position": 45,
+        "change": {
+          "dot": {
+            "replica": "5fe6147a-2b9c-4ae9-a125-f01ca588cfe8",
+            "seq": 20
+          },
+          "stamp": {
+            "wall": 1728000000010,
+            "counter": 6,
+            "replica": "5fe6147a-2b9c-4ae9-a125-f01ca588cfe8"
+          },
+          "ops": [
+            {
+              "document": {
+                "collection": "Person",
+                "key": "p2"
+              },
+              "op": {
+                "op": "increment",
+                "field": "visits",
+                "delta": 2
+              }
+            }
+          ]
+        }
+      },
+      {
+        "position": 46,
+        "change": {
+          "dot": {
+            "replica": "5fe6147a-2b9c-4ae9-a125-f01ca588cfe8",
+            "seq": 21
+          },
+          "stamp": {
+            "wall": 1728000000011,
+            "counter": 0,
+            "replica": "5fe6147a-2b9c-4ae9-a125-f01ca588cfe8"
+          },
+          "ops": [
+            {
+              "document": {
+                "collection": "Person",
+                "key": "p0"
+              },
+              "op": {
+                "op": "restore"
+              }
+            },
+            {
+              "document": {
+                "collection": "Person",
+                "key": "p0"
+              },
+              "op": {
+                "op": "set",
+                "field": "name",
+                "value": "\u0022n2\u0022"
+              }
+            }
+          ]
+        }
+      },
+      {
+        "position": 47,
+        "change": {
+          "dot": {
+            "replica": "acf4df7d-6c9f-4841-8324-626191e18b57",
+            "seq": 9
+          },
+          "stamp": {
+            "wall": 1728000000005,
+            "counter": 8,
+            "replica": "acf4df7d-6c9f-4841-8324-626191e18b57"
+          },
+          "ops": [
+            {
+              "document": {
+                "collection": "Person",
+                "key": "p0"
+              },
+              "op": {
+                "op": "increment",
+                "field": "visits",
+                "delta": 0
+              }
+            }
+          ]
+        }
+      },
+      {
+        "position": 48,
+        "change": {
+          "dot": {
+            "replica": "acf4df7d-6c9f-4841-8324-626191e18b57",
+            "seq": 10
+          },
+          "stamp": {
+            "wall": 1728000000005,
+            "counter": 9,
+            "replica": "acf4df7d-6c9f-4841-8324-626191e18b57"
+          },
+          "ops": [
+            {
+              "document": {
+                "collection": "Person",
+                "key": "p2"
+              },
+              "op": {
+                "op": "set",
+                "field": "city",
+                "value": "\u0022c3\u0022"
+              }
+            }
+          ]
+        }
+      },
+      {
+        "position": 49,
+        "change": {
+          "dot": {
+            "replica": "acf4df7d-6c9f-4841-8324-626191e18b57",
+            "seq": 11
+          },
+          "stamp": {
+            "wall": 1728000000005,
+            "counter": 10,
+            "replica": "acf4df7d-6c9f-4841-8324-626191e18b57"
+          },
+          "ops": [
+            {
+              "document": {
+                "collection": "Person",
+                "key": "p1"
+              },
+              "op": {
+                "op": "add",
+                "field": "tags",
+                "element": "\u0022t2\u0022"
+              }
+            }
+          ]
+        }
+      },
+      {
+        "position": 50,
+        "change": {
+          "dot": {
+            "replica": "acf4df7d-6c9f-4841-8324-626191e18b57",
+            "seq": 12
+          },
+          "stamp": {
+            "wall": 1728000000006,
+            "counter": 0,
+            "replica": "acf4df7d-6c9f-4841-8324-626191e18b57"
+          },
+          "ops": [
+            {
+              "document": {
+                "collection": "Person",
+                "key": "p1"
+              },
+              "op": {
+                "op": "delete"
+              }
+            }
+          ]
+        }
+      },
+      {
+        "position": 51,
+        "change": {
+          "dot": {
+            "replica": "acf4df7d-6c9f-4841-8324-626191e18b57",
+            "seq": 13
+          },
+          "stamp": {
+            "wall": 1728000000008,
+            "counter": 0,
+            "replica": "acf4df7d-6c9f-4841-8324-626191e18b57"
+          },
+          "ops": [
+            {
+              "document": {
+                "collection": "Note",
+                "key": "n0"
+              },
+              "op": {
+                "op": "erase",
+                "field": "body",
+                "spans": [
+                  {
+                    "dot": {
+                      "replica": "5fe6147a-2b9c-4ae9-a125-f01ca588cfe8",
+                      "seq": 1
+                    },
+                    "index": 0,
+                    "offset": 0,
+                    "length": 1
+                  }
+                ]
+              }
+            }
+          ]
+        }
+      },
+      {
+        "position": 52,
+        "change": {
+          "dot": {
+            "replica": "acf4df7d-6c9f-4841-8324-626191e18b57",
+            "seq": 14
+          },
+          "stamp": {
+            "wall": 1728000000009,
+            "counter": 0,
+            "replica": "acf4df7d-6c9f-4841-8324-626191e18b57"
+          },
+          "ops": [
+            {
+              "document": {
+                "collection": "Note",
+                "key": "n0"
+              },
+              "op": {
+                "op": "erase",
+                "field": "body",
+                "spans": [
+                  {
+                    "dot": {
+                      "replica": "acf4df7d-6c9f-4841-8324-626191e18b57",
+                      "seq": 1
+                    },
+                    "index": 1,
+                    "offset": 2,
+                    "length": 1
+                  }
+                ]
+              }
+            }
+          ]
+        }
+      },
+      {
+        "position": 53,
+        "change": {
+          "dot": {
+            "replica": "acf4df7d-6c9f-4841-8324-626191e18b57",
+            "seq": 15
+          },
+          "stamp": {
+            "wall": 1728000000012,
+            "counter": 0,
+            "replica": "acf4df7d-6c9f-4841-8324-626191e18b57"
+          },
+          "ops": [
+            {
+              "document": {
+                "collection": "Person",
+                "key": "p1"
+              },
+              "op": {
+                "op": "set",
+                "field": "city",
+                "value": null
+              }
+            }
+          ]
+        }
+      },
+      {
+        "position": 54,
+        "change": {
+          "dot": {
+            "replica": "acf4df7d-6c9f-4841-8324-626191e18b57",
+            "seq": 16
+          },
+          "stamp": {
+            "wall": 1728000000012,
+            "counter": 1,
+            "replica": "acf4df7d-6c9f-4841-8324-626191e18b57"
+          },
+          "ops": [
+            {
+              "document": {
+                "collection": "Note",
+                "key": "n0"
+              },
+              "op": {
+                "op": "erase",
+                "field": "body",
+                "spans": [
+                  {
+                    "dot": {
+                      "replica": "acf4df7d-6c9f-4841-8324-626191e18b57",
+                      "seq": 1
+                    },
+                    "index": 1,
+                    "offset": 1,
+                    "length": 1
+                  }
+                ]
+              }
+            }
+          ]
+        }
+      },
+      {
+        "position": 55,
+        "change": {
+          "dot": {
+            "replica": "acf4df7d-6c9f-4841-8324-626191e18b57",
+            "seq": 17
+          },
+          "stamp": {
+            "wall": 1728000000013,
+            "counter": 0,
+            "replica": "acf4df7d-6c9f-4841-8324-626191e18b57"
+          },
+          "ops": [
+            {
+              "document": {
+                "collection": "Person",
+                "key": "p0"
+              },
+              "op": {
+                "op": "remove",
+                "field": "tags",
+                "element": "\u0022t0\u0022",
+                "observed": []
+              }
+            }
+          ]
+        }
+      },
+      {
+        "position": 56,
+        "change": {
+          "dot": {
+            "replica": "acf4df7d-6c9f-4841-8324-626191e18b57",
+            "seq": 18
+          },
+          "stamp": {
+            "wall": 1728000000014,
+            "counter": 0,
+            "replica": "acf4df7d-6c9f-4841-8324-626191e18b57"
+          },
+          "ops": [
+            {
+              "document": {
+                "collection": "Note",
+                "key": "n0"
+              },
+              "op": {
+                "op": "erase",
+                "field": "body",
+                "spans": [
+                  {
+                    "dot": {
+                      "replica": "5fe6147a-2b9c-4ae9-a125-f01ca588cfe8",
+                      "seq": 3
+                    },
+                    "index": 0,
+                    "offset": 0,
+                    "length": 1
+                  }
+                ]
+              }
+            }
+          ]
+        }
+      },
+      {
+        "position": 57,
+        "change": {
+          "dot": {
+            "replica": "56a1c6fa-d983-40b4-a96a-175f478de19b",
+            "seq": 18
+          },
+          "stamp": {
+            "wall": 1728000000010,
+            "counter": 3,
+            "replica": "56a1c6fa-d983-40b4-a96a-175f478de19b"
+          },
+          "ops": [
+            {
+              "document": {
+                "collection": "Person",
+                "key": "p0"
+              },
+              "op": {
+                "op": "add",
+                "field": "tags",
+                "element": "\u0022t0\u0022"
+              }
+            }
+          ]
+        }
+      },
+      {
+        "position": 58,
+        "change": {
+          "dot": {
+            "replica": "56a1c6fa-d983-40b4-a96a-175f478de19b",
+            "seq": 19
+          },
+          "stamp": {
+            "wall": 1728000000010,
+            "counter": 4,
+            "replica": "56a1c6fa-d983-40b4-a96a-175f478de19b"
+          },
+          "ops": [
+            {
+              "document": {
+                "collection": "Person",
+                "key": "p2"
+              },
+              "op": {
+                "op": "set",
+                "field": "city",
+                "value": "\u0022c2\u0022"
+              }
+            }
+          ]
+        }
+      },
+      {
+        "position": 59,
+        "change": {
+          "dot": {
+            "replica": "56a1c6fa-d983-40b4-a96a-175f478de19b",
+            "seq": 20
+          },
+          "stamp": {
+            "wall": 1728000000011,
+            "counter": 0,
+            "replica": "56a1c6fa-d983-40b4-a96a-175f478de19b"
+          },
+          "ops": [
+            {
+              "document": {
+                "collection": "Person",
+                "key": "p0"
+              },
+              "op": {
+                "op": "delete"
+              }
+            }
+          ]
+        }
+      },
+      {
+        "position": 60,
+        "change": {
+          "dot": {
+            "replica": "56a1c6fa-d983-40b4-a96a-175f478de19b",
+            "seq": 21
+          },
+          "stamp": {
+            "wall": 1728000000013,
+            "counter": 0,
+            "replica": "56a1c6fa-d983-40b4-a96a-175f478de19b"
+          },
+          "ops": [
+            {
+              "document": {
+                "collection": "Person",
+                "key": "p1"
+              },
+              "op": {
+                "op": "add",
+                "field": "tags",
+                "element": "\u0022t0\u0022"
+              }
+            }
+          ]
+        }
+      },
+      {
+        "position": 61,
+        "change": {
+          "dot": {
+            "replica": "56a1c6fa-d983-40b4-a96a-175f478de19b",
+            "seq": 22
+          },
+          "stamp": {
+            "wall": 1728000000014,
+            "counter": 0,
+            "replica": "56a1c6fa-d983-40b4-a96a-175f478de19b"
+          },
+          "ops": [
+            {
+              "document": {
+                "collection": "Person",
+                "key": "p1"
+              },
+              "op": {
+                "op": "set",
+                "field": "city",
+                "value": "\u0022c4\u0022"
+              }
+            }
+          ]
+        }
+      },
+      {
+        "position": 62,
+        "change": {
+          "dot": {
+            "replica": "56a1c6fa-d983-40b4-a96a-175f478de19b",
+            "seq": 23
+          },
+          "stamp": {
+            "wall": 1728000000015,
+            "counter": 1,
+            "replica": "56a1c6fa-d983-40b4-a96a-175f478de19b"
+          },
+          "ops": [
+            {
+              "document": {
+                "collection": "Note",
+                "key": "n0"
+              },
+              "op": {
+                "op": "insert",
+                "field": "body",
+                "after": {
+                  "dot": {
+                    "replica": "acf4df7d-6c9f-4841-8324-626191e18b57",
+                    "seq": 1
+                  },
+                  "index": 1,
+                  "offset": 1
+                },
+                "text": "h"
+              }
+            }
+          ]
+        }
+      },
+      {
+        "position": 63,
+        "change": {
+          "dot": {
+            "replica": "56a1c6fa-d983-40b4-a96a-175f478de19b",
+            "seq": 24
+          },
+          "stamp": {
+            "wall": 1728000000017,
+            "counter": 0,
+            "replica": "56a1c6fa-d983-40b4-a96a-175f478de19b"
+          },
+          "ops": [
+            {
+              "document": {
+                "collection": "Person",
+                "key": "p2"
+              },
+              "op": {
+                "op": "increment",
+                "field": "visits",
+                "delta": 3
+              }
+            }
+          ]
+        }
+      },
+      {
+        "position": 64,
+        "change": {
+          "dot": {
+            "replica": "56a1c6fa-d983-40b4-a96a-175f478de19b",
+            "seq": 25
+          },
+          "stamp": {
+            "wall": 1728000000017,
+            "counter": 1,
+            "replica": "56a1c6fa-d983-40b4-a96a-175f478de19b"
+          },
+          "ops": [
+            {
+              "document": {
+                "collection": "Person",
+                "key": "p2"
+              },
+              "op": {
+                "op": "remove",
+                "field": "tags",
+                "element": "\u0022t2\u0022",
+                "observed": [
+                  {
+                    "dot": {
+                      "replica": "5fe6147a-2b9c-4ae9-a125-f01ca588cfe8",
+                      "seq": 6
+                    },
+                    "index": 0
+                  }
+                ]
+              }
+            }
+          ]
+        }
+      },
+      {
+        "position": 65,
+        "change": {
+          "dot": {
+            "replica": "56a1c6fa-d983-40b4-a96a-175f478de19b",
+            "seq": 26
+          },
+          "stamp": {
+            "wall": 1728000000017,
+            "counter": 2,
+            "replica": "56a1c6fa-d983-40b4-a96a-175f478de19b"
+          },
+          "ops": [
+            {
+              "document": {
+                "collection": "Note",
+                "key": "n0"
+              },
+              "op": {
+                "op": "insert",
+                "field": "body",
+                "after": {
+                  "dot": {
+                    "replica": "56a1c6fa-d983-40b4-a96a-175f478de19b",
+                    "seq": 14
+                  },
+                  "index": 0,
+                  "offset": 0
+                },
+                "text": "g"
+              }
+            }
+          ]
+        }
+      },
+      {
+        "position": 66,
+        "change": {
+          "dot": {
+            "replica": "56a1c6fa-d983-40b4-a96a-175f478de19b",
+            "seq": 27
+          },
+          "stamp": {
+            "wall": 1728000000019,
+            "counter": 0,
+            "replica": "56a1c6fa-d983-40b4-a96a-175f478de19b"
+          },
+          "ops": [
+            {
+              "document": {
+                "collection": "Person",
+                "key": "p1"
+              },
+              "op": {
+                "op": "increment",
+                "field": "visits",
+                "delta": 2
+              }
+            }
+          ]
+        }
+      },
+      {
+        "position": 67,
+        "change": {
+          "dot": {
+            "replica": "56a1c6fa-d983-40b4-a96a-175f478de19b",
+            "seq": 28
+          },
+          "stamp": {
+            "wall": 1728000000019,
+            "counter": 1,
+            "replica": "56a1c6fa-d983-40b4-a96a-175f478de19b"
+          },
+          "ops": [
+            {
+              "document": {
+                "collection": "Person",
+                "key": "p1"
+              },
+              "op": {
+                "op": "delete"
+              }
+            }
+          ]
+        }
+      },
+      {
+        "position": 68,
+        "change": {
+          "dot": {
+            "replica": "56a1c6fa-d983-40b4-a96a-175f478de19b",
+            "seq": 29
+          },
+          "stamp": {
+            "wall": 1728000000020,
+            "counter": 1,
+            "replica": "56a1c6fa-d983-40b4-a96a-175f478de19b"
+          },
+          "ops": [
+            {
+              "document": {
+                "collection": "Person",
+                "key": "p2"
+              },
+              "op": {
+                "op": "add",
+                "field": "tags",
+                "element": "\u0022t2\u0022"
+              }
+            }
+          ]
+        }
+      },
+      {
+        "position": 69,
+        "change": {
+          "dot": {
+            "replica": "56a1c6fa-d983-40b4-a96a-175f478de19b",
+            "seq": 30
+          },
+          "stamp": {
+            "wall": 1728000000021,
+            "counter": 2,
+            "replica": "56a1c6fa-d983-40b4-a96a-175f478de19b"
+          },
+          "ops": [
+            {
+              "document": {
+                "collection": "Person",
+                "key": "p1"
+              },
+              "op": {
+                "op": "set",
+                "field": "city",
+                "value": null
+              }
+            }
+          ]
+        }
+      },
+      {
+        "position": 70,
+        "change": {
+          "dot": {
+            "replica": "56a1c6fa-d983-40b4-a96a-175f478de19b",
+            "seq": 31
+          },
+          "stamp": {
+            "wall": 1728000000023,
+            "counter": 0,
+            "replica": "56a1c6fa-d983-40b4-a96a-175f478de19b"
+          },
+          "ops": [
+            {
+              "document": {
+                "collection": "Person",
+                "key": "p1"
+              },
+              "op": {
+                "op": "add",
+                "field": "tags",
+                "element": "\u0022t2\u0022"
+              }
+            }
+          ]
+        }
+      },
+      {
+        "position": 71,
+        "change": {
+          "dot": {
+            "replica": "56a1c6fa-d983-40b4-a96a-175f478de19b",
+            "seq": 32
+          },
+          "stamp": {
+            "wall": 1728000000024,
+            "counter": 0,
+            "replica": "56a1c6fa-d983-40b4-a96a-175f478de19b"
+          },
+          "ops": [
+            {
+              "document": {
+                "collection": "Note",
+                "key": "n0"
+              },
+              "op": {
+                "op": "insert",
+                "field": "body",
+                "after": null,
+                "text": "o"
+              }
+            }
+          ]
+        }
+      },
+      {
+        "position": 72,
+        "change": {
+          "dot": {
+            "replica": "56a1c6fa-d983-40b4-a96a-175f478de19b",
+            "seq": 33
+          },
+          "stamp": {
+            "wall": 1728000000024,
+            "counter": 1,
+            "replica": "56a1c6fa-d983-40b4-a96a-175f478de19b"
+          },
+          "ops": [
+            {
+              "document": {
+                "collection": "Person",
+                "key": "p2"
+              },
+              "op": {
+                "op": "delete"
+              }
+            }
+          ]
+        }
+      },
+      {
+        "position": 73,
+        "change": {
+          "dot": {
+            "replica": "56a1c6fa-d983-40b4-a96a-175f478de19b",
+            "seq": 34
+          },
+          "stamp": {
+            "wall": 1728000000024,
+            "counter": 2,
+            "replica": "56a1c6fa-d983-40b4-a96a-175f478de19b"
+          },
+          "ops": [
+            {
+              "document": {
+                "collection": "Note",
+                "key": "n0"
+              },
+              "op": {
+                "op": "insert",
+                "field": "body",
+                "after": {
+                  "dot": {
+                    "replica": "56a1c6fa-d983-40b4-a96a-175f478de19b",
+                    "seq": 1
+                  },
+                  "index": 0,
+                  "offset": 0
+                },
+                "text": "j"
+              }
+            }
+          ]
+        }
+      },
+      {
+        "position": 74,
+        "change": {
+          "dot": {
+            "replica": "acf4df7d-6c9f-4841-8324-626191e18b57",
+            "seq": 19
+          },
+          "stamp": {
+            "wall": 1728000000015,
+            "counter": 1,
+            "replica": "acf4df7d-6c9f-4841-8324-626191e18b57"
+          },
+          "ops": [
+            {
+              "document": {
+                "collection": "Person",
+                "key": "p0"
+              },
+              "op": {
+                "op": "set",
+                "field": "city",
+                "value": "\u0022c0\u0022"
+              }
+            }
+          ]
+        }
+      },
+      {
+        "position": 75,
+        "change": {
+          "dot": {
+            "replica": "acf4df7d-6c9f-4841-8324-626191e18b57",
+            "seq": 20
+          },
+          "stamp": {
+            "wall": 1728000000015,
+            "counter": 2,
+            "replica": "acf4df7d-6c9f-4841-8324-626191e18b57"
+          },
+          "ops": [
+            {
+              "document": {
+                "collection": "Person",
+                "key": "p0"
+              },
+              "op": {
+                "op": "restore"
+              }
+            },
+            {
+              "document": {
+                "collection": "Person",
+                "key": "p0"
+              },
+              "op": {
+                "op": "set",
+                "field": "name",
+                "value": "\u0022n0\u0022"
+              }
+            }
+          ]
+        }
+      },
+      {
+        "position": 76,
+        "change": {
+          "dot": {
+            "replica": "acf4df7d-6c9f-4841-8324-626191e18b57",
+            "seq": 21
+          },
+          "stamp": {
+            "wall": 1728000000015,
+            "counter": 3,
+            "replica": "acf4df7d-6c9f-4841-8324-626191e18b57"
+          },
+          "ops": [
+            {
+              "document": {
+                "collection": "Person",
+                "key": "p1"
+              },
+              "op": {
+                "op": "remove",
+                "field": "tags",
+                "element": "\u0022t2\u0022",
+                "observed": [
+                  {
+                    "dot": {
+                      "replica": "acf4df7d-6c9f-4841-8324-626191e18b57",
+                      "seq": 7
+                    },
+                    "index": 0
+                  },
+                  {
+                    "dot": {
+                      "replica": "56a1c6fa-d983-40b4-a96a-175f478de19b",
+                      "seq": 6
+                    },
+                    "index": 0
+                  },
+                  {
+                    "dot": {
+                      "replica": "acf4df7d-6c9f-4841-8324-626191e18b57",
+                      "seq": 11
+                    },
+                    "index": 0
+                  }
+                ]
+              }
+            }
+          ]
+        }
+      },
+      {
+        "position": 77,
+        "change": {
+          "dot": {
+            "replica": "acf4df7d-6c9f-4841-8324-626191e18b57",
+            "seq": 22
+          },
+          "stamp": {
+            "wall": 1728000000015,
+            "counter": 4,
+            "replica": "acf4df7d-6c9f-4841-8324-626191e18b57"
+          },
+          "ops": [
+            {
+              "document": {
+                "collection": "Person",
+                "key": "p0"
+              },
+              "op": {
+                "op": "increment",
+                "field": "visits",
+                "delta": 4
+              }
+            }
+          ]
+        }
+      },
+      {
+        "position": 78,
+        "change": {
+          "dot": {
+            "replica": "acf4df7d-6c9f-4841-8324-626191e18b57",
+            "seq": 23
+          },
+          "stamp": {
+            "wall": 1728000000016,
+            "counter": 0,
+            "replica": "acf4df7d-6c9f-4841-8324-626191e18b57"
+          },
+          "ops": [
+            {
+              "document": {
+                "collection": "Person",
+                "key": "p0"
+              },
+              "op": {
+                "op": "restore"
+              }
+            },
+            {
+              "document": {
+                "collection": "Person",
+                "key": "p0"
+              },
+              "op": {
+                "op": "set",
+                "field": "name",
+                "value": "\u0022n39\u0022"
+              }
+            }
+          ]
+        }
+      },
+      {
+        "position": 79,
+        "change": {
+          "dot": {
+            "replica": "acf4df7d-6c9f-4841-8324-626191e18b57",
+            "seq": 24
+          },
+          "stamp": {
+            "wall": 1728000000017,
+            "counter": 0,
+            "replica": "acf4df7d-6c9f-4841-8324-626191e18b57"
+          },
+          "ops": [
+            {
+              "document": {
+                "collection": "Note",
+                "key": "n0"
+              },
+              "op": {
+                "op": "erase",
+                "field": "body",
+                "spans": [
+                  {
+                    "dot": {
+                      "replica": "5fe6147a-2b9c-4ae9-a125-f01ca588cfe8",
+                      "seq": 19
+                    },
+                    "index": 0,
+                    "offset": 0,
+                    "length": 1
+                  }
+                ]
+              }
+            }
+          ]
+        }
+      },
+      {
+        "position": 80,
+        "change": {
+          "dot": {
+            "replica": "acf4df7d-6c9f-4841-8324-626191e18b57",
+            "seq": 25
+          },
+          "stamp": {
+            "wall": 1728000000017,
+            "counter": 1,
+            "replica": "acf4df7d-6c9f-4841-8324-626191e18b57"
+          },
+          "ops": [
+            {
+              "document": {
+                "collection": "Person",
+                "key": "p0"
+              },
+              "op": {
+                "op": "add",
+                "field": "tags",
+                "element": "\u0022t1\u0022"
+              }
+            }
+          ]
+        }
+      },
+      {
+        "position": 81,
+        "change": {
+          "dot": {
+            "replica": "acf4df7d-6c9f-4841-8324-626191e18b57",
+            "seq": 26
+          },
+          "stamp": {
+            "wall": 1728000000017,
+            "counter": 2,
+            "replica": "acf4df7d-6c9f-4841-8324-626191e18b57"
+          },
+          "ops": [
+            {
+              "document": {
+                "collection": "Person",
+                "key": "p1"
+              },
+              "op": {
+                "op": "increment",
+                "field": "visits",
+                "delta": 1
+              }
+            }
+          ]
+        }
+      },
+      {
+        "position": 82,
+        "change": {
+          "dot": {
+            "replica": "acf4df7d-6c9f-4841-8324-626191e18b57",
+            "seq": 27
+          },
+          "stamp": {
+            "wall": 1728000000017,
+            "counter": 3,
+            "replica": "acf4df7d-6c9f-4841-8324-626191e18b57"
+          },
+          "ops": [
+            {
+              "document": {
+                "collection": "Person",
+                "key": "p2"
+              },
+              "op": {
+                "op": "delete"
+              }
+            }
+          ]
+        }
+      },
+      {
+        "position": 83,
+        "change": {
+          "dot": {
+            "replica": "acf4df7d-6c9f-4841-8324-626191e18b57",
+            "seq": 28
+          },
+          "stamp": {
+            "wall": 1728000000019,
+            "counter": 0,
+            "replica": "acf4df7d-6c9f-4841-8324-626191e18b57"
+          },
+          "ops": [
+            {
+              "document": {
+                "collection": "Person",
+                "key": "p1"
+              },
+              "op": {
+                "op": "set",
+                "field": "city",
+                "value": null
+              }
+            }
+          ]
+        }
+      },
+      {
+        "position": 84,
+        "change": {
+          "dot": {
+            "replica": "acf4df7d-6c9f-4841-8324-626191e18b57",
+            "seq": 29
+          },
+          "stamp": {
+            "wall": 1728000000020,
+            "counter": 0,
+            "replica": "acf4df7d-6c9f-4841-8324-626191e18b57"
+          },
+          "ops": [
+            {
+              "document": {
+                "collection": "Person",
+                "key": "p0"
+              },
+              "op": {
+                "op": "delete"
+              }
+            }
+          ]
+        }
+      },
+      {
+        "position": 85,
+        "change": {
+          "dot": {
+            "replica": "acf4df7d-6c9f-4841-8324-626191e18b57",
+            "seq": 30
+          },
+          "stamp": {
+            "wall": 1728000000022,
+            "counter": 0,
+            "replica": "acf4df7d-6c9f-4841-8324-626191e18b57"
+          },
+          "ops": [
+            {
+              "document": {
+                "collection": "Person",
+                "key": "p0"
+              },
+              "op": {
+                "op": "set",
+                "field": "city",
+                "value": "\u0022c0\u0022"
+              }
+            }
+          ]
+        }
+      },
+      {
+        "position": 86,
+        "change": {
+          "dot": {
+            "replica": "acf4df7d-6c9f-4841-8324-626191e18b57",
+            "seq": 31
+          },
+          "stamp": {
+            "wall": 1728000000022,
+            "counter": 1,
+            "replica": "acf4df7d-6c9f-4841-8324-626191e18b57"
+          },
+          "ops": [
+            {
+              "document": {
+                "collection": "Person",
+                "key": "p1"
+              },
+              "op": {
+                "op": "set",
+                "field": "city",
+                "value": "\u0022c3\u0022"
+              }
+            }
+          ]
+        }
+      },
+      {
+        "position": 87,
+        "change": {
+          "dot": {
+            "replica": "acf4df7d-6c9f-4841-8324-626191e18b57",
+            "seq": 32
+          },
+          "stamp": {
+            "wall": 1728000000023,
+            "counter": 0,
+            "replica": "acf4df7d-6c9f-4841-8324-626191e18b57"
+          },
+          "ops": [
+            {
+              "document": {
+                "collection": "Person",
+                "key": "p2"
+              },
+              "op": {
+                "op": "add",
+                "field": "tags",
+                "element": "\u0022t1\u0022"
+              }
+            }
+          ]
+        }
+      },
+      {
+        "position": 88,
+        "change": {
+          "dot": {
+            "replica": "acf4df7d-6c9f-4841-8324-626191e18b57",
+            "seq": 33
+          },
+          "stamp": {
+            "wall": 1728000000024,
+            "counter": 0,
+            "replica": "acf4df7d-6c9f-4841-8324-626191e18b57"
+          },
+          "ops": [
+            {
+              "document": {
+                "collection": "Note",
+                "key": "n0"
+              },
+              "op": {
+                "op": "erase",
+                "field": "body",
+                "spans": [
+                  {
+                    "dot": {
+                      "replica": "56a1c6fa-d983-40b4-a96a-175f478de19b",
+                      "seq": 1
+                    },
+                    "index": 0,
+                    "offset": 0,
+                    "length": 1
+                  }
+                ]
+              }
+            }
+          ]
+        }
+      },
+      {
+        "position": 89,
+        "change": {
+          "dot": {
+            "replica": "acf4df7d-6c9f-4841-8324-626191e18b57",
+            "seq": 34
+          },
+          "stamp": {
+            "wall": 1728000000024,
+            "counter": 1,
+            "replica": "acf4df7d-6c9f-4841-8324-626191e18b57"
+          },
+          "ops": [
+            {
+              "document": {
+                "collection": "Note",
+                "key": "n0"
+              },
+              "op": {
+                "op": "insert",
+                "field": "body",
+                "after": {
+                  "dot": {
+                    "replica": "56a1c6fa-d983-40b4-a96a-175f478de19b",
+                    "seq": 14
+                  },
+                  "index": 0,
+                  "offset": 0
+                },
+                "text": "h"
+              }
+            }
+          ]
+        }
+      },
+      {
+        "position": 90,
+        "change": {
+          "dot": {
+            "replica": "acf4df7d-6c9f-4841-8324-626191e18b57",
+            "seq": 35
+          },
+          "stamp": {
+            "wall": 1728000000026,
+            "counter": 2,
+            "replica": "acf4df7d-6c9f-4841-8324-626191e18b57"
+          },
+          "ops": [
+            {
+              "document": {
+                "collection": "Person",
+                "key": "p0"
+              },
+              "op": {
+                "op": "set",
+                "field": "city",
+                "value": "\u0022c2\u0022"
+              }
+            }
+          ]
+        }
+      },
+      {
+        "position": 91,
+        "change": {
+          "dot": {
+            "replica": "acf4df7d-6c9f-4841-8324-626191e18b57",
+            "seq": 36
+          },
+          "stamp": {
+            "wall": 1728000000026,
+            "counter": 3,
+            "replica": "acf4df7d-6c9f-4841-8324-626191e18b57"
+          },
+          "ops": [
+            {
+              "document": {
+                "collection": "Note",
+                "key": "n0"
+              },
+              "op": {
+                "op": "insert",
+                "field": "body",
+                "after": {
+                  "dot": {
+                    "replica": "56a1c6fa-d983-40b4-a96a-175f478de19b",
+                    "seq": 16
+                  },
+                  "index": 1,
+                  "offset": 0
+                },
+                "text": "l"
+              }
+            }
+          ]
+        }
+      },
+      {
+        "position": 92,
+        "change": {
+          "dot": {
+            "replica": "acf4df7d-6c9f-4841-8324-626191e18b57",
+            "seq": 37
+          },
+          "stamp": {
+            "wall": 1728000000026,
+            "counter": 4,
+            "replica": "acf4df7d-6c9f-4841-8324-626191e18b57"
+          },
+          "ops": [
+            {
+              "document": {
+                "collection": "Note",
+                "key": "n0"
+              },
+              "op": {
+                "op": "erase",
+                "field": "body",
+                "spans": [
+                  {
+                    "dot": {
+                      "replica": "56a1c6fa-d983-40b4-a96a-175f478de19b",
+                      "seq": 32
+                    },
+                    "index": 0,
+                    "offset": 0,
+                    "length": 1
+                  },
+                  {
+                    "dot": {
+                      "replica": "56a1c6fa-d983-40b4-a96a-175f478de19b",
+                      "seq": 14
+                    },
+                    "index": 0,
+                    "offset": 0,
+                    "length": 1
+                  }
+                ]
+              }
+            }
+          ]
+        }
+      },
+      {
+        "position": 93,
+        "change": {
+          "dot": {
+            "replica": "5fe6147a-2b9c-4ae9-a125-f01ca588cfe8",
+            "seq": 22
+          },
+          "stamp": {
+            "wall": 1728000000013,
+            "counter": 18,
+            "replica": "5fe6147a-2b9c-4ae9-a125-f01ca588cfe8"
+          },
+          "ops": [
+            {
+              "document": {
+                "collection": "Person",
+                "key": "p2"
+              },
+              "op": {
+                "op": "add",
+                "field": "tags",
+                "element": "\u0022t2\u0022"
+              }
+            }
+          ]
+        }
+      },
+      {
+        "position": 94,
+        "change": {
+          "dot": {
+            "replica": "5fe6147a-2b9c-4ae9-a125-f01ca588cfe8",
+            "seq": 23
+          },
+          "stamp": {
+            "wall": 1728000000013,
+            "counter": 19,
+            "replica": "5fe6147a-2b9c-4ae9-a125-f01ca588cfe8"
+          },
+          "ops": [
+            {
+              "document": {
+                "collection": "Person",
+                "key": "p2"
+              },
+              "op": {
+                "op": "restore"
+              }
+            },
+            {
+              "document": {
+                "collection": "Person",
+                "key": "p2"
+              },
+              "op": {
+                "op": "set",
+                "field": "name",
+                "value": "\u0022n13\u0022"
+              }
+            }
+          ]
+        }
+      },
+      {
+        "position": 95,
+        "change": {
+          "dot": {
+            "replica": "5fe6147a-2b9c-4ae9-a125-f01ca588cfe8",
+            "seq": 24
+          },
+          "stamp": {
+            "wall": 1728000000013,
+            "counter": 21,
+            "replica": "5fe6147a-2b9c-4ae9-a125-f01ca588cfe8"
+          },
+          "ops": [
+            {
+              "document": {
+                "collection": "Person",
+                "key": "p1"
+              },
+              "op": {
+                "op": "delete"
+              }
+            }
+          ]
+        }
+      },
+      {
+        "position": 96,
+        "change": {
+          "dot": {
+            "replica": "5fe6147a-2b9c-4ae9-a125-f01ca588cfe8",
+            "seq": 25
+          },
+          "stamp": {
+            "wall": 1728000000013,
+            "counter": 22,
+            "replica": "5fe6147a-2b9c-4ae9-a125-f01ca588cfe8"
+          },
+          "ops": [
+            {
+              "document": {
+                "collection": "Person",
+                "key": "p2"
+              },
+              "op": {
+                "op": "add",
+                "field": "tags",
+                "element": "\u0022t2\u0022"
+              }
+            }
+          ]
+        }
+      },
+      {
+        "position": 97,
+        "change": {
+          "dot": {
+            "replica": "5fe6147a-2b9c-4ae9-a125-f01ca588cfe8",
+            "seq": 26
+          },
+          "stamp": {
+            "wall": 1728000000013,
+            "counter": 23,
+            "replica": "5fe6147a-2b9c-4ae9-a125-f01ca588cfe8"
+          },
+          "ops": [
+            {
+              "document": {
+                "collection": "Person",
+                "key": "p0"
+              },
+              "op": {
+                "op": "increment",
+                "field": "visits",
+                "delta": 4
+              }
+            }
+          ]
+        }
+      },
+      {
+        "position": 98,
+        "change": {
+          "dot": {
+            "replica": "5fe6147a-2b9c-4ae9-a125-f01ca588cfe8",
+            "seq": 27
+          },
+          "stamp": {
+            "wall": 1728000000013,
+            "counter": 24,
+            "replica": "5fe6147a-2b9c-4ae9-a125-f01ca588cfe8"
+          },
+          "ops": [
+            {
+              "document": {
+                "collection": "Note",
+                "key": "n0"
+              },
+              "op": {
+                "op": "insert",
+                "field": "body",
+                "after": {
+                  "dot": {
+                    "replica": "5fe6147a-2b9c-4ae9-a125-f01ca588cfe8",
+                    "seq": 3
+                  },
+                  "index": 0,
+                  "offset": 0
+                },
+                "text": "d"
+              }
+            }
+          ]
+        }
+      },
+      {
+        "position": 99,
+        "change": {
+          "dot": {
+            "replica": "5fe6147a-2b9c-4ae9-a125-f01ca588cfe8",
+            "seq": 28
+          },
+          "stamp": {
+            "wall": 1728000000014,
+            "counter": 0,
+            "replica": "5fe6147a-2b9c-4ae9-a125-f01ca588cfe8"
+          },
+          "ops": [
+            {
+              "document": {
+                "collection": "Person",
+                "key": "p1"
+              },
+              "op": {
+                "op": "increment",
+                "field": "visits",
+                "delta": 4
+              }
+            }
+          ]
+        }
+      },
+      {
+        "position": 100,
+        "change": {
+          "dot": {
+            "replica": "5fe6147a-2b9c-4ae9-a125-f01ca588cfe8",
+            "seq": 29
+          },
+          "stamp": {
+            "wall": 1728000000014,
+            "counter": 1,
+            "replica": "5fe6147a-2b9c-4ae9-a125-f01ca588cfe8"
+          },
+          "ops": [
+            {
+              "document": {
+                "collection": "Person",
+                "key": "p2"
+              },
+              "op": {
+                "op": "delete"
+              }
+            }
+          ]
+        }
+      },
+      {
+        "position": 101,
+        "change": {
+          "dot": {
+            "replica": "5fe6147a-2b9c-4ae9-a125-f01ca588cfe8",
+            "seq": 30
+          },
+          "stamp": {
+            "wall": 1728000000014,
+            "counter": 2,
+            "replica": "5fe6147a-2b9c-4ae9-a125-f01ca588cfe8"
+          },
+          "ops": [
+            {
+              "document": {
+                "collection": "Person",
+                "key": "p0"
+              },
+              "op": {
+                "op": "set",
+                "field": "city",
+                "value": null
+              }
+            }
+          ]
+        }
+      },
+      {
+        "position": 102,
+        "change": {
+          "dot": {
+            "replica": "5fe6147a-2b9c-4ae9-a125-f01ca588cfe8",
+            "seq": 31
+          },
+          "stamp": {
+            "wall": 1728000000015,
+            "counter": 0,
+            "replica": "5fe6147a-2b9c-4ae9-a125-f01ca588cfe8"
+          },
+          "ops": [
+            {
+              "document": {
+                "collection": "Person",
+                "key": "p1"
+              },
+              "op": {
+                "op": "remove",
+                "field": "tags",
+                "element": "\u0022t2\u0022",
+                "observed": [
+                  {
+                    "dot": {
+                      "replica": "acf4df7d-6c9f-4841-8324-626191e18b57",
+                      "seq": 7
+                    },
+                    "index": 0
+                  },
+                  {
+                    "dot": {
+                      "replica": "56a1c6fa-d983-40b4-a96a-175f478de19b",
+                      "seq": 6
+                    },
+                    "index": 0
+                  }
+                ]
+              }
+            }
+          ]
+        }
+      },
+      {
+        "position": 103,
+        "change": {
+          "dot": {
+            "replica": "5fe6147a-2b9c-4ae9-a125-f01ca588cfe8",
+            "seq": 32
+          },
+          "stamp": {
+            "wall": 1728000000016,
+            "counter": 0,
+            "replica": "5fe6147a-2b9c-4ae9-a125-f01ca588cfe8"
+          },
+          "ops": [
+            {
+              "document": {
+                "collection": "Person",
+                "key": "p0"
+              },
+              "op": {
+                "op": "remove",
+                "field": "tags",
+                "element": "\u0022t1\u0022",
+                "observed": [
+                  {
+                    "dot": {
+                      "replica": "5fe6147a-2b9c-4ae9-a125-f01ca588cfe8",
+                      "seq": 2
+                    },
+                    "index": 0
+                  }
+                ]
+              }
+            }
+          ]
+        }
+      },
+      {
+        "position": 104,
+        "change": {
+          "dot": {
+            "replica": "5fe6147a-2b9c-4ae9-a125-f01ca588cfe8",
+            "seq": 33
+          },
+          "stamp": {
+            "wall": 1728000000017,
+            "counter": 0,
+            "replica": "5fe6147a-2b9c-4ae9-a125-f01ca588cfe8"
+          },
+          "ops": [
+            {
+              "document": {
+                "collection": "Note",
+                "key": "n0"
+              },
+              "op": {
+                "op": "erase",
+                "field": "body",
+                "spans": [
+                  {
+                    "dot": {
+                      "replica": "5fe6147a-2b9c-4ae9-a125-f01ca588cfe8",
+                      "seq": 3
+                    },
+                    "index": 0,
+                    "offset": 0,
+                    "length": 1
+                  }
+                ]
+              }
+            }
+          ]
+        }
+      },
+      {
+        "position": 105,
+        "change": {
+          "dot": {
+            "replica": "5fe6147a-2b9c-4ae9-a125-f01ca588cfe8",
+            "seq": 34
+          },
+          "stamp": {
+            "wall": 1728000000018,
+            "counter": 0,
+            "replica": "5fe6147a-2b9c-4ae9-a125-f01ca588cfe8"
+          },
+          "ops": [
+            {
+              "document": {
+                "collection": "Person",
+                "key": "p0"
+              },
+              "op": {
+                "op": "add",
+                "field": "tags",
+                "element": "\u0022t2\u0022"
+              }
+            }
+          ]
+        }
+      },
+      {
+        "position": 106,
+        "change": {
+          "dot": {
+            "replica": "5fe6147a-2b9c-4ae9-a125-f01ca588cfe8",
+            "seq": 35
+          },
+          "stamp": {
+            "wall": 1728000000020,
+            "counter": 0,
+            "replica": "5fe6147a-2b9c-4ae9-a125-f01ca588cfe8"
+          },
+          "ops": [
+            {
+              "document": {
+                "collection": "Note",
+                "key": "n0"
+              },
+              "op": {
+                "op": "insert",
+                "field": "body",
+                "after": {
+                  "dot": {
+                    "replica": "56a1c6fa-d983-40b4-a96a-175f478de19b",
+                    "seq": 1
+                  },
+                  "index": 0,
+                  "offset": 0
+                },
+                "text": "t"
+              }
+            }
+          ]
+        }
+      },
+      {
+        "position": 107,
+        "change": {
+          "dot": {
+            "replica": "5fe6147a-2b9c-4ae9-a125-f01ca588cfe8",
+            "seq": 36
+          },
+          "stamp": {
+            "wall": 1728000000020,
+            "counter": 1,
+            "replica": "5fe6147a-2b9c-4ae9-a125-f01ca588cfe8"
+          },
+          "ops": [
+            {
+              "document": {
+                "collection": "Person",
+                "key": "p1"
+              },
+              "op": {
+                "op": "remove",
+                "field": "tags",
+                "element": "\u0022t0\u0022",
+                "observed": [
+                  {
+                    "dot": {
+                      "replica": "5fe6147a-2b9c-4ae9-a125-f01ca588cfe8",
+                      "seq": 16
+                    },
+                    "index": 0
+                  }
+                ]
+              }
+            }
+          ]
+        }
+      },
+      {
+        "position": 108,
+        "change": {
+          "dot": {
+            "replica": "5fe6147a-2b9c-4ae9-a125-f01ca588cfe8",
+            "seq": 37
+          },
+          "stamp": {
+            "wall": 1728000000021,
+            "counter": 0,
+            "replica": "5fe6147a-2b9c-4ae9-a125-f01ca588cfe8"
+          },
+          "ops": [
+            {
+              "document": {
+                "collection": "Note",
+                "key": "n0"
+              },
+              "op": {
+                "op": "erase",
+                "field": "body",
+                "spans": [
+                  {
+                    "dot": {
+                      "replica": "5fe6147a-2b9c-4ae9-a125-f01ca588cfe8",
+                      "seq": 27
+                    },
+                    "index": 0,
+                    "offset": 0,
+                    "length": 1
+                  }
+                ]
+              }
+            }
+          ]
+        }
+      },
+      {
+        "position": 109,
+        "change": {
+          "dot": {
+            "replica": "5fe6147a-2b9c-4ae9-a125-f01ca588cfe8",
+            "seq": 38
+          },
+          "stamp": {
+            "wall": 1728000000023,
+            "counter": 0,
+            "replica": "5fe6147a-2b9c-4ae9-a125-f01ca588cfe8"
+          },
+          "ops": [
+            {
+              "document": {
+                "collection": "Note",
+                "key": "n0"
+              },
+              "op": {
+                "op": "erase",
+                "field": "body",
+                "spans": [
+                  {
+                    "dot": {
+                      "replica": "5fe6147a-2b9c-4ae9-a125-f01ca588cfe8",
+                      "seq": 1
+                    },
+                    "index": 0,
+                    "offset": 0,
+                    "length": 1
+                  },
+                  {
+                    "dot": {
+                      "replica": "acf4df7d-6c9f-4841-8324-626191e18b57",
+                      "seq": 1
+                    },
+                    "index": 1,
+                    "offset": 2,
+                    "length": 1
+                  }
+                ]
+              }
+            }
+          ]
+        }
+      },
+      {
+        "position": 110,
+        "change": {
+          "dot": {
+            "replica": "5fe6147a-2b9c-4ae9-a125-f01ca588cfe8",
+            "seq": 39
+          },
+          "stamp": {
+            "wall": 1728000000023,
+            "counter": 1,
+            "replica": "5fe6147a-2b9c-4ae9-a125-f01ca588cfe8"
+          },
+          "ops": [
+            {
+              "document": {
+                "collection": "Person",
+                "key": "p0"
+              },
+              "op": {
+                "op": "restore"
+              }
+            },
+            {
+              "document": {
+                "collection": "Person",
+                "key": "p0"
+              },
+              "op": {
+                "op": "set",
+                "field": "name",
+                "value": "\u0022n43\u0022"
+              }
+            }
+          ]
+        }
+      },
+      {
+        "position": 111,
+        "change": {
+          "dot": {
+            "replica": "5fe6147a-2b9c-4ae9-a125-f01ca588cfe8",
+            "seq": 40
+          },
+          "stamp": {
+            "wall": 1728000000023,
+            "counter": 2,
+            "replica": "5fe6147a-2b9c-4ae9-a125-f01ca588cfe8"
+          },
+          "ops": [
+            {
+              "document": {
+                "collection": "Person",
+                "key": "p2"
+              },
+              "op": {
+                "op": "remove",
+                "field": "tags",
+                "element": "\u0022t2\u0022",
+                "observed": [
+                  {
+                    "dot": {
+                      "replica": "5fe6147a-2b9c-4ae9-a125-f01ca588cfe8",
+                      "seq": 6
+                    },
+                    "index": 0
+                  },
+                  {
+                    "dot": {
+                      "replica": "5fe6147a-2b9c-4ae9-a125-f01ca588cfe8",
+                      "seq": 9
+                    },
+                    "index": 0
+                  },
+                  {
+                    "dot": {
+                      "replica": "5fe6147a-2b9c-4ae9-a125-f01ca588cfe8",
+                      "seq": 22
+                    },
+                    "index": 0
+                  },
+                  {
+                    "dot": {
+                      "replica": "5fe6147a-2b9c-4ae9-a125-f01ca588cfe8",
+                      "seq": 25
+                    },
+                    "index": 0
+                  }
+                ]
+              }
+            }
+          ]
+        }
+      },
+      {
+        "position": 112,
+        "change": {
+          "dot": {
+            "replica": "5fe6147a-2b9c-4ae9-a125-f01ca588cfe8",
+            "seq": 41
+          },
+          "stamp": {
+            "wall": 1728000000023,
+            "counter": 3,
+            "replica": "5fe6147a-2b9c-4ae9-a125-f01ca588cfe8"
+          },
+          "ops": [
+            {
+              "document": {
+                "collection": "Person",
+                "key": "p2"
+              },
+              "op": {
+                "op": "remove",
+                "field": "tags",
+                "element": "\u0022t1\u0022",
+                "observed": [
+                  {
+                    "dot": {
+                      "replica": "56a1c6fa-d983-40b4-a96a-175f478de19b",
+                      "seq": 2
+                    },
+                    "index": 0
+                  }
+                ]
+              }
+            }
+          ]
+        }
+      },
+      {
+        "position": 113,
+        "change": {
+          "dot": {
+            "replica": "5fe6147a-2b9c-4ae9-a125-f01ca588cfe8",
+            "seq": 42
+          },
+          "stamp": {
+            "wall": 1728000000024,
+            "counter": 0,
+            "replica": "5fe6147a-2b9c-4ae9-a125-f01ca588cfe8"
+          },
+          "ops": [
+            {
+              "document": {
+                "collection": "Person",
+                "key": "p2"
+              },
+              "op": {
+                "op": "add",
+                "field": "tags",
+                "element": "\u0022t1\u0022"
+              }
+            }
+          ]
+        }
+      },
+      {
+        "position": 114,
+        "change": {
+          "dot": {
+            "replica": "5fe6147a-2b9c-4ae9-a125-f01ca588cfe8",
+            "seq": 43
+          },
+          "stamp": {
+            "wall": 1728000000024,
+            "counter": 1,
+            "replica": "5fe6147a-2b9c-4ae9-a125-f01ca588cfe8"
+          },
+          "ops": [
+            {
+              "document": {
+                "collection": "Person",
+                "key": "p2"
+              },
+              "op": {
+                "op": "remove",
+                "field": "tags",
+                "element": "\u0022t2\u0022",
+                "observed": []
+              }
+            }
+          ]
+        }
+      },
+      {
+        "position": 115,
+        "change": {
+          "dot": {
+            "replica": "5fe6147a-2b9c-4ae9-a125-f01ca588cfe8",
+            "seq": 44
+          },
+          "stamp": {
+            "wall": 1728000000026,
+            "counter": 0,
+            "replica": "5fe6147a-2b9c-4ae9-a125-f01ca588cfe8"
+          },
+          "ops": [
+            {
+              "document": {
+                "collection": "Person",
+                "key": "p1"
+              },
+              "op": {
+                "op": "restore"
+              }
+            },
+            {
+              "document": {
+                "collection": "Person",
+                "key": "p1"
+              },
+              "op": {
+                "op": "set",
+                "field": "name",
+                "value": "\u0022n23\u0022"
+              }
+            }
+          ]
+        }
+      },
+      {
+        "position": 116,
+        "change": {
+          "dot": {
+            "replica": "5fe6147a-2b9c-4ae9-a125-f01ca588cfe8",
+            "seq": 45
+          },
+          "stamp": {
+            "wall": 1728000000026,
+            "counter": 1,
+            "replica": "5fe6147a-2b9c-4ae9-a125-f01ca588cfe8"
+          },
+          "ops": [
+            {
+              "document": {
+                "collection": "Person",
+                "key": "p2"
+              },
+              "op": {
+                "op": "delete"
+              }
+            }
+          ]
+        }
+      },
+      {
+        "position": 117,
+        "change": {
+          "dot": {
+            "replica": "5fe6147a-2b9c-4ae9-a125-f01ca588cfe8",
+            "seq": 46
+          },
+          "stamp": {
+            "wall": 1728000000026,
+            "counter": 2,
+            "replica": "5fe6147a-2b9c-4ae9-a125-f01ca588cfe8"
+          },
+          "ops": [
+            {
+              "document": {
+                "collection": "Person",
+                "key": "p2"
+              },
+              "op": {
+                "op": "set",
+                "field": "city",
+                "value": null
+              }
+            }
+          ]
+        }
+      },
+      {
+        "position": 118,
+        "change": {
+          "dot": {
+            "replica": "acf4df7d-6c9f-4841-8324-626191e18b57",
+            "seq": 38
+          },
+          "stamp": {
+            "wall": 1728000000026,
+            "counter": 19,
+            "replica": "acf4df7d-6c9f-4841-8324-626191e18b57"
+          },
+          "ops": [
+            {
+              "document": {
+                "collection": "Person",
+                "key": "p1"
+              },
+              "op": {
+                "op": "add",
+                "field": "tags",
+                "element": "\u0022t1\u0022"
+              }
+            }
+          ]
+        }
+      },
+      {
+        "position": 119,
+        "change": {
+          "dot": {
+            "replica": "acf4df7d-6c9f-4841-8324-626191e18b57",
+            "seq": 39
+          },
+          "stamp": {
+            "wall": 1728000000026,
+            "counter": 20,
+            "replica": "acf4df7d-6c9f-4841-8324-626191e18b57"
+          },
+          "ops": [
+            {
+              "document": {
+                "collection": "Person",
+                "key": "p2"
+              },
+              "op": {
+                "op": "add",
+                "field": "tags",
+                "element": "\u0022t1\u0022"
+              }
+            }
+          ]
+        }
+      },
+      {
+        "position": 120,
+        "change": {
+          "dot": {
+            "replica": "acf4df7d-6c9f-4841-8324-626191e18b57",
+            "seq": 40
+          },
+          "stamp": {
+            "wall": 1728000000027,
+            "counter": 0,
+            "replica": "acf4df7d-6c9f-4841-8324-626191e18b57"
+          },
+          "ops": [
+            {
+              "document": {
+                "collection": "Person",
+                "key": "p1"
+              },
+              "op": {
+                "op": "add",
+                "field": "tags",
+                "element": "\u0022t2\u0022"
+              }
+            }
+          ]
+        }
+      },
+      {
+        "position": 121,
+        "change": {
+          "dot": {
+            "replica": "acf4df7d-6c9f-4841-8324-626191e18b57",
+            "seq": 41
+          },
+          "stamp": {
+            "wall": 1728000000027,
+            "counter": 1,
+            "replica": "acf4df7d-6c9f-4841-8324-626191e18b57"
+          },
+          "ops": [
+            {
+              "document": {
+                "collection": "Person",
+                "key": "p1"
+              },
+              "op": {
+                "op": "set",
+                "field": "city",
+                "value": null
+              }
+            }
+          ]
+        }
+      },
+      {
+        "position": 122,
+        "change": {
+          "dot": {
+            "replica": "5fe6147a-2b9c-4ae9-a125-f01ca588cfe8",
+            "seq": 47
+          },
+          "stamp": {
+            "wall": 1728000000027,
+            "counter": 0,
+            "replica": "5fe6147a-2b9c-4ae9-a125-f01ca588cfe8"
+          },
+          "ops": [
+            {
+              "document": {
+                "collection": "Person",
+                "key": "p1"
+              },
+              "op": {
+                "op": "add",
+                "field": "tags",
+                "element": "\u0022t1\u0022"
+              }
+            }
+          ]
+        }
+      },
+      {
+        "position": 123,
+        "change": {
+          "dot": {
+            "replica": "56a1c6fa-d983-40b4-a96a-175f478de19b",
+            "seq": 35
+          },
+          "stamp": {
+            "wall": 1728000000025,
+            "counter": 0,
+            "replica": "56a1c6fa-d983-40b4-a96a-175f478de19b"
+          },
+          "ops": [
+            {
+              "document": {
+                "collection": "Note",
+                "key": "n0"
+              },
+              "op": {
+                "op": "insert",
+                "field": "body",
+                "after": {
+                  "dot": {
+                    "replica": "56a1c6fa-d983-40b4-a96a-175f478de19b",
+                    "seq": 34
+                  },
+                  "index": 0,
+                  "offset": 0
+                },
+                "text": "a"
+              }
+            }
+          ]
+        }
+      },
+      {
+        "position": 124,
+        "change": {
+          "dot": {
+            "replica": "56a1c6fa-d983-40b4-a96a-175f478de19b",
+            "seq": 36
+          },
+          "stamp": {
+            "wall": 1728000000026,
+            "counter": 0,
+            "replica": "56a1c6fa-d983-40b4-a96a-175f478de19b"
+          },
+          "ops": [
+            {
+              "document": {
+                "collection": "Note",
+                "key": "n0"
+              },
+              "op": {
+                "op": "insert",
+                "field": "body",
+                "after": {
+                  "dot": {
+                    "replica": "56a1c6fa-d983-40b4-a96a-175f478de19b",
+                    "seq": 23
+                  },
+                  "index": 0,
+                  "offset": 0
+                },
+                "text": "i"
+              }
+            }
+          ]
+        }
+      }
+    ],
+    "position": 124,
+    "more": false,
+    "snapshotRequired": false
+  },
+  "snapshot": {
+    "documents": [
+      {
+        "id": {
+          "collection": "Note",
+          "key": "n0"
+        },
+        "exists": true,
+        "existenceStamp": {
+          "stamp": {
+            "wall": 1728000000000,
+            "counter": 0,
+            "replica": "acf4df7d-6c9f-4841-8324-626191e18b57"
+          },
+          "index": 0
+        },
+        "registers": [],
+        "elements": [],
+        "counters": [],
+        "texts": [
+          {
+            "field": "body",
+            "runs": [
+              {
+                "start": {
+                  "dot": {
+                    "replica": "56a1c6fa-d983-40b4-a96a-175f478de19b",
+                    "seq": 32
+                  },
+                  "index": 0,
+                  "offset": 0
+                },
+                "stamp": {
+                  "stamp": {
+                    "wall": 1728000000024,
+                    "counter": 0,
+                    "replica": "56a1c6fa-d983-40b4-a96a-175f478de19b"
+                  },
+                  "index": 0
+                },
+                "text": "o",
+                "erased": true
+              },
+              {
+                "start": {
+                  "dot": {
+                    "replica": "56a1c6fa-d983-40b4-a96a-175f478de19b",
+                    "seq": 14
+                  },
+                  "index": 0,
+                  "offset": 0
+                },
+                "stamp": {
+                  "stamp": {
+                    "wall": 1728000000008,
+                    "counter": 4,
+                    "replica": "56a1c6fa-d983-40b4-a96a-175f478de19b"
+                  },
+                  "index": 0
+                },
+                "text": "u",
+                "erased": true
+              },
+              {
+                "start": {
+                  "dot": {
+                    "replica": "acf4df7d-6c9f-4841-8324-626191e18b57",
+                    "seq": 34
+                  },
+                  "index": 0,
+                  "offset": 0
+                },
+                "stamp": {
+                  "stamp": {
+                    "wall": 1728000000024,
+                    "counter": 1,
+                    "replica": "acf4df7d-6c9f-4841-8324-626191e18b57"
+                  },
+                  "index": 0
+                },
+                "text": "h",
+                "erased": false
+              },
+              {
+                "start": {
+                  "dot": {
+                    "replica": "56a1c6fa-d983-40b4-a96a-175f478de19b",
+                    "seq": 26
+                  },
+                  "index": 0,
+                  "offset": 0
+                },
+                "stamp": {
+                  "stamp": {
+                    "wall": 1728000000017,
+                    "counter": 2,
+                    "replica": "56a1c6fa-d983-40b4-a96a-175f478de19b"
+                  },
+                  "index": 0
+                },
+                "text": "g",
+                "erased": false
+              },
+              {
+                "start": {
+                  "dot": {
+                    "replica": "5fe6147a-2b9c-4ae9-a125-f01ca588cfe8",
+                    "seq": 3
+                  },
+                  "index": 0,
+                  "offset": 0
+                },
+                "stamp": {
+                  "stamp": {
+                    "wall": 1728000000004,
+                    "counter": 1,
+                    "replica": "5fe6147a-2b9c-4ae9-a125-f01ca588cfe8"
+                  },
+                  "index": 0
+                },
+                "text": "x",
+                "erased": true
+              },
+              {
+                "start": {
+                  "dot": {
+                    "replica": "5fe6147a-2b9c-4ae9-a125-f01ca588cfe8",
+                    "seq": 27
+                  },
+                  "index": 0,
+                  "offset": 0
+                },
+                "stamp": {
+                  "stamp": {
+                    "wall": 1728000000013,
+                    "counter": 24,
+                    "replica": "5fe6147a-2b9c-4ae9-a125-f01ca588cfe8"
+                  },
+                  "index": 0
+                },
+                "text": "d",
+                "erased": true
+              },
+              {
+                "start": {
+                  "dot": {
+                    "replica": "5fe6147a-2b9c-4ae9-a125-f01ca588cfe8",
+                    "seq": 1
+                  },
+                  "index": 0,
+                  "offset": 0
+                },
+                "stamp": {
+                  "stamp": {
+                    "wall": 1728000000003,
+                    "counter": 0,
+                    "replica": "5fe6147a-2b9c-4ae9-a125-f01ca588cfe8"
+                  },
+                  "index": 0
+                },
+                "text": "h",
+                "erased": true
+              },
+              {
+                "start": {
+                  "dot": {
+                    "replica": "acf4df7d-6c9f-4841-8324-626191e18b57",
+                    "seq": 1
+                  },
+                  "index": 1,
+                  "offset": 0
+                },
+                "stamp": {
+                  "stamp": {
+                    "wall": 1728000000000,
+                    "counter": 0,
+                    "replica": "acf4df7d-6c9f-4841-8324-626191e18b57"
+                  },
+                  "index": 1
+                },
+                "text": "H",
+                "erased": true
+              },
+              {
+                "start": {
+                  "dot": {
+                    "replica": "5fe6147a-2b9c-4ae9-a125-f01ca588cfe8",
+                    "seq": 12
+                  },
+                  "index": 0,
+                  "offset": 0
+                },
+                "stamp": {
+                  "stamp": {
+                    "wall": 1728000000008,
+                    "counter": 0,
+                    "replica": "5fe6147a-2b9c-4ae9-a125-f01ca588cfe8"
+                  },
+                  "index": 0
+                },
+                "text": "c",
+                "erased": true
+              },
+              {
+                "start": {
+                  "dot": {
+                    "replica": "acf4df7d-6c9f-4841-8324-626191e18b57",
+                    "seq": 1
+                  },
+                  "index": 1,
+                  "offset": 1
+                },
+                "stamp": {
+                  "stamp": {
+                    "wall": 1728000000000,
+                    "counter": 0,
+                    "replica": "acf4df7d-6c9f-4841-8324-626191e18b57"
+                  },
+                  "index": 1
+                },
+                "text": "e",
+                "erased": true
+              },
+              {
+                "start": {
+                  "dot": {
+                    "replica": "56a1c6fa-d983-40b4-a96a-175f478de19b",
+                    "seq": 23
+                  },
+                  "index": 0,
+                  "offset": 0
+                },
+                "stamp": {
+                  "stamp": {
+                    "wall": 1728000000015,
+                    "counter": 1,
+                    "replica": "56a1c6fa-d983-40b4-a96a-175f478de19b"
+                  },
+                  "index": 0
+                },
+                "text": "h",
+                "erased": false
+              },
+              {
+                "start": {
+                  "dot": {
+                    "replica": "56a1c6fa-d983-40b4-a96a-175f478de19b",
+                    "seq": 36
+                  },
+                  "index": 0,
+                  "offset": 0
+                },
+                "stamp": {
+                  "stamp": {
+                    "wall": 1728000000026,
+                    "counter": 0,
+                    "replica": "56a1c6fa-d983-40b4-a96a-175f478de19b"
+                  },
+                  "index": 0
+                },
+                "text": "i",
+                "erased": false
+              },
+              {
+                "start": {
+                  "dot": {
+                    "replica": "acf4df7d-6c9f-4841-8324-626191e18b57",
+                    "seq": 1
+                  },
+                  "index": 1,
+                  "offset": 2
+                },
+                "stamp": {
+                  "stamp": {
+                    "wall": 1728000000000,
+                    "counter": 0,
+                    "replica": "acf4df7d-6c9f-4841-8324-626191e18b57"
+                  },
+                  "index": 1
+                },
+                "text": "ll",
+                "erased": true
+              },
+              {
+                "start": {
+                  "dot": {
+                    "replica": "5fe6147a-2b9c-4ae9-a125-f01ca588cfe8",
+                    "seq": 19
+                  },
+                  "index": 0,
+                  "offset": 0
+                },
+                "stamp": {
+                  "stamp": {
+                    "wall": 1728000000010,
+                    "counter": 5,
+                    "replica": "5fe6147a-2b9c-4ae9-a125-f01ca588cfe8"
+                  },
+                  "index": 0
+                },
+                "text": "q",
+                "erased": true
+              },
+              {
+                "start": {
+                  "dot": {
+                    "replica": "acf4df7d-6c9f-4841-8324-626191e18b57",
+                    "seq": 1
+                  },
+                  "index": 1,
+                  "offset": 4
+                },
+                "stamp": {
+                  "stamp": {
+                    "wall": 1728000000000,
+                    "counter": 0,
+                    "replica": "acf4df7d-6c9f-4841-8324-626191e18b57"
+                  },
+                  "index": 1
+                },
+                "text": "o",
+                "erased": true
+              },
+              {
+                "start": {
+                  "dot": {
+                    "replica": "56a1c6fa-d983-40b4-a96a-175f478de19b",
+                    "seq": 1
+                  },
+                  "index": 0,
+                  "offset": 0
+                },
+                "stamp": {
+                  "stamp": {
+                    "wall": 1728000000000,
+                    "counter": 0,
+                    "replica": "56a1c6fa-d983-40b4-a96a-175f478de19b"
+                  },
+                  "index": 0
+                },
+                "text": "\u00FC",
+                "erased": true
+              },
+              {
+                "start": {
+                  "dot": {
+                    "replica": "56a1c6fa-d983-40b4-a96a-175f478de19b",
+                    "seq": 34
+                  },
+                  "index": 0,
+                  "offset": 0
+                },
+                "stamp": {
+                  "stamp": {
+                    "wall": 1728000000024,
+                    "counter": 2,
+                    "replica": "56a1c6fa-d983-40b4-a96a-175f478de19b"
+                  },
+                  "index": 0
+                },
+                "text": "j",
+                "erased": false
+              },
+              {
+                "start": {
+                  "dot": {
+                    "replica": "56a1c6fa-d983-40b4-a96a-175f478de19b",
+                    "seq": 35
+                  },
+                  "index": 0,
+                  "offset": 0
+                },
+                "stamp": {
+                  "stamp": {
+                    "wall": 1728000000025,
+                    "counter": 0,
+                    "replica": "56a1c6fa-d983-40b4-a96a-175f478de19b"
+                  },
+                  "index": 0
+                },
+                "text": "a",
+                "erased": false
+              },
+              {
+                "start": {
+                  "dot": {
+                    "replica": "5fe6147a-2b9c-4ae9-a125-f01ca588cfe8",
+                    "seq": 35
+                  },
+                  "index": 0,
+                  "offset": 0
+                },
+                "stamp": {
+                  "stamp": {
+                    "wall": 1728000000020,
+                    "counter": 0,
+                    "replica": "5fe6147a-2b9c-4ae9-a125-f01ca588cfe8"
+                  },
+                  "index": 0
+                },
+                "text": "t",
+                "erased": false
+              },
+              {
+                "start": {
+                  "dot": {
+                    "replica": "56a1c6fa-d983-40b4-a96a-175f478de19b",
+                    "seq": 16
+                  },
+                  "index": 1,
+                  "offset": 0
+                },
+                "stamp": {
+                  "stamp": {
+                    "wall": 1728000000009,
+                    "counter": 1,
+                    "replica": "56a1c6fa-d983-40b4-a96a-175f478de19b"
+                  },
+                  "index": 1
+                },
+                "text": "\u00E9",
+                "erased": false
+              },
+              {
+                "start": {
+                  "dot": {
+                    "replica": "acf4df7d-6c9f-4841-8324-626191e18b57",
+                    "seq": 36
+                  },
+                  "index": 0,
+                  "offset": 0
+                },
+                "stamp": {
+                  "stamp": {
+                    "wall": 1728000000026,
+                    "counter": 3,
+                    "replica": "acf4df7d-6c9f-4841-8324-626191e18b57"
+                  },
+                  "index": 0
+                },
+                "text": "l",
+                "erased": false
+              },
+              {
+                "start": {
+                  "dot": {
+                    "replica": "56a1c6fa-d983-40b4-a96a-175f478de19b",
+                    "seq": 4
+                  },
+                  "index": 0,
+                  "offset": 0
+                },
+                "stamp": {
+                  "stamp": {
+                    "wall": 1728000000004,
+                    "counter": 2,
+                    "replica": "56a1c6fa-d983-40b4-a96a-175f478de19b"
+                  },
+                  "index": 0
+                },
+                "text": "k",
+                "erased": true
+              },
+              {
+                "start": {
+                  "dot": {
+                    "replica": "56a1c6fa-d983-40b4-a96a-175f478de19b",
+                    "seq": 10
+                  },
+                  "index": 1,
+                  "offset": 0
+                },
+                "stamp": {
+                  "stamp": {
+                    "wall": 1728000000007,
+                    "counter": 1,
+                    "replica": "56a1c6fa-d983-40b4-a96a-175f478de19b"
+                  },
+                  "index": 1
+                },
+                "text": "\u00E9",
+                "erased": true
+              },
+              {
+                "start": {
+                  "dot": {
+                    "replica": "56a1c6fa-d983-40b4-a96a-175f478de19b",
+                    "seq": 5
+                  },
+                  "index": 0,
+                  "offset": 0
+                },
+                "stamp": {
+                  "stamp": {
+                    "wall": 1728000000004,
+                    "counter": 3,
+                    "replica": "56a1c6fa-d983-40b4-a96a-175f478de19b"
+                  },
+                  "index": 0
+                },
+                "text": "\u00FC",
+                "erased": true
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "id": {
+          "collection": "Person",
+          "key": "p2"
+        },
+        "exists": false,
+        "existenceStamp": {
+          "stamp": {
+            "wall": 1728000000026,
+            "counter": 1,
+            "replica": "5fe6147a-2b9c-4ae9-a125-f01ca588cfe8"
+          },
+          "index": 0
+        },
+        "registers": [
+          {
+            "field": "city",
+            "value": null,
+            "stamp": {
+              "stamp": {
+                "wall": 1728000000026,
+                "counter": 2,
+                "replica": "5fe6147a-2b9c-4ae9-a125-f01ca588cfe8"
+              },
+              "index": 0
+            }
+          },
+          {
+            "field": "name",
+            "value": "\u0022n13\u0022",
+            "stamp": {
+              "stamp": {
+                "wall": 1728000000013,
+                "counter": 19,
+                "replica": "5fe6147a-2b9c-4ae9-a125-f01ca588cfe8"
+              },
+              "index": 1
+            }
+          }
+        ],
+        "elements": [
+          {
+            "field": "tags",
+            "element": "\u0022t2\u0022",
+            "tags": [
+              {
+                "dot": {
+                  "replica": "56a1c6fa-d983-40b4-a96a-175f478de19b",
+                  "seq": 29
+                },
+                "index": 0
+              }
+            ]
+          },
+          {
+            "field": "tags",
+            "element": "\u0022t0\u0022",
+            "tags": [
+              {
+                "dot": {
+                  "replica": "acf4df7d-6c9f-4841-8324-626191e18b57",
+                  "seq": 5
+                },
+                "index": 0
+              },
+              {
+                "dot": {
+                  "replica": "56a1c6fa-d983-40b4-a96a-175f478de19b",
+                  "seq": 3
+                },
+                "index": 0
+              }
+            ]
+          },
+          {
+            "field": "tags",
+            "element": "\u0022t1\u0022",
+            "tags": [
+              {
+                "dot": {
+                  "replica": "5fe6147a-2b9c-4ae9-a125-f01ca588cfe8",
+                  "seq": 42
+                },
+                "index": 0
+              },
+              {
+                "dot": {
+                  "replica": "acf4df7d-6c9f-4841-8324-626191e18b57",
+                  "seq": 32
+                },
+                "index": 0
+              },
+              {
+                "dot": {
+                  "replica": "acf4df7d-6c9f-4841-8324-626191e18b57",
+                  "seq": 39
+                },
+                "index": 0
+              }
+            ]
+          }
+        ],
+        "counters": [
+          {
+            "field": "visits",
+            "value": 6
+          }
+        ],
+        "texts": []
+      },
+      {
+        "id": {
+          "collection": "Person",
+          "key": "p0"
+        },
+        "exists": true,
+        "existenceStamp": {
+          "stamp": {
+            "wall": 1728000000023,
+            "counter": 1,
+            "replica": "5fe6147a-2b9c-4ae9-a125-f01ca588cfe8"
+          },
+          "index": 0
+        },
+        "registers": [
+          {
+            "field": "city",
+            "value": "\u0022c2\u0022",
+            "stamp": {
+              "stamp": {
+                "wall": 1728000000026,
+                "counter": 2,
+                "replica": "acf4df7d-6c9f-4841-8324-626191e18b57"
+              },
+              "index": 0
+            }
+          },
+          {
+            "field": "name",
+            "value": "\u0022n43\u0022",
+            "stamp": {
+              "stamp": {
+                "wall": 1728000000023,
+                "counter": 1,
+                "replica": "5fe6147a-2b9c-4ae9-a125-f01ca588cfe8"
+              },
+              "index": 1
+            }
+          }
+        ],
+        "elements": [
+          {
+            "field": "tags",
+            "element": "\u0022t2\u0022",
+            "tags": [
+              {
+                "dot": {
+                  "replica": "acf4df7d-6c9f-4841-8324-626191e18b57",
+                  "seq": 3
+                },
+                "index": 0
+              },
+              {
+                "dot": {
+                  "replica": "5fe6147a-2b9c-4ae9-a125-f01ca588cfe8",
+                  "seq": 34
+                },
+                "index": 0
+              }
+            ]
+          },
+          {
+            "field": "tags",
+            "element": "\u0022t1\u0022",
+            "tags": [
+              {
+                "dot": {
+                  "replica": "acf4df7d-6c9f-4841-8324-626191e18b57",
+                  "seq": 25
+                },
+                "index": 0
+              }
+            ]
+          },
+          {
+            "field": "tags",
+            "element": "\u0022t0\u0022",
+            "tags": [
+              {
+                "dot": {
+                  "replica": "56a1c6fa-d983-40b4-a96a-175f478de19b",
+                  "seq": 18
+                },
+                "index": 0
+              }
+            ]
+          }
+        ],
+        "counters": [
+          {
+            "field": "visits",
+            "value": 13
+          }
+        ],
+        "texts": []
+      },
+      {
+        "id": {
+          "collection": "Person",
+          "key": "p1"
+        },
+        "exists": true,
+        "existenceStamp": {
+          "stamp": {
+            "wall": 1728000000026,
+            "counter": 0,
+            "replica": "5fe6147a-2b9c-4ae9-a125-f01ca588cfe8"
+          },
+          "index": 0
+        },
+        "registers": [
+          {
+            "field": "name",
+            "value": "\u0022n23\u0022",
+            "stamp": {
+              "stamp": {
+                "wall": 1728000000026,
+                "counter": 0,
+                "replica": "5fe6147a-2b9c-4ae9-a125-f01ca588cfe8"
+              },
+              "index": 1
+            }
+          },
+          {
+            "field": "city",
+            "value": null,
+            "stamp": {
+              "stamp": {
+                "wall": 1728000000027,
+                "counter": 1,
+                "replica": "acf4df7d-6c9f-4841-8324-626191e18b57"
+              },
+              "index": 0
+            }
+          }
+        ],
+        "elements": [
+          {
+            "field": "tags",
+            "element": "\u0022t2\u0022",
+            "tags": [
+              {
+                "dot": {
+                  "replica": "acf4df7d-6c9f-4841-8324-626191e18b57",
+                  "seq": 40
+                },
+                "index": 0
+              },
+              {
+                "dot": {
+                  "replica": "56a1c6fa-d983-40b4-a96a-175f478de19b",
+                  "seq": 31
+                },
+                "index": 0
+              }
+            ]
+          },
+          {
+            "field": "tags",
+            "element": "\u0022t0\u0022",
+            "tags": [
+              {
+                "dot": {
+                  "replica": "56a1c6fa-d983-40b4-a96a-175f478de19b",
+                  "seq": 21
+                },
+                "index": 0
+              }
+            ]
+          },
+          {
+            "field": "tags",
+            "element": "\u0022t1\u0022",
+            "tags": [
+              {
+                "dot": {
+                  "replica": "acf4df7d-6c9f-4841-8324-626191e18b57",
+                  "seq": 38
+                },
+                "index": 0
+              },
+              {
+                "dot": {
+                  "replica": "5fe6147a-2b9c-4ae9-a125-f01ca588cfe8",
+                  "seq": 47
+                },
+                "index": 0
+              }
+            ]
+          }
+        ],
+        "counters": [
+          {
+            "field": "visits",
+            "value": 6
+          }
+        ],
+        "texts": []
+      }
+    ],
+    "position": 124
+  },
+  "expected": [
+    {
+      "collection": "Note",
+      "key": "n0",
+      "exists": true,
+      "registers": {},
+      "elements": {},
+      "counters": {},
+      "texts": {
+        "body": "hghijat\u00E9l"
+      }
+    },
+    {
+      "collection": "Person",
+      "key": "p0",
+      "exists": true,
+      "registers": {
+        "city": "\u0022c2\u0022",
+        "name": "\u0022n43\u0022"
+      },
+      "elements": {
+        "tags": [
+          "\u0022t0\u0022",
+          "\u0022t1\u0022",
+          "\u0022t2\u0022"
+        ]
+      },
+      "counters": {
+        "visits": 13
+      },
+      "texts": {}
+    },
+    {
+      "collection": "Person",
+      "key": "p1",
+      "exists": true,
+      "registers": {
+        "city": null,
+        "name": "\u0022n23\u0022"
+      },
+      "elements": {
+        "tags": [
+          "\u0022t0\u0022",
+          "\u0022t1\u0022",
+          "\u0022t2\u0022"
+        ]
+      },
+      "counters": {
+        "visits": 6
+      },
+      "texts": {}
+    },
+    {
+      "collection": "Person",
+      "key": "p2",
+      "exists": false,
+      "registers": {
+        "city": null,
+        "name": "\u0022n13\u0022"
+      },
+      "elements": {
+        "tags": [
+          "\u0022t0\u0022",
+          "\u0022t1\u0022",
+          "\u0022t2\u0022"
+        ]
+      },
+      "counters": {
+        "visits": 6
+      },
+      "texts": {}
+    }
+  ]
+}

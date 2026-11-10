@@ -32,6 +32,7 @@
     <File Path="CHANGELOG.md" />
     <File Path="SECURITY.md" />
     <File Path="VERSIONING.md" />
+    <File Path="PROTOCOL-REMOTE.md" />
     <File Path="Routeables.SignalR.slnLaunch" />
   </Folder>
   <Folder Name="/.github/">
@@ -43,6 +44,7 @@
     <!-- routeables_client, the Dart client: built and tested by Flutter (flutter test), not by Visual Studio. -->
     <File Path="clients/dart/README.md" />
     <File Path="clients/dart/pubspec.yaml" />
+    <File Path="clients/fixtures/remote-v1.json" />
     <Project Path="clients/typescript/Routeables.Client.esproj">
       <Build />
       <Deploy />
@@ -54,13 +56,16 @@
     <File Path="samples/Flutter/xanimals_flutter/pubspec.yaml" />
   </Folder>
   <Folder Name="/src/">
+    <Project Path="src/Routeables.Remote/Routeables.Remote.csproj" />
     <Project Path="src/Routeables.SignalR/Routeables.SignalR.csproj" />
   </Folder>
   <Folder Name="/tests/">
     <File Path="tests/e2e/e2e.test.mjs" />
+    <File Path="tests/e2e/replication.test.mjs" />
     <File Path="tests/samples/smoke.mjs" />
     <Project Path="tests/Routeables.SignalR.E2E.Server/Routeables.SignalR.E2E.Server.csproj" />
     <Project Path="tests/Routeables.SignalR.Test.Angular/Routeables.SignalR.Test.Angular.csproj" />
+    <Project Path="tests/Routeables.Remote.Test/Routeables.Remote.Test.csproj" />
     <Project Path="tests/Routeables.SignalR.Test/Routeables.SignalR.Test.csproj" />
   </Folder>
 </Solution>

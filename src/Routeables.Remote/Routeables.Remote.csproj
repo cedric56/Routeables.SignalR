@@ -1,0 +1,26 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    The Routeables Remote Protocol (PROTOCOL-REMOTE.md): replicated documents, their merge, a client replica that works offline,
+    and a server that decides. No package reference: Routeables.SignalR carries it over a hub, Queryeables.Replication stores it
+    in a database.
+  -->
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <LangVersion>latest</LangVersion>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <IsAotCompatible>true</IsAotCompatible>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <NoWarn>$(NoWarn);CS1591</NoWarn>
+    <PackageId>Routeables.Remote</PackageId>
+    <Description>The Routeables Remote Protocol (RRP): offline-first replication of documents (last-writer-wins fields, observed-remove sets, counters, collaborative text) between clients and a server, with idempotent push, cursor-based pull, snapshots and server-side admission.</Description>
+    <PackageTags>crdt;offline;replication;sync;routeables</PackageTags>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="Routeables.Remote.Test" />
+  </ItemGroup>
+
+</Project>

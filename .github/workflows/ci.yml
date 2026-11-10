@@ -34,19 +34,19 @@ jobs:
     steps:
       # The projects reference the sources of Routeables, checked out next to this repository (RouteablesRoot, ../Routeables by default).
       - name: Checkout Routeables.SignalR
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           path: Routeables.SignalR
 
       - name: Checkout Routeables
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           repository: cedric56/Routeables
           ref: ${{ env.ROUTEABLES_REF }}
           path: Routeables
 
       - name: Setup .NET
-        uses: actions/setup-dotnet@v4
+        uses: actions/setup-dotnet@v6
         with:
           dotnet-version: 10.0.x
 
@@ -58,13 +58,20 @@ jobs:
         run: dotnet test --project tests/Routeables.SignalR.Test/Routeables.SignalR.Test.csproj --no-build -c ${{ env.CONFIGURATION }}
         working-directory: Routeables.SignalR
 
+      # The Routeables Remote Protocol: convergence, failures, admission, text, the shared fixture of the clients.
+      - name: Remote protocol
+        run: dotnet test --project tests/Routeables.Remote.Test/Routeables.Remote.Test.csproj --no-build -c ${{ env.CONFIGURATION }}
+        working-directory: Routeables.SignalR
+
       # The server of the samples, driven the way an application drives it.
       - name: Sample server
         run: dotnet test --project tests/Routeables.SignalR.Test.Angular/Routeables.SignalR.Test.Angular.csproj --no-build -c ${{ env.CONFIGURATION }}
         working-directory: Routeables.SignalR
 
       - name: Pack (sources of Routeables)
-        run: dotnet pack src/Routeables.SignalR/Routeables.SignalR.csproj --no-build -c ${{ env.CONFIGURATION }} -o ../artifacts
+        run: |
+          dotnet pack src/Routeables.Remote/Routeables.Remote.csproj --no-build -c ${{ env.CONFIGURATION }} -o ../artifacts
+          dotnet pack src/Routeables.SignalR/Routeables.SignalR.csproj --no-build -c ${{ env.CONFIGURATION }} -o ../artifacts
         working-directory: Routeables.SignalR
 
   ts-client:
@@ -74,10 +81,10 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Setup Node
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v7
         with:
           node-version: 22
           cache: npm
@@ -109,24 +116,24 @@ jobs:
 
     steps:
       - name: Checkout Routeables.SignalR
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           path: Routeables.SignalR
 
       - name: Checkout Routeables
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           repository: cedric56/Routeables
           ref: ${{ env.ROUTEABLES_REF }}
           path: Routeables
 
       - name: Setup .NET
-        uses: actions/setup-dotnet@v4
+        uses: actions/setup-dotnet@v6
         with:
           dotnet-version: 10.0.x
 
       - name: Setup Node
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v7
         with:
           node-version: 22
 
@@ -138,8 +145,9 @@ jobs:
         run: npm ci --no-audit --no-fund && npm run build
         working-directory: Routeables.SignalR/clients/typescript
 
+      # The sessions (e2e.test.mjs), and the replication: the TypeScript replica against the .NET server (replication.test.mjs).
       - name: Test
-        run: node --test tests/e2e/e2e.test.mjs
+        run: node --test tests/e2e/e2e.test.mjs tests/e2e/replication.test.mjs
         working-directory: Routeables.SignalR
 
   # The web samples draw the view models of the sample server (samples/Server): their types and their builds are checked here, then each one is
@@ -159,24 +167,24 @@ jobs:
 
     steps:
       - name: Checkout Routeables.SignalR
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           path: Routeables.SignalR
 
       - name: Checkout Routeables
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           repository: cedric56/Routeables
           ref: ${{ env.ROUTEABLES_REF }}
           path: Routeables
 
       - name: Setup .NET
-        uses: actions/setup-dotnet@v4
+        uses: actions/setup-dotnet@v6
         with:
           dotnet-version: 10.0.x
 
       - name: Setup Node
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v7
         with:
           node-version: 22
 
@@ -211,7 +219,7 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       # A release line, not the moving stable channel: a new Flutter never breaks this build by surprise. Move it on purpose.
       - name: Setup Flutter

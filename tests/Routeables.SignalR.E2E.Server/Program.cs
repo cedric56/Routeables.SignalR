@@ -26,10 +26,14 @@ builder.Services.AddRouteablesSignalR(services =>
     options.ReconnectGracePeriod = TimeSpan.FromSeconds(10);
 });
 
+// The Routeables Remote Protocol beside the sessions: tests/e2e/replication.test.mjs.
+builder.Services.AddE2EReplication();
+
 var app = builder.Build();
 app.UseAuthentication();
 app.UseAuthorization();
 app.MapRouteables().RequireAuthorization();
+app.MapE2EReplication();
 
 await app.StartAsync();
 // The tests read the address on the first line.

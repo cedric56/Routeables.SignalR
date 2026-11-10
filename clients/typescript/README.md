@@ -77,6 +77,30 @@ const page = shallowRef<Page | null>(null);
 client.subscribe(p => (page.value = p));
 ```
 
+## Offline data (Routeables Remote Protocol)
+
+`Replica` holds documents written without the server and merges them with it (`MapRouteablesReplication` on the server,
+[PROTOCOL-REMOTE.md](../../PROTOCOL-REMOTE.md)): what is written is visible at once, survives a reload (its storage), and
+converges with every other device once synchronized, the server deciding what is admitted and what each user reads.
+
+```ts
+import { Replica, signalRReplicationChannel, webReplicaStorage } from '@routeables/client';
+
+const channel = signalRReplicationChannel('/replication');
+const replica = await Replica.open(webReplicaStorage('notes'), ['Note']);
+const note = { collection: 'Note', key: crypto.randomUUID() };
+
+await replica.edit().create(note).set(note, 'title', '"Groceries"').replaceText(note, 'body', textarea.value).commit();
+replica.find(note)?.text('body');                    // at once, offline
+replica.onChanged(ids => redraw(ids));
+channel.onLogAdvanced(() => replica.sync(channel));  // another device wrote: synchronize
+await replica.sync(channel).catch(() => {});         // when online; a failure leaves everything stored, call it again
+replica.rejected;                                    // what the server refused, its effect already gone
+```
+
+Fields: `set` (last writer wins), `addElement`/`removeElement` (an addition not seen by a removal survives), `increment`,
+`insertText`/`eraseText`/`replaceText` (two people typing in one field keep both), `create`/`delete`.
+
 ## Transport
 
 `RouteableTransport` is what the client needs from a connection. `signalRTransport` is the first one (`reconnect` sets the delays of SignalR's automatic reconnection); a raw WebSocket can replace it. `apply(state, patch)` is exported for a transport or a test that applies the patches itself.

@@ -4,6 +4,20 @@
 
 The first version meant for production. It changes the protocol (2) and some defaults: see "Breaking changes".
 
+### Offline data: the Routeables Remote Protocol
+
+- **`Routeables.Remote`**, a new package without dependency (Native AOT): documents replicated between a server and clients that
+  write offline (last-writer-wins fields, add-wins sets, counters, collaborative text, deletion), with an exactly-once push, a
+  one-cursor pull, snapshots after compaction, and the rules of the server (`IReplicationPolicy`) over every change and every
+  read. See [PROTOCOL-REMOTE.md](PROTOCOL-REMOTE.md).
+- **`ReplicationHub`**: `services.AddRouteablesReplication(...)` and `app.MapRouteablesReplication()` serve it over SignalR, and
+  tell the connected clients when the log of a collection grows (`LogAdvanced`).
+- **Clients**: `Replica` in `@routeables/client` (TypeScript, with `signalRReplicationChannel`) and in `routeables_client` (Dart,
+  with `SignalRReplicationChannel`). `clients/fixtures/remote-v1.json`, written by the .NET implementation, checks that the three
+  merge alike.
+- **A durable server**: `IReplicationStore`; `Queryeables.Replication` stores the protocol in EF Core, MongoDB, Dommel or
+  PostgreSQL and writes the merged documents to the application's entities.
+
 ### Security
 
 - **Explicit exposure by default.** Only properties marked `[RouteableState]` (or classes marked with it, or types accepted by `RouteablesOptions.ExposeTypes`) are sent; only those marked `[RouteableState(Settable = true)]` can be set by the client. Before, every public property was sent and every public setter could be called. `RouteableExposure.Public` restores that, as a deliberate choice.
