@@ -42,6 +42,7 @@ await client.invoke('approveAsync', 42);   // resolves when the command has ende
 - **An ordered, consistent state.** One dispatcher per session (a view model is never used by two threads at once), one stream per target (generations and versions), patches instead of whole states, changes merged for slow clients.
 - **Dialogs, notifications and modals** that a view model awaits as on a desktop, without blocking the connection.
 - **Reconnection.** A session survives a dropped connection for 30 seconds and is resumed by its user: pages, state and the dialogs that wait.
+- **The device of each user.** `Routeables.SignalR.Essentials` gives the view models the .NET MAUI Essentials of the browser or app of their user (`IPreferences`, `IConnectivity`, `Preferences.Default`…), never of another one.
 - **Observability.** Logs, an activity per call, and metrics (`Routeables.SignalR`).
 - **Offline data.** The Routeables Remote Protocol ([PROTOCOL-REMOTE.md](PROTOCOL-REMOTE.md)): documents that the .NET, TypeScript and Dart clients write without the server, restart with, and merge when the network is back (fields, sets, counters, text typed by two people at once), the server deciding what is admitted and what each user reads.
 
@@ -50,6 +51,7 @@ await client.invoke('approveAsync', 42);   // resolves when the command has ende
 | Folder | What it holds |
 | --- | --- |
 | [src/Routeables.SignalR](src/Routeables.SignalR) | The server library (`AddRouteablesSignalR`, `MapRouteables`; `AddRouteablesReplication`, `MapRouteablesReplication`). |
+| [src/Routeables.SignalR.Essentials](src/Routeables.SignalR.Essentials) | The MAUI Essentials of each client, for the view models (`AddRouteablesEssentials`). |
 | [src/Routeables.Remote](src/Routeables.Remote) | The Routeables Remote Protocol: merge, client replica, server, stores. No dependency. |
 | [clients/fixtures](clients/fixtures) | A log written by the .NET implementation and what it merges into: the three clients must agree. |
 | [clients/typescript](clients/typescript) | `@routeables/client`, the client; it does not depend on Angular or Vue. |
@@ -121,6 +123,7 @@ npm --prefix tests/samples ci && node tests/samples/smoke.mjs http://localhost:5
 ## Documentation
 
 - [src/Routeables.SignalR/README.md](src/Routeables.SignalR/README.md): the server — what crosses the network, authorization, the session, the messages, the limits, the options, deployment.
+- [src/Routeables.SignalR.Essentials/README.md](src/Routeables.SignalR.Essentials/README.md): the MAUI Essentials of the clients — what runs where, the facades, the protocol.
 - [clients/typescript/README.md](clients/typescript/README.md) and [clients/dart/README.md](clients/dart/README.md): the clients — order, answers, reconnection.
 - The README of each sample ([Angular](samples/Angular/README.md), [Vue](samples/Vue/README.md), [React](samples/React/README.md), [Flutter](samples/Flutter/README.md)).
 - [PROTOCOL-REMOTE.md](PROTOCOL-REMOTE.md): the Routeables Remote Protocol — merges, messages, guarantees, failures, limits.

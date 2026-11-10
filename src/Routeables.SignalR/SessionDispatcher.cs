@@ -23,6 +23,9 @@ internal sealed class SessionDispatcher : SynchronizationContext
         _unhandled = unhandled;
     }
 
+    /// <summary>The session this dispatcher runs: <see cref="RouteableSession.Running"/> while its work runs.</summary>
+    internal RouteableSession? Session { get; init; }
+
     /// <summary>Whether the current thread is the one that runs the work of this session now.</summary>
     public bool CheckAccess() => Volatile.Read(ref _thread) == Environment.CurrentManagedThreadId;
 
@@ -136,9 +139,21 @@ internal sealed class SessionDispatcher : SynchronizationContext
                 try
                 {
                     if (item.Context is null)
-                        item.Callback(item.State);
+                    {
+                        // A continuation (Post) restores the context it captured; set the session for the rest anyway, and restore it after.
+                        var outer = RouteableSession.Ambient;
+                        RouteableSession.Ambient = Session;
+                        try { item.Callback(item.State); }
+                        finally { RouteableSession.Ambient = outer; }
+                    }
                     else
-                        ExecutionContext.Run(item.Context, static s => { var (c, st) = ((SendOrPostCallback, object?))s!; c(st); }, (item.Callback, item.State));
+                        ExecutionContext.Run(item.Context, static s =>
+                        {
+                            var (session, c, st) = ((RouteableSession?, SendOrPostCallback, object?))s!;
+                            // Flows into what the work starts (Task.Run, ConfigureAwait(false)); ExecutionContext.Run undoes it after.
+                            RouteableSession.Ambient = session;
+                            c(st);
+                        }, (Session, item.Callback, item.State));
                 }
                 catch (Exception exception)
                 {

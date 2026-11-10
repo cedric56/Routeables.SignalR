@@ -91,6 +91,12 @@ internal sealed class RecordingClient : IRouteableClient
     Task IRouteableClient.Notified(RouteableToast message) { Toasts.Add(message); All.Add(message); return Task.CompletedTask; }
     Task IRouteableClient.Closed(RouteableClosed message) { Closed.Add(message); All.Add(message); return Task.CompletedTask; }
     Task IRouteableClient.Completed(RouteableCompleted message) { Completed.Add(message); All.Add(message); return Task.CompletedTask; }
+
+    public Told<EssentialsCall> EssentialsCalls { get; } = new();
+    public Told<EssentialsSubscription> EssentialsSubscriptions { get; } = new();
+
+    Task IRouteableClient.EssentialsInvoke(EssentialsCall call) { EssentialsCalls.Add(call); All.Add(call); return Task.CompletedTask; }
+    Task IRouteableClient.EssentialsSubscribe(EssentialsSubscription subscription) { EssentialsSubscriptions.Add(subscription); All.Add(subscription); return Task.CompletedTask; }
 }
 
 /// <summary>The schema, the projector and the invoker the tests use outside a session.</summary>

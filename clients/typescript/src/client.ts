@@ -1,3 +1,5 @@
+import { EssentialsBridge } from './essentials.js';
+import type { EssentialsServices } from './essentials.js';
 import { MODAL, PAGE, PROTOCOL } from './types.js';
 import type {
   Ack, ChangedMessage, ClosedMessage, CompletedMessage, Dialog, FailureMessage, NavigatedMessage, Page, Patch, RouteableTransport,
@@ -35,6 +37,11 @@ export interface RouteablesClientOptions {
   recover?: ((recovery: Recovery) => void | Promise<void>) | false;
   /** Whether a notification that has an expiration is closed by the client after it (`dismiss`). `true` by default. */
   expireToasts?: boolean;
+  /**
+   * The device APIs the server may use for this user (the `IPreferences`, `IConnectivity`… of the view models, with Routeables.SignalR.Essentials):
+   * `browserEssentials()` for the browser ones, or your own. They are announced after each `Hello`; without them, the server sees no Essentials.
+   */
+  essentials?: EssentialsServices;
 }
 
 const SESSION_LOST: Ack = { success: false, error: 'The session was lost: the call may not have ended.', code: 'session-lost' };
@@ -72,8 +79,10 @@ export class RouteablesClient {
   private sequence = 0;
   private session: string | null = null;
   private lastRoute: string | null = null;
+  private readonly essentials: EssentialsBridge | null;
 
   constructor(private readonly transport: RouteableTransport, private readonly options: RouteablesClientOptions = {}) {
+    this.essentials = options.essentials ? new EssentialsBridge(options.essentials, (method, ...args) => this.transport.call(method, ...args)) : null;
     transport.onConnectionChange(connected => {
       if (!connected) {
         // The pages and the calls that wait stay: the session is resumed when the connection comes back (by itself, or by connect() once
@@ -120,12 +129,17 @@ export class RouteablesClient {
       notified: toast => this.onToast(toast),
       closed: message => this.onClosed(message),
       completed: message => this.onCompleted(message),
+      ...(this.essentials === null ? {} : {
+        essentialsInvoke: message => void this.essentials!.invoke(message),
+        essentialsSubscribe: message => this.essentials!.subscribe(message),
+      }),
     });
     await this.hello();
   }
 
   /** Closes the connection: the application is done with it. The calls that wait end with `{ code: 'disconnected' }`; the pages stay. */
   async disconnect(): Promise<void> {
+    this.essentials?.stopAll();
     await this.transport.stop();
     this.setConnected(false);
     this.abandonCalls(DISCONNECTED);
@@ -277,6 +291,9 @@ export class RouteablesClient {
       this.abandonCalls(SESSION_LOST);
     }
 
+    // Before anything is shown or navigated: the view models read the preferences and the network of this device on the server.
+    await this.announceEssentials();
+
     this.setConnected(true);
     // A resumed session already sent what it watches; a new one watches nothing yet.
     if (!welcome.resumed) for (const target of this.watchers.keys()) this.watchRemote(target);
@@ -288,6 +305,16 @@ export class RouteablesClient {
         const recover = this.options.recover ?? (async (r: Recovery) => { if (r.lastRoute !== null) await r.client.goTo(r.lastRoute); });
         await recover(recovery);
       }
+    }
+  }
+
+  private async announceEssentials(): Promise<void> {
+    if (this.essentials === null) return;
+    try {
+      const ack = await this.essentials.ready();
+      if (!ack.success) this.fail('EssentialsReady', undefined, new Error(ack.error ?? 'The server refused the Essentials of this client.'), ack.code ?? 'failed');
+    } catch (error) {
+      this.fail('EssentialsReady', undefined, error);
     }
   }
 

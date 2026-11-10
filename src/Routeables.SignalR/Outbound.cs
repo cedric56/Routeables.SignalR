@@ -57,6 +57,9 @@ internal sealed class Outbound(Func<string, long> generationOf, Action overflow,
 
     public void Completed(RouteableCompleted message) => Enqueue(new Message(Kind.Completed, null, 0, c => c.Completed(message)));
 
+    /// <summary>An Essentials message: dropped while the connection is gone (<see cref="RouteableEssentials"/> sends again what has to be).</summary>
+    public void Essentials(Func<IRouteableClient, Task> send) => Enqueue(new Message(Kind.Essentials, null, 0, send));
+
     /// <summary>Completes once every message given so far has been written (or dropped).</summary>
     public Task DrainedAsync()
     {
@@ -242,7 +245,7 @@ internal sealed class Outbound(Func<string, long> generationOf, Action overflow,
         }
     }
 
-    private enum Kind { Navigated, Changed, Closed, Dialog, Completed, Other }
+    private enum Kind { Navigated, Changed, Closed, Dialog, Completed, Essentials, Other }
 
     private sealed class Message(Kind kind, string? target, long generation, Func<IRouteableClient, Task>? send)
     {

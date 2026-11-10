@@ -101,6 +101,25 @@ replica.rejected;                                    // what the server refused,
 Fields: `set` (last writer wins), `addElement`/`removeElement` (an addition not seen by a removal survives), `increment`,
 `insertText`/`eraseText`/`replaceText` (two people typing in one field keep both), `create`/`delete`.
 
+## Essentials (the device APIs of this user)
+
+With Routeables.SignalR.Essentials on the server, the view models use the device APIs of this browser through the .NET MAUI
+contracts (`IPreferences`, `IGeolocation`, `IFilePicker`, `IShare`, the sensors…):
+
+```ts
+const client = new RouteablesClient(signalRTransport('/routeables'), {
+  essentials: browserEssentials({ app: { name: 'Zoo', version: '2.1', build: '21' } }),
+});
+```
+
+`browserEssentials` takes the version of your app (the browser does not know it), `baseUrl` when the files endpoint is not on the page's
+origin, and `nominatim` to offer geocoding through your own instance. Each service is also exported on its own (`geolocationService()`,
+`secureStorageService()`…) to build a smaller set.
+
+The client announces them after each `Hello`, before it says it is connected, with their state (the server answers the synchronous
+calls from it). It only runs the methods and events a service lists: give your own services the same shape (`EssentialsService`) to offer
+more, and throw `EssentialsError` with a code (`permission-denied`, `not-supported`…) when one fails.
+
 ## Transport
 
 `RouteableTransport` is what the client needs from a connection. `signalRTransport` is the first one (`reconnect` sets the delays of SignalR's automatic reconnection); a raw WebSocket can replace it. `apply(state, patch)` is exported for a transport or a test that applies the patches itself.

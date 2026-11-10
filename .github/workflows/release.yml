@@ -66,6 +66,8 @@ jobs:
           dotnet pack src/Routeables.Remote/Routeables.Remote.csproj -c Release -o artifacts -p:Version=${{ steps.version.outputs.value }} -p:ContinuousIntegrationBuild=true
           dotnet pack src/Routeables.SignalR/Routeables.SignalR.csproj -c Release -o artifacts \
             -p:RouteablesVersion=${{ vars.ROUTEABLES_VERSION }} -p:Version=${{ steps.version.outputs.value }} -p:ContinuousIntegrationBuild=true
+          dotnet pack src/Routeables.SignalR.Essentials/Routeables.SignalR.Essentials.csproj -c Release -o artifacts \
+            -p:RouteablesVersion=${{ vars.ROUTEABLES_VERSION }} -p:Version=${{ steps.version.outputs.value }} -p:ContinuousIntegrationBuild=true
 
       # The package as an application gets it: from a feed, in an empty project, with nothing of this repository around it.
       - name: Install the NuGet package

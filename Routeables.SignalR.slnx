@@ -58,6 +58,7 @@
   <Folder Name="/src/">
     <Project Path="src/Routeables.Remote/Routeables.Remote.csproj" />
     <Project Path="src/Routeables.SignalR/Routeables.SignalR.csproj" />
+    <Project Path="src/Routeables.SignalR.Essentials/Routeables.SignalR.Essentials.csproj" />
   </Folder>
   <Folder Name="/tests/">
     <File Path="tests/e2e/e2e.test.mjs" />

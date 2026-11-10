@@ -72,6 +72,7 @@ jobs:
         run: |
           dotnet pack src/Routeables.Remote/Routeables.Remote.csproj --no-build -c ${{ env.CONFIGURATION }} -o ../artifacts
           dotnet pack src/Routeables.SignalR/Routeables.SignalR.csproj --no-build -c ${{ env.CONFIGURATION }} -o ../artifacts
+          dotnet pack src/Routeables.SignalR.Essentials/Routeables.SignalR.Essentials.csproj --no-build -c ${{ env.CONFIGURATION }} -o ../artifacts
         working-directory: Routeables.SignalR
 
   ts-client:

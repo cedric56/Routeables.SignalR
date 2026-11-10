@@ -99,6 +99,15 @@ public sealed class RouteablesOptions
     public bool? DetailedErrors { get; set; }
 
     /// <summary>
+    /// How long an Essentials call waits for the client (<c>Preferences</c>, <c>Geolocation</c>…), its announcement included; a call that waits
+    /// for the user (a permission, a file dialog) has none (<see cref="EssentialsCallOptions.Interactive"/>). 30 seconds by default.
+    /// </summary>
+    public TimeSpan EssentialsTimeout { get; set; } = TimeSpan.FromSeconds(30);
+
+    /// <summary>How many Essentials calls of a session may wait for the client at once. 64 by default.</summary>
+    public int EssentialsMaxPendingCalls { get; set; } = 64;
+
+    /// <summary>
     /// Whether a connection must be authenticated. The hub endpoint should be protected too (<c>MapRouteables().RequireAuthorization()</c>);
     /// this closes the connections that reach it anyway. <see langword="false"/> by default.
     /// </summary>
@@ -129,12 +138,15 @@ public sealed class RouteablesOptions
         AtLeast(nameof(MaxPendingMessages), MaxPendingMessages, 1);
         AtLeast(nameof(MaxDetachedSessions), MaxDetachedSessions, 0);
         AtLeast(nameof(MaxDetachedSessionsPerUser), MaxDetachedSessionsPerUser, 1);
+        AtLeast(nameof(EssentialsMaxPendingCalls), EssentialsMaxPendingCalls, 1);
         if (MaxDepth > 64)
             problems.Add($"MaxDepth is {MaxDepth}: it must be 64 or less (a state is read recursively).");
         if (MaxStateNodes >= 1 && MaxCollectionItems > MaxStateNodes)
             problems.Add($"MaxCollectionItems ({MaxCollectionItems}) is larger than MaxStateNodes ({MaxStateNodes}): a collection that fits would still not be sent.");
         if (CommandGrace < TimeSpan.Zero || CommandGrace == Timeout.InfiniteTimeSpan)
             problems.Add($"CommandGrace is {CommandGrace}: it must be zero or more, and finite.");
+        if (EssentialsTimeout <= TimeSpan.Zero || EssentialsTimeout == Timeout.InfiniteTimeSpan)
+            problems.Add($"EssentialsTimeout is {EssentialsTimeout}: it must be more than zero, and finite (interactive calls have their own).");
         if (ReconnectGracePeriod < TimeSpan.Zero || ReconnectGracePeriod == Timeout.InfiniteTimeSpan)
             problems.Add($"ReconnectGracePeriod is {ReconnectGracePeriod}: it must be zero or more, and finite.");
         return problems;

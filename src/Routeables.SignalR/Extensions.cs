@@ -58,6 +58,7 @@ public static class Extensions
         services.AddAuthorizationCore();
         services.AddSingleton<RouteableSessions>();
         services.AddScoped<RouteableConnection>();
+        services.AddScoped<RouteableEssentials>();   // the device APIs of the client (Routeables.SignalR.Essentials builds the MAUI services on it)
         services.RegisterMenuViewModel<TMain>(ServiceLifetime.Scoped);
         services.AddRouteCoordinator(ServiceLifetime.Scoped);
         services.AddScoped(_ => new RouteableHostLifetime(ServiceLifetime.Scoped));

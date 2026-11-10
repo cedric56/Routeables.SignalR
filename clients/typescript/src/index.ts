@@ -9,6 +9,8 @@ export type {
   CommandRef,
   CompletedMessage,
   Dialog,
+  EssentialsCallMessage,
+  EssentialsSubscriptionMessage,
   FailureMessage,
   NavigatedMessage,
   Page,
@@ -21,6 +23,18 @@ export type {
 } from './types.js';
 export { MODAL, PAGE, PROTOCOL, isCommand } from './types.js';
 export { signalRTransport } from './signalr.js';
+export {
+  ESSENTIALS_PROTOCOL, EssentialsBridge, EssentialsError, connectivityService, essentialsErrorCode, preferencesService,
+} from './essentials.js';
+export {
+  SessionFiles, appInfoService, batteryService, browserEssentials, browserService, chooseFiles, clipboardService, contactsService,
+  deviceDisplayService, deviceInfoService, emailService, filePickerService, flashlightService, geocodingService, geolocationService,
+  hapticFeedbackService, indexedDbKeyStore, launcherService, mailtoUrl, mapService, mapUrl, mediaPickerService, openInNewTab,
+  phoneDialerService, screenshotService, secureStorageService, semanticScreenReaderService, sensorService, shareService, smsService, smsUrl,
+  textToSpeechService, vibrationService, webAuthenticatorService,
+} from './browser.js';
+export type { BrowserEssentialsOptions, SecureKeyStore } from './browser.js';
+export type { EssentialsErrorCode, EssentialsService, EssentialsServices, PreferenceStorage } from './essentials.js';
 export type { SignalROptions } from './signalr.js';
 export {
   REMOTE_PROTOCOL, AckStatus, RemoteErrorCodes, ChangeBuilder, DocumentSet, DocumentState, HybridClock, MemoryReplicaStorage, Replica,

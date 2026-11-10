@@ -72,7 +72,9 @@ public sealed class RouteableSession : IAsyncDisposable
         UserKey = KeyOf(user);
         Token = Convert.ToBase64String(RandomNumberGenerator.GetBytes(32)).TrimEnd('=').Replace('+', '-').Replace('/', '_');
 
-        Dispatcher = new SessionDispatcher(EndOfTurn, Unhandled);
+        Dispatcher = new SessionDispatcher(EndOfTurn, Unhandled) { Session = this };
+        Essentials = provider.GetService<RouteableEssentials>() ?? new RouteableEssentials();
+        Essentials.Attach(this);
         Outbound = new Outbound(GenerationOf, Abort, Math.Max(1, Options.MaxPendingMessages), _logger);
         Outbound.Attach(client);
 
@@ -87,6 +89,27 @@ public sealed class RouteableSession : IAsyncDisposable
         // The page of the main router is told to the client whoever asked for it: the client (GoTo) or a command of a view model that navigates.
         Dispatcher.InvokeAsync(() => Put(RouteableTargets.Page, new WatchedTarget(RouteableTargets.Page, this, _router))).GetAwaiter().GetResult();
     }
+
+    private static readonly AsyncLocal<RouteableSession?> AmbientSession = new();
+
+    /// <summary>
+    /// The session whose work runs now: on its dispatcher (a command, an event, an <c>await</c> that came back), and in what that work started
+    /// (<c>Task.Run</c>, <c>ConfigureAwait(false)</c>). <see langword="null"/> elsewhere (a hosted service, a timer created at startup). The
+    /// Essentials facades (<c>Preferences.Default</c>…) use it to reach the client of the user, never another one.
+    /// </summary>
+    public static RouteableSession? Running
+        => SynchronizationContext.Current is SessionDispatcher { Session: { } session } ? session : AmbientSession.Value;
+
+    internal static RouteableSession? Ambient
+    {
+        get => AmbientSession.Value;
+        set => AmbientSession.Value = value;
+    }
+
+    /// <summary>The device APIs of the client of this session (Essentials).</summary>
+    public RouteableEssentials Essentials { get; }
+
+    internal CancellationToken LifetimeToken => _lifetime.Token;
 
     /// <summary>The token that resumes this session from another connection (<see cref="RouteableWelcome.Session"/>).</summary>
     public string Token { get; }
@@ -497,6 +520,7 @@ public sealed class RouteableSession : IAsyncDisposable
     /// <summary>The connection dropped: the session keeps its view models and waits for the client.</summary>
     internal void Detach()
     {
+        Essentials.OnDetached();
         Outbound.Attach(null);
         _connection.Attach(null, _connection.User);
     }
@@ -569,6 +593,7 @@ public sealed class RouteableSession : IAsyncDisposable
         }
         finally
         {
+            Essentials.Dispose();
             Outbound.Dispose();
             await _scope.DisposeAsync().ConfigureAwait(false);
             // _lifetime is cancelled, not disposed: a call that ends after the session may still read its token.

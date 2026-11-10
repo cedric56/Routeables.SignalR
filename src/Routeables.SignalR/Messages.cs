@@ -51,6 +51,15 @@ public interface IRouteableClient
 
     /// <summary>A call that was answered <see cref="RouteableAck.Pending"/> has ended.</summary>
     Task Completed(RouteableCompleted message);
+
+    /// <summary>
+    /// Calls a device API of the client (Essentials): the client answers with <c>EssentialsResult</c> on the hub. Only a client that sent
+    /// <c>EssentialsReady</c> receives it; the default implementation drops it, for the clients written before Essentials.
+    /// </summary>
+    Task EssentialsInvoke(EssentialsCall call) => Task.CompletedTask;
+
+    /// <summary>Starts or stops an event of a device API of the client; the client tells it with <c>EssentialsEvent</c> on the hub.</summary>
+    Task EssentialsSubscribe(EssentialsSubscription subscription) => Task.CompletedTask;
 }
 
 /// <summary>A page became current, or its full state is sent again.</summary>

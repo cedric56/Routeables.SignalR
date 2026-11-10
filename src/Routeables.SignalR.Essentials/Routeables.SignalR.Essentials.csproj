@@ -1,0 +1,36 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    The .NET MAUI Essentials contracts (IPreferences, IConnectivity…) for the view models of a Routeables.SignalR server: every call goes to the
+    device of the user of the session (its browser, its app) through RouteableEssentials. The view models only know Microsoft.Maui.Essentials.
+  -->
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <NoWarn>$(NoWarn);CS1591</NoWarn>
+    <PackageId>Routeables.SignalR.Essentials</PackageId>
+    <Description>The .NET MAUI Essentials APIs (Preferences, Connectivity…) of the browser or app of each user, for the view models of a Routeables.SignalR server.</Description>
+    <PackageTags>$(PackageTags);maui;essentials</PackageTags>
+    <!-- The static facades forward to the session that runs through DispatchProxy: runtime code, as the reflection of Routeables.SignalR. -->
+    <IsTrimmable>false</IsTrimmable>
+    <IsAotCompatible>false</IsAotCompatible>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+    <!-- The contracts and the static facades; on net10.0 the package has no platform implementation, which is what a server wants. -->
+    <PackageReference Include="Microsoft.Maui.Essentials" Version="10.0.120" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Routeables.SignalR\Routeables.SignalR.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="Routeables.SignalR.Test" />
+  </ItemGroup>
+
+</Project>

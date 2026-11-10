@@ -110,6 +110,26 @@ public class RouteablesHub(IServiceProvider services, RouteableSessions sessions
     /// <summary>A notification was closed (or clicked when <paramref name="click"/> is true).</summary>
     public Task<RouteableAck> Dismiss(int id, bool click) => Session.DismissAsync(id, click);
 
+    /// <summary>
+    /// The client says which Essentials services it implements, and their state. Call it after <c>Hello</c> (on the session that was resumed),
+    /// and again after each reconnection.
+    /// </summary>
+    public Task<RouteableAck> EssentialsReady(EssentialsReady ready) => Session.Essentials.OnReadyAsync(ready);
+
+    /// <summary>The answer of the client to an Essentials call.</summary>
+    public Task EssentialsResult(EssentialsResult result)
+    {
+        Session.Essentials.OnResult(result);
+        return Task.CompletedTask;
+    }
+
+    /// <summary>An event of a device API of the client, for a subscription the server asked.</summary>
+    public Task EssentialsEvent(EssentialsEvent message)
+    {
+        Session.Essentials.OnEvent(message);
+        return Task.CompletedTask;
+    }
+
     private RouteableSession Session
         => sessions.Get(Context.ConnectionId) ?? throw new HubException("The session of this connection is closed.");
 }

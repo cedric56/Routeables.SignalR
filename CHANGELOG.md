@@ -4,6 +4,21 @@
 
 The first version meant for production. It changes the protocol (2) and some defaults: see "Breaking changes".
 
+### The device of each user: Essentials
+
+- **`Routeables.SignalR.Essentials`**, a new package: `services.AddRouteablesEssentials()` gives the view models every .NET MAUI
+  Essentials contract (36, from `IAccelerometer` to `IWebAuthenticator`) of the client of their session, and
+  `app.MapRouteablesEssentials()` carries the files of the pickers, the screenshot, `Share`, `Launcher` and `Email` (upload slots and
+  download links bound to the session, never rendered on the origin of the app). The synchronous members answer from the state the
+  client announced (no round trip); the writes go to the client in order and survive a reconnection. `Preferences.Default` and
+  `Connectivity.Current` forward to the session that runs (`RouteableSession.Running`) and throw outside of one: never the service of
+  another user.
+- **`RouteableEssentials`** in Routeables.SignalR: the Essentials messages (`EssentialsReady`, `EssentialsInvoke`, `EssentialsResult`,
+  `EssentialsSubscribe`, `EssentialsEvent`), with timeouts, replay after a reconnection, validation of what the client sends, and the
+  options `EssentialsTimeout` and `EssentialsMaxPendingCalls`. `IRouteableClient` has two more methods, with a default implementation.
+- **`@routeables/client`**: the `essentials` option, `browserEssentials()` (`localStorage`, `navigator.onLine`), and `EssentialsBridge`
+  that only runs the methods and events a service lists.
+
 ### Offline data: the Routeables Remote Protocol
 
 - **`Routeables.Remote`**, a new package without dependency (Native AOT): documents replicated between a server and clients that

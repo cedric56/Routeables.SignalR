@@ -31,6 +31,8 @@ export function signalRTransport(url = '/routeables', options: SignalROptions = 
         connection.on('Notified', handlers.notified);
         connection.on('Closed', handlers.closed);
         connection.on('Completed', handlers.completed);
+        if (handlers.essentialsInvoke) connection.on('EssentialsInvoke', handlers.essentialsInvoke);
+        if (handlers.essentialsSubscribe) connection.on('EssentialsSubscribe', handlers.essentialsSubscribe);
       }
       if (connection.state === HubConnectionState.Disconnected) await connection.start();
     },

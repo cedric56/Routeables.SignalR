@@ -134,6 +134,21 @@ export interface Welcome {
   error?: string | null;
 }
 
+/** A call of a device API of this client (Essentials), made by the server; answered with `EssentialsResult`. */
+export interface EssentialsCallMessage {
+  id: string;
+  service: string;
+  method: string;
+  args: unknown[];
+}
+
+/** The server starts (`active`) or stops an event of a device API of this client. */
+export interface EssentialsSubscriptionMessage {
+  service: string;
+  event: string;
+  active: boolean;
+}
+
 /** The server messages a transport delivers. */
 export interface ServerMessages {
   navigated(message: NavigatedMessage): void;
@@ -143,6 +158,10 @@ export interface ServerMessages {
   notified(message: Toast): void;
   closed(message: ClosedMessage): void;
   completed(message: CompletedMessage): void;
+  /** Essentials: a call of a device API (only when the client has `essentials`). */
+  essentialsInvoke?(message: EssentialsCallMessage): void;
+  /** Essentials: an event to start or stop. */
+  essentialsSubscribe?(message: EssentialsSubscriptionMessage): void;
 }
 
 /** The methods of the server a transport calls. */
@@ -150,7 +169,8 @@ export type ServerMethod =
   | 'Hello'
   | 'GoTo' | 'Invoke' | 'Set'
   | 'Watch' | 'Unwatch' | 'Resync' | 'GoToIn' | 'InvokeOn' | 'SetOn'
-  | 'Answer' | 'Dismiss';
+  | 'Answer' | 'Dismiss'
+  | 'EssentialsReady' | 'EssentialsResult' | 'EssentialsEvent';
 
 /**
  * What the client needs from a connection. SignalR is the first one (see signalr.ts); a raw WebSocket can replace it

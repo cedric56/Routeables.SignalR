@@ -24,6 +24,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\src\Routeables.SignalR\Routeables.SignalR.csproj" />
+    <ProjectReference Include="..\..\src\Routeables.SignalR.Essentials\Routeables.SignalR.Essentials.csproj" />
   </ItemGroup>
 
   <!-- Routeables: its sources while it is developed; its packages, through Routeables.SignalR, when RouteablesVersion is given (the release). -->
