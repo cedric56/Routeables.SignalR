@@ -14,13 +14,15 @@
     <PackageId>Routeables.SignalR.Essentials</PackageId>
     <Description>The .NET MAUI Essentials APIs (Preferences, Connectivity…) of the browser or app of each user, for the view models of a Routeables.SignalR server.</Description>
     <PackageTags>$(PackageTags);maui;essentials</PackageTags>
-    <!-- The static facades forward to the session that runs through DispatchProxy: runtime code, as the reflection of Routeables.SignalR. -->
+    <!-- The static facades forward to the session that runs through DispatchProxy (Essentieables.Facades): runtime code, as the reflection of
+         Routeables.SignalR. -->
     <IsTrimmable>false</IsTrimmable>
     <IsAotCompatible>false</IsAotCompatible>
   </PropertyGroup>
 
   <ItemGroup>
     <FrameworkReference Include="Microsoft.AspNetCore.App" />
+    <PackageReference Include="Essentieables.Facades" Version="1.0.0-preview.1" />
     <!-- The contracts and the static facades; on net10.0 the package has no platform implementation, which is what a server wants. -->
     <PackageReference Include="Microsoft.Maui.Essentials" Version="10.0.120" />
   </ItemGroup>

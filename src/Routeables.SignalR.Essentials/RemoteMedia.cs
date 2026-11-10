@@ -1,9 +1,9 @@
 using System.Reflection;
-using System.Runtime.CompilerServices;
 using System.Text.Json;
 using Microsoft.Maui.ApplicationModel;
 using Microsoft.Maui.Devices;
 using Microsoft.Maui.Media;
+using Essentieables;
 using Microsoft.Maui.Storage;
 
 namespace Routeables.SignalR.Essentials;
@@ -17,8 +17,9 @@ public sealed class RemoteTextToSpeech(RouteableEssentials essentials) : RemoteS
 {
     internal const string ServiceName = "textToSpeech";
 
-    [UnsafeAccessor(UnsafeAccessorKind.Constructor)]
-    private static extern Locale CreateLocale(string language, string country, string name, string id);
+    // Locale has no public constructor: Essentieables.Facades reaches it.
+    private static Locale CreateLocale(string language, string country, string name, string id)
+        => (Locale)EssentialsAccessors.CreateLocale(language, country, name, id);
 
     /// <inheritdoc />
     public async Task<IEnumerable<Locale>> GetLocalesAsync()

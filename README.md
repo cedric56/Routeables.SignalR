@@ -64,18 +64,19 @@ await client.invoke('approveAsync', 42);   // resolves when the command has ende
 
 ## Build
 
-The projects reference the sources of Routeables, so check both repositories out side by side:
+The projects reference the sources of Routeables (and Routeables.SignalR.Essentials those of Essentieables.Facades), so check the repositories out side by side:
 
 ```
 git clone https://github.com/cedric56/Routeables
+git clone https://github.com/cedric56/Essentieables
 git clone https://github.com/cedric56/Routeables.SignalR
 cd Routeables.SignalR
 dotnet build Routeables.SignalR.slnx
 ```
 
-Needs the .NET 10 SDK and Node.js 22. Routeables is expected in `../Routeables`; set `-p:RouteablesRoot=<path>\` (with the trailing separator) to use another place. The sample server also uses the view models of the XAnimals samples of Routeables (`samples/Bases`).
+Needs the .NET 10 SDK and Node.js 22. Routeables is expected in `../Routeables`; set `-p:RouteablesRoot=<path>\` (with the trailing separator) to use another place. Essentieables is expected in `../Essentieables` (`-p:EssentieablesRoot=<path>\`). The sample server also uses the view models of the XAnimals samples of Routeables (`samples/Bases`).
 
-The CI builds against one revision of Routeables (`ROUTEABLES_REF` in [.github/workflows/ci.yml](.github/workflows/ci.yml)), so that a change of Routeables never breaks this build by surprise: move it on purpose. To build against the published packages of Routeables instead of its sources, give their version: `dotnet build -p:RouteablesVersion=2.0.0` (the release does so: the NuGet package depends on packages only).
+The CI builds against one revision of Routeables (`ROUTEABLES_REF` in [.github/workflows/ci.yml](.github/workflows/ci.yml)), so that a change of Routeables never breaks this build by surprise: move it on purpose. To build against the published packages of Routeables instead of its sources, give their version: `dotnet build -p:RouteablesVersion=2.0.0` (the release does so: the NuGet package depends on packages only). The same goes for Essentieables.Facades: `ESSENTIEABLES_REF` in the CI, `-p:EssentieablesVersion=1.0.0` for its package.
 
 ## Run the samples
 

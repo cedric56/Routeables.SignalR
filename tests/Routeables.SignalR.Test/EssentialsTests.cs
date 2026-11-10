@@ -1,7 +1,9 @@
 using System.ComponentModel;
 using System.Security.Claims;
 using System.Text.Json;
+using Essentieables;
 using Microsoft.Maui.ApplicationModel;
+using Microsoft.Maui.ApplicationModel.DataTransfer;
 using Microsoft.Maui.Networking;
 using Microsoft.Maui.Storage;
 using Routeables.Abstraction.Registrations;
@@ -342,9 +344,48 @@ public class EssentialsTests
 
         // Outside of a session: no user to ask.
         var outside = await Task.Run(() => Assert.Throws<InvalidOperationException>(() => Preferences.Default.Get("user", "?")));
-        Assert.Contains("outside of a Routeables session", outside.Message);
+        Assert.Contains("outside of a session", outside.Message);
+        Assert.Contains(RemoteFacades.Host, outside.Message);
         Assert.Null(RouteableSession.Running);
         await bobHub.OnDisconnectedAsync(null);
+    }
+
+    private static readonly AsyncLocal<IServiceProvider?> s_otherHost = new();
+
+    [Fact]
+    public async Task The_facades_are_shared_with_another_host_of_the_process()
+    {
+        // Another multi-user host of the process (Blazor Server through Essentieables) registers its own session resolver: each call goes to
+        // the session that runs, whichever host owns it, and its extended facades are kept when Routeables installs the facades again.
+        using var registration = EssentialsFacades.AddSessionResolver("Other host", () => s_otherHost.Value);
+        EssentialsFacades.Install<IExtendedShare, IShare>();
+        await using var provider = Services();
+        var (_, _, ann) = await ConnectAsync(provider, "c1", ready: Ready("""{ "": { "user": "ann" } }"""));
+        var carol = new ServiceCollection().AddSingleton<IPreferences>(new OtherHostPreferences("carol")).BuildServiceProvider();
+
+        Assert.Equal("ann", await ann.Dispatcher.InvokeAsync(() => Preferences.Default.Get("user", "?")));
+        Assert.Equal("carol", await Task.Run(() =>
+        {
+            s_otherHost.Value = carol;
+            return Preferences.Default.Get("user", "?");
+        }));
+        Assert.IsAssignableFrom<IExtendedShare>(Share.Default);
+
+        var outside = await Task.Run(() => Assert.Throws<InvalidOperationException>(() => Preferences.Default.Get("user", "?")));
+        Assert.Contains("Other host", outside.Message);
+        Assert.Contains(RemoteFacades.Host, outside.Message);
+    }
+
+    /// <summary>An extended facade of another host, as Essentieables' IAvaeShare.</summary>
+    public interface IExtendedShare : IShare;
+
+    private sealed class OtherHostPreferences(string user) : IPreferences
+    {
+        public bool ContainsKey(string key, string? sharedName = null) => key == "user";
+        public void Remove(string key, string? sharedName = null) { }
+        public void Clear(string? sharedName = null) { }
+        public void Set<T>(string key, T value, string? sharedName = null) { }
+        public T Get<T>(string key, T defaultValue, string? sharedName = null) => key == "user" ? (T)(object)user : defaultValue;
     }
 
     [Fact]

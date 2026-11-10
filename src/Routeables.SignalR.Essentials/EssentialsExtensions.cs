@@ -26,8 +26,9 @@ public static class EssentialsExtensions
     /// <param name="services">The service collection.</param>
     /// <param name="options">The options (where the files go, their size).</param>
     /// <param name="installFacades">
-    /// Whether to install the static facades. They are process-wide: leave them out when another host of the same process owns them (a Blazor
-    /// Server app using Essentieables); injection keeps working.
+    /// Whether to install the static facades. They are those of Essentieables.Facades, which a Blazor Server app using Essentieables shares:
+    /// both hosts can run in one process, each call going to the session that runs. Leave them out only when the process sets the facades
+    /// itself; injection keeps working.
     /// </param>
     public static IServiceCollection AddRouteablesEssentials(
         this IServiceCollection services,

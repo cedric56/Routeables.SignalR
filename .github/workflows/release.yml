@@ -3,7 +3,8 @@ name: Release
 # A tag v2.1.0 publishes Routeables.SignalR and Routeables.Remote 2.1.0 to NuGet and @routeables/client 2.1.0 to npm: the two packages always share their version
 # (see VERSIONING.md). The NuGet package depends on the published packages of Routeables (vars.ROUTEABLES_VERSION), not on its sources.
 #
-# Needs: the secret NUGET_API_KEY, the secret NPM_TOKEN, and the variable ROUTEABLES_VERSION (the version of the Routeables packages).
+# Needs: the secret NUGET_API_KEY, the secret NPM_TOKEN, the variable ROUTEABLES_VERSION (the version of the Routeables packages) and the
+# variable ESSENTIEABLES_VERSION (the version of the Essentieables.Facades package, for Routeables.SignalR.Essentials).
 
 on:
   push:
@@ -55,7 +56,9 @@ jobs:
       # The tests of the server, against the published packages of Routeables that the package will depend on: what passed in the CI against
       # the pinned sources of Routeables must pass against them too, or nothing is published.
       - name: Test the server against the packages of Routeables
-        run: dotnet test tests/Routeables.SignalR.Test -c Release -p:RouteablesVersion=${{ vars.ROUTEABLES_VERSION }}
+        run: >
+          dotnet test tests/Routeables.SignalR.Test -c Release
+          -p:RouteablesVersion=${{ vars.ROUTEABLES_VERSION }} -p:EssentieablesVersion=${{ vars.ESSENTIEABLES_VERSION }}
 
       - name: Test the remote protocol
         run: dotnet test tests/Routeables.Remote.Test -c Release
@@ -67,7 +70,7 @@ jobs:
           dotnet pack src/Routeables.SignalR/Routeables.SignalR.csproj -c Release -o artifacts \
             -p:RouteablesVersion=${{ vars.ROUTEABLES_VERSION }} -p:Version=${{ steps.version.outputs.value }} -p:ContinuousIntegrationBuild=true
           dotnet pack src/Routeables.SignalR.Essentials/Routeables.SignalR.Essentials.csproj -c Release -o artifacts \
-            -p:RouteablesVersion=${{ vars.ROUTEABLES_VERSION }} -p:Version=${{ steps.version.outputs.value }} -p:ContinuousIntegrationBuild=true
+            -p:RouteablesVersion=${{ vars.ROUTEABLES_VERSION }} -p:EssentieablesVersion=${{ vars.ESSENTIEABLES_VERSION }} -p:Version=${{ steps.version.outputs.value }} -p:ContinuousIntegrationBuild=true
 
       # The package as an application gets it: from a feed, in an empty project, with nothing of this repository around it.
       - name: Install the NuGet package

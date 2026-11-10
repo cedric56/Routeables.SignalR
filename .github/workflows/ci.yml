@@ -9,6 +9,9 @@ on:
       routeables-ref:
         description: The commit, tag or branch of Routeables to build against (the pinned one by default).
         required: false
+      essentieables-ref:
+        description: The commit, tag or branch of Essentieables (Essentieables.Facades) to build against (the pinned one by default).
+        required: false
 
 concurrency:
   group: ci-${{ github.ref }}
@@ -24,6 +27,8 @@ env:
   # The revision of Routeables this repository is built and tested against. Move it on purpose, in its own commit:
   # a change of Routeables never breaks this build by surprise.
   ROUTEABLES_REF: ${{ github.event.inputs.routeables-ref || '649af26d6776733749c25751a6b61892fc310559' }}
+  # The revision of Essentieables whose Essentieables.Facades Routeables.SignalR.Essentials is built against: pin it the same way.
+  ESSENTIEABLES_REF: ${{ github.event.inputs.essentieables-ref || 'master' }}
 
 jobs:
   dotnet:
@@ -44,6 +49,14 @@ jobs:
           repository: cedric56/Routeables
           ref: ${{ env.ROUTEABLES_REF }}
           path: Routeables
+
+      # Routeables.SignalR.Essentials references Essentieables.Facades (EssentieablesRoot, ../Essentieables by default).
+      - name: Checkout Essentieables
+        uses: actions/checkout@v7
+        with:
+          repository: cedric56/Essentieables
+          ref: ${{ env.ESSENTIEABLES_REF }}
+          path: Essentieables
 
       - name: Setup .NET
         uses: actions/setup-dotnet@v6

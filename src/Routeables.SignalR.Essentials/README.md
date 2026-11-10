@@ -82,8 +82,11 @@ models of that session receive by injection. A session runs on its dispatcher (a
 `await` that came back) and in what that work starts (`Task.Run`, `ConfigureAwait(false)`). Outside of a session (a hosted service, a
 timer created at startup) the facades throw `InvalidOperationException`: there is no user to ask.
 
-`AddRouteablesEssentials(installFacades: false)` leaves the facades alone, for a process where another host owns them (a Blazor Server
-app using Essentieables); injection keeps working.
+The forwarding facades are those of [Essentieables.Facades](https://github.com/cedric56/Essentieables/tree/master/src/Essentieables.Facades):
+`RemoteFacades.Install` registers the Routeables session resolver there. A Blazor Server app using Essentieables registers its circuit the
+same way, so both hosts can share a process: each call goes to the session that runs, whichever host owns it, and Essentieables' extended
+facades (`IAvaeShare`, `IAvaeMediaPicker`) are kept. `AddRouteablesEssentials(installFacades: false)` leaves the facades alone, for a process
+that sets them itself; injection keeps working.
 
 ## The protocol
 

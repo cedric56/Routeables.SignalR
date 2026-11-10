@@ -11,6 +11,9 @@
       one project under one path. "Routeables.SignalR\..\Routeables\samples\..." and "Routeables\samples\..." were two projects to it (NU1105).
     -->
     <RouteablesRoot>$([MSBuild]::NormalizeDirectory('$(RouteablesRoot)'))</RouteablesRoot>
+    <!-- Where the Essentieables repository is checked out, for Essentieables.Facades (Routeables.SignalR.Essentials): next to this one too. -->
+    <EssentieablesRoot Condition="'$(EssentieablesRoot)' == ''">$(MSBuildThisFileDirectory)..\Essentieables\</EssentieablesRoot>
+    <EssentieablesRoot>$([MSBuild]::NormalizeDirectory('$(EssentieablesRoot)'))</EssentieablesRoot>
   </PropertyGroup>
 
   <PropertyGroup>
