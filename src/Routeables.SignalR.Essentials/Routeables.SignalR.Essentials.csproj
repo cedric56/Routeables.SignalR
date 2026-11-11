@@ -18,11 +18,20 @@
          Routeables.SignalR. -->
     <IsTrimmable>false</IsTrimmable>
     <IsAotCompatible>false</IsAotCompatible>
+    <!-- The version of Essentieables.Facades; the release gives it with -p:EssentieablesVersion. -->
+    <EssentieablesPackageVersion Condition="'$(EssentieablesPackageVersion)' == '' And '$(EssentieablesVersion)' != ''">$(EssentieablesVersion)</EssentieablesPackageVersion>
+    <EssentieablesPackageVersion Condition="'$(EssentieablesPackageVersion)' == ''">1.0.0-preview.1</EssentieablesPackageVersion>
+    <!--
+      A package that depends on a preview is a preview: NuGet refuses a stable package with a prerelease dependency (NU5104). While
+      Essentieables.Facades is a preview, this package is X.Y.Z-preview (the version of Routeables.SignalR, with the suffix); it becomes stable
+      with it.
+    -->
+    <PackageVersion Condition="$(EssentieablesPackageVersion.Contains('-')) And !$(Version.Contains('-'))">$(Version)-preview</PackageVersion>
   </PropertyGroup>
 
   <ItemGroup>
     <FrameworkReference Include="Microsoft.AspNetCore.App" />
-    <PackageReference Include="Essentieables.Facades" Version="1.0.0-preview.1" />
+    <PackageReference Include="Essentieables.Facades" Version="$(EssentieablesPackageVersion)" />
   </ItemGroup>
 
   <ItemGroup>

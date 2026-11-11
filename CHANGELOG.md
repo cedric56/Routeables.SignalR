@@ -12,7 +12,7 @@ The first version meant for production. It changes the protocol (2) and some def
   download links bound to the session, never rendered on the origin of the app). The synchronous members answer from the state the
   client announced (no round trip); the writes go to the client in order and survive a reconnection. `Preferences.Default` and
   `Connectivity.Current` forward to the session that runs (`RouteableSession.Running`) and throw outside of one: never the service of
-  another user.
+  another user. A preview (`X.Y.Z-preview`) while Essentieables.Facades is one: NuGet refuses a stable package with a prerelease dependency.
 - **`RouteableEssentials`** in Routeables.SignalR: the Essentials messages (`EssentialsReady`, `EssentialsInvoke`, `EssentialsResult`,
   `EssentialsSubscribe`, `EssentialsEvent`), with timeouts, replay after a reconnection, validation of what the client sends, and the
   options `EssentialsTimeout` and `EssentialsMaxPendingCalls`. `IRouteableClient` has two more methods, with a default implementation.
