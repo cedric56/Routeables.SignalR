@@ -6,6 +6,7 @@ import { Adopt } from './pages/Adopt';
 import { AnimalDetail } from './pages/AnimalDetail';
 import { AnimalList } from './pages/AnimalList';
 import { Dialogs } from './pages/Dialogs';
+import { Essentials } from './pages/Essentials';
 import { Features } from './pages/Features';
 import { History } from './pages/History';
 import { LayoutBar } from './pages/LayoutBar';
@@ -19,6 +20,7 @@ const views: Record<string, ComponentType<PageProps>> = {
   AboutViewModel: About,
   AdoptViewModel: Adopt,
   DialogsViewModel: Dialogs,
+  EssentialsViewModel: Essentials,
   FeaturesViewModel: Features,
   HistoryViewModel: History,
   MembersViewModel: Members,

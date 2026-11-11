@@ -258,13 +258,25 @@ internal sealed class Outbound(Func<string, long> generationOf, Action overflow,
     }
 }
 
-/// <summary>How patches of one target are merged: a later <c>set</c> replaces what was said of the same value or of a value inside it.</summary>
+/// <summary>
+/// How patches of one target are merged: a later <c>set</c> replaces what was said of the same value or of a value inside it, back to the
+/// last <c>splice</c> of an array on its path. Before that splice, the same indexes named other items: those patches stay.
+/// </summary>
 internal static class RouteablePatches
 {
     public static void Add(List<RouteablePatch> patches, RouteablePatch patch)
     {
         if (patch.Op == RouteablePatch.Set)
-            patches.RemoveAll(p => StartsWith(p.Path, patch.Path));
+        {
+            for (var i = patches.Count - 1; i >= 0; i--)
+            {
+                var earlier = patches[i];
+                if (StartsWith(earlier.Path, patch.Path))
+                    patches.RemoveAt(i);   // the same value, or a value inside it: replaced
+                else if (earlier.Op == RouteablePatch.Splice && earlier.Path.Count < patch.Path.Count && StartsWith(patch.Path, earlier.Path))
+                    break;                 // an array on the path moved its items: what comes before named other items
+            }
+        }
         patches.Add(patch);
     }
 

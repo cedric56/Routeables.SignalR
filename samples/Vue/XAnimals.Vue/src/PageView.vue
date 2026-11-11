@@ -7,6 +7,7 @@ import Adopt from './pages/Adopt.vue';
 import AnimalDetail from './pages/AnimalDetail.vue';
 import AnimalList from './pages/AnimalList.vue';
 import Dialogs from './pages/Dialogs.vue';
+import Essentials from './pages/Essentials.vue';
 import Features from './pages/Features.vue';
 import History from './pages/History.vue';
 import LayoutBar from './pages/LayoutBar.vue';
@@ -29,6 +30,7 @@ const views: Record<string, Component> = {
   AboutViewModel: About,
   AdoptViewModel: Adopt,
   DialogsViewModel: Dialogs,
+  EssentialsViewModel: Essentials,
   FeaturesViewModel: Features,
   HistoryViewModel: History,
   MembersViewModel: Members,

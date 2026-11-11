@@ -1,6 +1,6 @@
 # Routeables with Flutter
 
-The same view models and the same server as the [Angular sample](../Angular), drawn by a Flutter app: on the web, on Windows, macOS or Linux, on Android or iOS. The server runs the view models; the app receives their state and sends what the user does, through [routeables_client](../../clients/dart), the Dart client of Routeables.SignalR. Every page of the menu is there: the animal lists and details, History, Regions, Adopt a pet, Dialogs (messages, content and task dialogs, notifications, the note modal), Features (guard, lock, measures), Members, Tabs and About, with the side menu and the theme button.
+The same view models and the same server as the [Angular sample](../Angular), drawn by a Flutter app: on the web, on Windows, macOS or Linux, on Android or iOS. The server runs the view models; the app receives their state and sends what the user does, through [routeables_client](../../clients/dart), the Dart client of Routeables.SignalR. Every page of the menu is there: the animal lists and details, History, Regions, Adopt a pet, Dialogs (messages, content and task dialogs, notifications, the note modal), Features (guard, lock, measures), Members, Tabs, Essentials and About, with the side menu and the theme button.
 
 ```
 Flutter app (xanimals_flutter)  ──SignalR──▶  XAnimals.Server (samples/Server)
@@ -47,6 +47,7 @@ A phone needs the address of the machine on the network, and a server that liste
 - `lib/page_view.dart`: the view model decides which page it is; this chooses the widget. The key is the number of the page: another page is another widget, and its search field starts again.
 - `lib/region.dart`: a region zone, the way a `RouteableRegion` is on the other platforms; `FollowsTarget` follows a target while the widget is there (the Adopt page follows `$pets` with it).
 - `lib/interactions.dart`: the dialogs, the notifications and the modal of the server, drawn above the page.
+- `lib/essentials.dart`: the device APIs the server may call (`AddRouteablesEssentials`), with Flutter plugins: preferences, network, battery, device and app, display, location, sensors, clipboard, share, and the links (dialer, SMS, email, browser, map). The Essentials page runs a test of each from the server.
 - `lib/pages/`: one widget per view model. A button runs the `...Command` of the state it was sent; it is disabled when the command cannot run.
 
 ## Limits
@@ -55,4 +56,5 @@ A phone needs the address of the machine on the network, and a server that liste
 - The server of the sample allows the pages of this machine (CORS) for Flutter web: a sample, not a policy for production.
 - There is no address bar on a phone: the menu and the buttons of the pages navigate; the back button of the system leaves the app.
 - A connection is a session: when it drops, the server keeps the view models for 30 seconds and the client resumes them (the page, its state, the dialog that waits). After that, the client opens the last page again on a new session.
+- The Essentials that need another plugin are not announced, and their tests say so: the compass, the orientation, text to speech, the screen reader, keeping the screen on, the flashlight, the pickers, the contacts. `dart run tool/setup.dart` declares the location and the links for Android, iOS and macOS.
 - The logo of the About page and of the Regions page is drawn as text: Flutter does not draw SVG without a package.

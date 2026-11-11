@@ -1,6 +1,6 @@
 import { Injectable, signal } from '@angular/core';
 import type { Signal } from '@angular/core';
-import { MODAL, PAGE, RouteablesClient, signalRTransport } from '@routeables/client';
+import { MODAL, PAGE, RouteablesClient, browserEssentials, signalRTransport } from '@routeables/client';
 import type { CommandRef, Dialog, Page, Toast } from '@routeables/client';
 
 /**
@@ -19,8 +19,11 @@ export type State = any;
  */
 @Injectable({ providedIn: 'root' })
 export class Routeables {
-  // /routeables is the hub of Routeables.SignalR: `ng serve` proxies it to the server (proxy.conf.json).
-  private readonly client = new RouteablesClient(signalRTransport('/routeables'));
+  // /routeables is the hub of Routeables.SignalR: `ng serve` proxies it to the server (proxy.conf.json). The Essentials are the device
+  // APIs of the browser the server may call (the Essentials page tests them).
+  private readonly client = new RouteablesClient(signalRTransport('/routeables'), {
+    essentials: browserEssentials({ app: { name: 'XAnimals', packageName: 'xanimals.angular', version: '2.0' } }),
+  });
 
   /** The page the server made current; null before the first one (it stays while the connection is down: the session is resumed). */
   readonly page = signal<Page | null>(null);

@@ -36,7 +36,7 @@ totally orders the history, so a client needs one cursor, not a version vector o
 |---|---|---|
 | `ReplicaId` | A GUID made by the client the first time it opens its storage; on the wire its text in lower case. | Bound to the first user that uses it on the server; never shared by two users or two devices. Replicas are **ordered by that text, ordinally**: the same order in .NET, TypeScript and Dart. |
 | `Dot` | `(ReplicaId, Seq)`, `Seq` = 1, 2, 3… with no gap. | Identifies a change for ever. Never reused, even for a change the server refused. |
-| `Hlc` | Hybrid logical clock `(Wall ms, Counter, ReplicaId)` (Kulkarni et al., 2014). | Total order: wall, then counter, then replica. Every replica observes the clock of the server at `Hello`, and the server observes every change it admits. |
+| `Hlc` | Hybrid logical clock `(Wall ms, Counter, ReplicaId)` (Kulkarni et al., 2014). | Total order: wall, then counter, then replica. Every replica observes the clock of the server at `Hello`, and the server observes every change it admits. The counter is a 32-bit integer from 0: when it is used up the clock moves to the next millisecond (it never wraps around), and a negative counter is refused and never followed. |
 | `OpStamp` | `(Hlc of the change, index of the operation in the change)`. | Orders two writes of one field, even inside one change. |
 | `DocumentId` | `(Collection, Key)`. | The key is chosen by the client (a GUID or a natural key); a key chosen offline by two clients is one document, merged. |
 | Position | `1, 2, 3…` in the log of the server. | The cursor of a client is the last position it considered. |
@@ -49,7 +49,7 @@ A document is a set of named fields. Values are opaque strings (JSON in practice
 |---|---|---|---|
 | Register (LWW) | `set {field, value}` | The greatest `OpStamp` wins. | A name, a status, a date: one value, the latest. |
 | Set (add-wins OR-Set) | `add {field, element}` / `remove {field, element, observed}` | An element is present while it keeps a tag. `add` gives the tag `(dot, index)`; `remove` deletes only the tags it **observed**. | A concurrent add the remover did not see survives. |
-| Counter (PN) | `increment {field, delta}` | Sum of the deltas. | Stock, visits, votes. Exactly-once (§5) means a delta is never counted twice. |
+| Counter (PN) | `increment {field, delta}` | Sum of the deltas, within ±(2^53 − 1) (`RemoteProtocol.MaxCounter`): what a number of JavaScript holds exactly, so that the three implementations add alike. The server refuses a change that would go beyond (`too-large`). | Stock, visits, votes. Exactly-once (§5) means a delta is never counted twice. |
 | Text (RGA) | `insert {field, after, text}` / `erase {field, spans}` | Each character has an identity `(dot, index, offset)`. An insertion goes right after its anchor `after` (the start when null), past the characters inserted there by later insertions; an erasure marks characters, by identity, as erased (they stay as tombstones). | Two people typing in one field both keep what they typed; text typed inside a passage erased concurrently survives; concurrent insertions at one place never interleave, the latest first. |
 | Existence | `restore` / `delete` | A register: the greatest `OpStamp` decides. | Deleting is a tombstone; fields are kept, so a later restore wins back the document. |
 
@@ -128,7 +128,9 @@ refused change disappears exactly, every operation of it; a restart shows what w
 
 The server answers the entries after `since`, up to its current position, that touch the requested collections, each
 **reduced to the operations the user may read** (`CanRead`), and the new `position`: every position up to it was
-considered, sent or not. The client applies each entry (once per dot), removes its own change of that dot from pending,
+considered, sent or not. A compaction may run between the moment the server reads its head and the moment it reads the
+log: it reads the horizon again afterwards, and answers `snapshotRequired` if the horizon passed `since`, rather than let
+the client move past entries it never received. The client applies each entry (once per dot), removes its own change of that dot from pending,
 then removes the pending changes whose position is `<= position`.
 
 ### 5.4 Snapshot: below the horizon
@@ -140,10 +142,18 @@ confirmed with it, drops the pending changes with `0 < position <= snapshot.posi
 
 A client that changes the collections it replicates starts from a snapshot.
 
+A snapshot does not stop the writes: the server reads the head, the documents, then the head again; when the position did not
+move, no decision was written meanwhile (a decision writes its entry and its documents at once) and the documents are those
+of that position. After three tries on a busy log it reads them between two decisions. At most `MaxConcurrentSnapshots` (4)
+are made at once.
+
 ### 5.5 Live updates
 
-The hub adds a connection to the group of each collection it pulls, and sends `LogAdvanced` to the group when a change on
-that collection is admitted. It is a hint to synchronize, never the data: a lost hint costs only delay.
+The hub adds a connection to the group of each collection it pulls (at most `MaxCollectionsPerConnection`, 256), and sends
+`LogAdvanced` to the group when a change on that collection is admitted. It is a hint to synchronize, never the data: a
+lost hint costs only delay. A connection learns this way that a collection moved, and at which position, even when it may
+read none of its documents: `IReplicationPolicy.CanFollow(user, collection)` (every user by default) keeps a collection whose
+activity alone tells too much out of the groups of those who may not follow it; they still pull what they may read.
 
 ### 5.6 Storage of the server
 
@@ -172,12 +182,23 @@ Queryeables).
 ## 7. Security
 
 * **Authentication** is the transport's (`MapRouteablesReplication().RequireAuthorization()`). RRP receives a `ClaimsPrincipal`.
-* **A replica belongs to one user**: the first that uses it. Another user gets `replica-taken`.
+* **A replica belongs to one user**: the first that uses it, known by the scheme, the issuer and the identifier
+  (`NameIdentifier`, else `sub`), as the sessions of Routeables.SignalR. Another user gets `replica-taken`.
+* **Only a user told apart from the others writes.** An anonymous user, or one signed in without an identifier, reads what
+  `CanRead` allows and has every change refused as `unidentified`: the replicas are public in the log, and nothing would
+  keep another such user from pushing the next change of his replica.
+* **No rules by default.** `ReplicationServer` and `AddRouteablesReplication` take the policy (or the server) explicitly;
+  `AllowAllReplicationPolicy` lets every identified user read and write everything, and is chosen on purpose.
 * **Admission** (`IReplicationPolicy.AdmitAsync`) sees the user, the whole change, and the documents **as stored on the
   server**. A client offline cannot write a document of another user by pretending it is new. Validation belongs here.
 * **Reading** (`CanRead`) filters the log and the snapshot per operation.
-* **Limits**: changes per push, operations per change, value, text and key length, collections per pull, clock skew;
-  refused as `too-large`, `invalid`, `clock-skew`.
+* **Limits**: changes per push, operations per change, value, text and key length, characters of a text field
+  (`MaxTextLength`, 1 000 000 with the erased ones), collections per pull and per connection, clock skew, counters and
+  increments (±(2^53 − 1)), stamp counters (from 0); refused as `too-large`, `invalid`, `clock-skew`. A change that lacks what
+  it must hold (its operations, a document, a field, a text, a list) is refused `invalid` with a reason, never a failure of the
+  server.
+* **Decisions are made one at a time**, in the order of the log, the policy included: a policy that waits (a database, a
+  service) slows every write of the server. Keep `AdmitAsync` to what the documents given and a quick lookup can decide.
 
 ## 8. Versioning
 

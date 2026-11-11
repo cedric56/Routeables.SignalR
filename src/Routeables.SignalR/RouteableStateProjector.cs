@@ -194,7 +194,9 @@ public sealed class RouteableStateProjector
                 var map = new Dictionary<string, object?>(StringComparer.Ordinal);
                 foreach (DictionaryEntry entry in dictionary)
                 {
-                    var key = Convert.ToString(entry.Key, System.Globalization.CultureInfo.InvariantCulture) ?? string.Empty;
+                    var key = KeyText(entry.Key);
+                    if (map.ContainsKey(key))
+                        continue;   // two keys with one text: the first is sent, and its commands are the ones a path reaches
                     map[key] = entry.Value is null ? null : ProjectValue(entry.Value, depth + 1, seen, Join(path, key), budget, property, guard);
                 }
                 return map;
@@ -231,6 +233,9 @@ public sealed class RouteableStateProjector
             seen.Remove(value);
         }
     }
+
+    /// <summary>The name of a key of a dictionary in the state, and in the path of what it holds.</summary>
+    internal static string KeyText(object key) => Convert.ToString(key, System.Globalization.CultureInfo.InvariantCulture) ?? string.Empty;
 
     private void CheckCount(int count)
     {

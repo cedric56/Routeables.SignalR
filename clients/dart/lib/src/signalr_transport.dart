@@ -31,6 +31,8 @@ class SignalRTransport implements RouteableTransport {
       listen('Notified', handlers.notified);
       listen('Closed', handlers.closed);
       listen('Completed', handlers.completed);
+      if (handlers.essentialsInvoke case final invoke?) listen('EssentialsInvoke', invoke);
+      if (handlers.essentialsSubscribe case final subscribe?) listen('EssentialsSubscribe', subscribe);
     }
     if (_connection.state == HubConnectionState.Disconnected) await _connection.start();
   }

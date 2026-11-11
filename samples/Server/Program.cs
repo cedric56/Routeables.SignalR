@@ -26,6 +26,7 @@ builder.Services.AddCors(cors => cors.AddDefaultPolicy(policy => policy
 var app = builder.Build();
 
 app.UseCors();
-app.MapRouteables();   // the hub, at /routeables
+app.MapRouteables();             // the hub, at /routeables
+app.MapRouteablesEssentials();   // the files of the Essentials page (pickers, screenshot), at /routeables/essentials
 
 app.Run();

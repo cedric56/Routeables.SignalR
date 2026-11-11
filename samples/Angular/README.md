@@ -1,6 +1,6 @@
 # Routeables with Angular
 
-The same view models as the other samples, drawn by an Angular app. The server runs them; the browser receives their state and sends what the user does. Every page of the menu is there: the animal lists and details, History, Regions, Adopt a pet, Dialogs (messages, content and task dialogs, notifications, the note modal), Features (guard, lock, measures), Members, Tabs and About, with the same side panel and theme button as the Razor sample.
+The same view models as the other samples, drawn by an Angular app. The server runs them; the browser receives their state and sends what the user does. Every page of the menu is there: the animal lists and details, History, Regions, Adopt a pet, Dialogs (messages, content and task dialogs, notifications, the note modal), Features (guard, lock, measures), Members, Tabs, Essentials (the device APIs of the browser, tested from the server) and About, with the same side panel and theme button as the Razor sample.
 
 ```
 Angular app (xanimals-angular)  ──SignalR──▶  XAnimals.Server (samples/Server)

@@ -15,7 +15,7 @@ public class ConvergenceTests
     public async Task Two_devices_offline_converge_and_a_concurrent_addition_survives_a_removal()
     {
         var time = new ManualTime(DateTimeOffset.UnixEpoch.AddDays(20_000));
-        var server = new ReplicationServer(time: time);
+        var server = new ReplicationServer(AllowAllReplicationPolicy.Instance, time: time);
         var a = await Device.StartAsync("A", server, time: time);
         var b = await Device.StartAsync("B", server, time: time);
 
@@ -54,7 +54,7 @@ public class ConvergenceTests
         var time = new ManualTime(DateTimeOffset.UnixEpoch.AddDays(20_000));
         foreach (var order in new[] { "ab", "ba" })
         {
-            var server = new ReplicationServer(time: time);
+            var server = new ReplicationServer(AllowAllReplicationPolicy.Instance, time: time);
             var a = await Device.StartAsync("A", server, time: time);
             var b = await Device.StartAsync("B", server, time: time);
             await a.Replica.Edit().Create(Ana).Set(Ana, "name", "\"from A\"").CommitAsync();
@@ -74,7 +74,7 @@ public class ConvergenceTests
     [Fact]
     public async Task Concurrent_increments_add_up()
     {
-        var server = new ReplicationServer();
+        var server = new ReplicationServer(AllowAllReplicationPolicy.Instance);
         var devices = new List<Device>();
         for (var i = 0; i < 3; i++)
             devices.Add(await Device.StartAsync($"D{i}", server));
@@ -104,7 +104,7 @@ public class ConvergenceTests
     public async Task A_deletion_and_a_concurrent_restoration_have_one_outcome_everywhere()
     {
         var time = new ManualTime(DateTimeOffset.UnixEpoch.AddDays(20_000));
-        var server = new ReplicationServer(time: time);
+        var server = new ReplicationServer(AllowAllReplicationPolicy.Instance, time: time);
         var a = await Device.StartAsync("A", server, time: time);
         var b = await Device.StartAsync("B", server, time: time);
         await a.Replica.Edit().Create(Ana).Set(Ana, "name", "\"Ana\"").CommitAsync();
@@ -133,7 +133,7 @@ public class ConvergenceTests
     private static async Task RunAsync(int seed)
     {
         var random = new Random(seed);
-        var server = new ReplicationServer();
+        var server = new ReplicationServer(AllowAllReplicationPolicy.Instance);
         var devices = new List<Device>();
         for (var i = 0; i < 4; i++)
             devices.Add(await Device.StartAsync($"D{i}", server));

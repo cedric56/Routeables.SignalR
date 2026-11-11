@@ -42,13 +42,14 @@ internal sealed class ShellViewModel : INotifyPropertyChanged, IDisposable
 
     public event PropertyChangedEventHandler? PropertyChanged;
 
-    /// <summary>The entries of the menu.</summary>
+    /// <summary>The entries of the menu: those of the main view model, then the pages of this server alone.</summary>
     public IReadOnlyList<MenuEntry> Entries => [.. _main.Entries
         .Select(e => (Entry: e, Route: "/" + e.Route.TrimStart('/')))
         .Where(e => !Unserved.Contains(e.Route, StringComparer.OrdinalIgnoreCase))
         .Select(e => new MenuEntry(
             e.Entry.DisplayName, e.Route, AnimalIcons.GlyphOf(e.Entry.Path ?? string.Empty),
-            e.Entry.Description?.Split('\n')[0].Trim() ?? string.Empty, e.Entry.IsLock))];
+            e.Entry.Description?.Split('\n')[0].Trim() ?? string.Empty, e.Entry.IsLock)),
+        new MenuEntry("Essentials", "/essentials", "📱", "The device APIs of this client, tested from the server.", IsLocked)];
 
     /// <summary>Whether a page published a lock.</summary>
     public bool IsLocked => _main.Entries.Any(e => e.IsLock);

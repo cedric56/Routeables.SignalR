@@ -18,6 +18,12 @@ The first version meant for production. It changes the protocol (2) and some def
   options `EssentialsTimeout` and `EssentialsMaxPendingCalls`. `IRouteableClient` has two more methods, with a default implementation.
 - **`@routeables/client`**: the `essentials` option, `browserEssentials()` (`localStorage`, `navigator.onLine`), and `EssentialsBridge`
   that only runs the methods and events a service lists.
+- **`routeables_client`** (Dart): the same protocol — the `essentials` parameter of `RouteablesClient`, `EssentialsService`,
+  `EssentialsError` and `EssentialsBridge`. The Flutter sample gives its services with Flutter plugins (`lib/essentials.dart`:
+  preferences, network, battery, device and app, display, location, sensors, clipboard, share, links).
+- **An Essentials page in the samples** (`/essentials`, every front end): about 35 tests the server runs on the device of the
+  session with the MAUI contracts — what the client announced, what each test answered, the failures as the server sees them
+  (not supported, refused, cancelled).
 
 ### Offline data: the Routeables Remote Protocol
 
@@ -61,6 +67,33 @@ The first version meant for production. It changes the protocol (2) and some def
 - The limit of watched targets cannot be passed by concurrent calls, and no longer counts the page and the modal.
 - A dialog asked by one call no longer ends the wait of another call.
 - A page whose collection changed while it was read is no longer lost: the property is read again.
+- **The merge of patches** (one turn of the dispatcher, or the changes that wait for a slow client) no longer drops a `set` of an
+  item made before a `splice` of its list: the same index named another item. Renaming C, removing A, then renaming D left
+  the client with the old C. A random test checks that merged and unmerged patches end the same.
+- **Routeables Remote**, after an audit:
+  - only a user told apart from the others writes: an anonymous user, or one without an identifier, gets `unidentified`
+    (another one could push the next change of his replica, read in the log, and his own was answered `duplicate`);
+  - a replica belongs to the scheme, the issuer and the identifier of a user, as a session;
+  - the hybrid clock never wraps around: a used-up counter moves to the next millisecond, a negative counter is refused at
+    `Push` and not followed at `Hello` (a client could send every other one before its own writes, a `Hello` alone was enough);
+  - a pull that a compaction crosses answers `snapshotRequired` instead of skipping entries;
+  - a counter stays within ±(2^53 − 1), where .NET, TypeScript and Dart add alike; beyond, the change is refused `too-large`;
+  - a connection follows at most `MaxCollectionsPerConnection` collections (256), and only those `IReplicationPolicy.CanFollow`
+    allows (every user by default);
+  - a snapshot no longer stops the writes while it reads the documents (it checks that no decision was written meanwhile), and
+    at most `MaxConcurrentSnapshots` (4) run at once;
+  - a text finds the character it follows without a search when one types, knows its characters in constant time and erases
+    in one pass (20 000 characters typed one by one: 6.5 s before, 0.1 s); a text field holds at most `MaxTextLength`
+    characters (1 000 000);
+  - a change that lacks what it must hold is refused `invalid` with a reason instead of failing the hub.
+- The command of a dictionary entry whose key is not a string (`Dictionary<int, ICommand>`) or holds a dot can be called; two
+  keys with the same text are sent once, the first. An item a list holds twice is sent with the whole list, both copies.
+- `AddRouteablesSignalR` raises the message limit of the hub so that it holds an argument of `MaxArgumentLength`: a long
+  argument was refused by SignalR (the connection closed) before the session could say why.
+- A call made while the client says `Hello` again reaches the session that is resumed: the clients wait for the answer to
+  `Hello`, and the hub makes the other calls of the connection wait while it resumes a session.
+- A session no longer waits synchronously in its constructor for its page target.
+- A notification that expires after more than 24.8 days is no longer closed at once by the timer of a browser.
 
 ### Performance and resilience
 
@@ -114,4 +147,7 @@ The first version meant for production. It changes the protocol (2) and some def
 - `RouteableStateProjector` and `RouteableCommandInvoker` are classes built on a `RouteableSchema` (they were static).
 - The messages: `RouteableChanged` carries patches, `Navigated` a generation and an instance, `IRouteableClient` has `Completed`, the hub has `Hello` and `Resync`. Protocol 2: update `@routeables/client` with the server.
 - `@routeables/client`: `RouteableTransport.call` is generic and rejects when the call does not reach the server; `ServerMessages` has `completed`; the pages are no longer cleared when the connection drops.
+- `ReplicationServer` takes its `IReplicationPolicy` (pass `AllowAllReplicationPolicy.Instance` on purpose), and
+  `AddRouteablesReplication` its server: there is no default that lets anyone read and write everything. Replicas are now owned by
+  scheme, issuer and identifier: the stores written before keep the old owners, and those replicas start again.
 - `RemoteInteractions.ModalClosed` gives the view model that closed; `RouteableProjectionIssue` has the `Exception`; a session whose client never said `Hello` is disposed when its connection drops.

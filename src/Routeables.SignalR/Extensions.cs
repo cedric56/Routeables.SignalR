@@ -2,8 +2,10 @@
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http.Connections;
 using Microsoft.AspNetCore.Routing;
+using Microsoft.AspNetCore.SignalR;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
+using Microsoft.Extensions.Options;
 using Routeables.Abstraction;
 using Routeables.Abstraction.Bases;
 using Routeables.Abstraction.Guards;
@@ -32,6 +34,9 @@ public static class Extensions
     public static IServiceCollection AddRouteablesSignalR(this IServiceCollection services, Action<IServiceCollection>? configure = null, Action<RouteablesOptions>? options = null)
         => services.AddRouteablesSignalR<DefaultMainViewModel>(configure, options);
 
+    /// <summary>The size of a message that holds an argument of <see cref="RouteablesOptions.MaxArgumentLength"/> characters and its envelope.</summary>
+    internal static long MessageSizeFor(RouteablesOptions options) => (long)options.MaxArgumentLength * 3 + 4096;
+
     /// <summary>
     /// Registers SignalR and what a session needs: a router per connection (scoped), the sessions, the main view model, the authorization of the
     /// view models and the options. Register the routes of the application as usual (<c>AddGeneratedRoutes()</c>, or <c>RegisterRoute</c> by name).
@@ -55,6 +60,15 @@ public static class Extensions
         services.AddSingleton(new RouteableSchema(settings));
 
         services.AddSignalR();
+        // A message holds an argument of MaxArgumentLength characters (3 bytes each at most in UTF-8) and its envelope: SignalR's limit
+        // (32 KiB by default) would close the connection before the session could refuse the argument with a reason.
+        // The hub has no value of its own unless the application gave one: SignalR then uses the one of every hub. No limit is left alone.
+        services.AddOptions<HubOptions<RouteablesHub>>().PostConfigure<IOptions<HubOptions>>((hub, all) =>
+        {
+            var needed = MessageSizeFor(settings);
+            if ((hub.MaximumReceiveMessageSize ?? all.Value.MaximumReceiveMessageSize) is { } size && size < needed)
+                hub.MaximumReceiveMessageSize = needed;
+        });
         services.AddAuthorizationCore();
         services.AddSingleton<RouteableSessions>();
         services.AddScoped<RouteableConnection>();

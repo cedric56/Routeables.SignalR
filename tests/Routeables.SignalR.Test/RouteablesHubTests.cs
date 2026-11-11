@@ -157,7 +157,7 @@ public class RouteablesHubTests
         var hub = Connect(provider, sessions, "gone", new RecordingClient());
 
         // No OnConnectedAsync: the connection has no session (it was closed).
-        Assert.Throws<HubException>(() => { _ = hub.Set("x", Json("1")); });
+        await Assert.ThrowsAsync<HubException>(() => hub.Set("x", Json("1")));
         await Assert.ThrowsAsync<HubException>(() => hub.GoTo("/shop"));
     }
 }

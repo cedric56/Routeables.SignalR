@@ -70,6 +70,26 @@ channel.logAdvanced.listen((_) => replica.sync(channel));
 await replica.sync(channel);                             // when online; after a failure, call it again
 ```
 
+## The device of the user: Essentials
+
+With `Routeables.SignalR.Essentials` on the server, the view models use the .NET MAUI Essentials contracts (`IPreferences`,
+`IGeolocation`, `IBattery`…) and the calls reach the app of their user. The app gives the services it supports, by name; the client
+announces them after each Hello, answers the calls and starts or stops the events. Only what a service lists can be reached.
+
+```dart
+final client = RouteablesClient(SignalRTransport(url), essentials: {
+  'battery': EssentialsService(
+    state: () async => {'chargeLevel': await battery.batteryLevel / 100, 'state': 'Unknown', 'powerSource': 'Unknown', 'energySaverStatus': 'Unknown'},
+  ),
+  'vibration': EssentialsService(state: () => {'isSupported': true}, methods: {'vibrate': (args) => HapticFeedback.vibrate()}),
+});
+```
+
+A method takes the arguments of the server in order and returns a JSON value; it throws `EssentialsError(message, code)` for a precise
+failure (`EssentialsErrorCodes.permissionDenied`, `notSupported`…). The shapes are those of `browserEssentials()` in `@routeables/client`;
+the Flutter sample ([lib/essentials.dart](../../samples/Flutter/xanimals_flutter/lib/essentials.dart)) gives about twenty services with
+Flutter plugins.
+
 ## Transport
 
 `RouteableTransport` is what the client needs from a connection. `SignalRTransport` uses [signalr_netcore](https://pub.dev/packages/signalr_netcore) (MIT): WebSockets, Server-Sent Events or long polling, automatic reconnection (`retryDelays`), and `accessTokenFactory` for a hub that requires authorization. The SignalR client for Dart does not send a `null` argument: a property is set to `null` only inside a list or a map. `applyPatch(state, patch)` is exported for a transport or a test that applies the patches itself.

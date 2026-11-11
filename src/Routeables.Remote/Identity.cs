@@ -111,15 +111,27 @@ public sealed class HybridClock
 
     private long WallNow => _time.GetUtcNow().ToUnixTimeMilliseconds();
 
+    /// <summary>
+    /// The value right after (<paramref name="wall"/>, <paramref name="counter"/>): the next counter, or the next millisecond when the counter
+    /// is used up. A counter never wraps around: a value that did would come before every value of its millisecond.
+    /// </summary>
+    internal static (long Wall, int Counter) After(long wall, int counter) => counter >= int.MaxValue ? (wall + 1, 0) : (wall, counter + 1);
+
     /// <summary>A new value, after every value given or observed so far.</summary>
     public Hlc Next()
     {
         lock (_gate)
         {
             var wall = Math.Max(WallNow, _last.Wall);
-            _last = wall == _last.Wall
-                ? new Hlc(wall, checked(_last.Counter + 1), Replica)
-                : new Hlc(wall, 0, Replica);
+            if (wall == _last.Wall)
+            {
+                var (after, counter) = After(wall, _last.Counter);
+                _last = new Hlc(after, counter, Replica);
+            }
+            else
+            {
+                _last = new Hlc(wall, 0, Replica);
+            }
             return _last;
         }
     }
@@ -139,17 +151,27 @@ public sealed class HybridClock
         }
     }
 
-    /// <summary>A value received from another replica: the next values come after it.</summary>
+    /// <summary>
+    /// A value received from another replica: the next values come after it. A negative counter is never sent by a replica: such a value
+    /// is not followed.
+    /// </summary>
     public void Observe(Hlc remote)
     {
+        if (remote.Counter < 0)
+            return;
         lock (_gate)
         {
             var wall = Math.Max(WallNow, Math.Max(_last.Wall, remote.Wall));
+            if (wall != _last.Wall && wall != remote.Wall)
+            {
+                _last = new Hlc(wall, 0, Replica);
+                return;
+            }
             var counter = wall == _last.Wall && wall == remote.Wall ? Math.Max(_last.Counter, remote.Counter)
                 : wall == _last.Wall ? _last.Counter
-                : wall == remote.Wall ? remote.Counter
-                : -1;
-            _last = new Hlc(wall, counter + 1, Replica);
+                : remote.Counter;
+            var (after, next) = After(wall, counter);
+            _last = new Hlc(after, next, Replica);
         }
     }
 }

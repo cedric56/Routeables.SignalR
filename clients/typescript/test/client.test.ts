@@ -12,6 +12,8 @@ class FakeTransport implements RouteableTransport {
   replies = new Map<ServerMethod, Ack>();
   welcome: Welcome = { success: true, protocol: PROTOCOL, session: 's1', resumed: false };
   unreachable = false;
+  /** When set, the answer to Hello waits for it. */
+  helloGate: Promise<void> | null = null;
 
   async start(handlers: ServerMessages): Promise<void> {
     this.server = handlers;
@@ -20,7 +22,10 @@ class FakeTransport implements RouteableTransport {
   async call<T>(method: ServerMethod, ...args: unknown[]): Promise<T> {
     this.calls.push({ method, args });
     if (this.unreachable) throw new Error('Not connected.');
-    if (method === 'Hello') return this.welcome as T;
+    if (method === 'Hello') {
+      if (this.helloGate) await this.helloGate;
+      return this.welcome as T;
+    }
     return (this.replies.get(method) ?? this.reply) as T;
   }
   onConnectionChange(handler: (connected: boolean) => void): void {
@@ -393,6 +398,14 @@ describe('dialogs and notifications', () => {
     assert.deepEqual(kept.transport.called('Dismiss'), []);
   });
 
+  it('keeps a notification whose time is beyond what a timer holds (24.8 days) instead of closing it at once', async () => {
+    const { client, transport } = await connected();
+    transport.server.notified({ ...toast, id: 5, expirationSeconds: 30 * 24 * 3600 });
+    await new Promise(resolve => setTimeout(resolve, 20));
+    assert.deepEqual(transport.called('Dismiss'), []);
+    assert.equal(client.toasts.length, 1);
+  });
+
   it('keeps the dialogs that wait, in order, and removes the one the server took the answer of', async () => {
     const { client, transport } = await connected();
     const counts: number[] = [];
@@ -470,6 +483,24 @@ describe('the connection', () => {
     assert.equal(client.dialogs.length, 1);
     assert.deepEqual(transport.called('Watch'), [['history']]);   // the resumed session watches it already
     assert.deepEqual(transport.called('GoTo'), []);
+  });
+
+  it('sends a call made while it says Hello again after that Hello was answered: it belongs to the resumed session', async () => {
+    const { client, transport } = await connected();
+    transport.changeConnection(false);
+    let release!: () => void;
+    transport.helloGate = new Promise(resolve => { release = resolve; });
+    transport.welcome = { success: true, protocol: PROTOCOL, session: 's1', resumed: true };
+    transport.changeConnection(true);
+    await tick();
+
+    const going = client.goTo('/dogs');
+    await tick();
+    assert.deepEqual(transport.calls.slice(-1).map(c => c.method), ['Hello']);   // GoTo waits
+
+    release();
+    assert.equal((await going).success, true);
+    assert.deepEqual(transport.calls.slice(-2).map(c => c.method), ['Hello', 'GoTo']);
   });
 
   it('names the calls it waits for when it resumes its session, and gets their end then', async () => {

@@ -446,7 +446,12 @@ public sealed class ChangeBuilder
     public ChangeBuilder RemoveElement(DocumentId document, string field, string element)
         => Add(document, view => new RemoveElement(field, element, view(document)?.TagsOf(field, element) ?? []));
 
-    public ChangeBuilder Increment(DocumentId document, string field, long delta) => Add(document, _ => new Increment(field, delta));
+    public ChangeBuilder Increment(DocumentId document, string field, long delta)
+    {
+        if (delta is < -RemoteProtocol.MaxCounter or > RemoteProtocol.MaxCounter)
+            throw new ArgumentOutOfRangeException(nameof(delta), delta, $"An increment is at most ±{RemoteProtocol.MaxCounter} (RemoteProtocol.MaxCounter).");
+        return Add(document, _ => new Increment(field, delta));
+    }
 
     /// <summary>
     /// Inserts <paramref name="text"/> in a text field at <paramref name="position"/> (in UTF-16 code units) of the text this

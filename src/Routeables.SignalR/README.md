@@ -40,6 +40,10 @@ Nothing that a view model does not expose. By default (`RouteableExposure.Explic
 | A method marked `[RouteableCommand]` | its name | `Invoke` / `InvokeOn` |
 | An `ICommand` held by an exposed property | `{ "$command": "items.2.buyCommand", "canExecute": true }` | `InvokeOn(target, path, [])` |
 
+`canExecute` is `CanExecute(null)`: the client does not know yet the argument it will send. A command that depends on its argument says so when it runs (a failed answer), and its button is drawn by what `CanExecute(null)` answers; give such a screen one command per choice (`items.2.buyCommand`) rather than one command with a parameter.
+
+The keys of a dictionary are sent as invariant text (`Convert.ToString`): `7` for an `int`, and the path of what an entry holds goes through that text (`byNumber.7.runCommand`; a key with dots, `byName.a.b`, is found too, the longest key first). Two keys with the same text are sent once, the first one.
+
 `[JsonIgnore]` keeps a property on the server in every mode. A delegate, a task, a type, a stream, a `ClaimsPrincipal` and a service (`IRouter`, `IServiceProvider`) are never sent. The `RouteableCommand` buttons of a Routeables view model (a name and a command) are exposed, read-only.
 
 `options.Exposure = RouteableExposure.Public` restores the behaviour of the first versions (every public property read, every public setter callable): a deliberate choice for a prototype, not for view models that hold more than the screen.
@@ -186,7 +190,7 @@ builder.Services.AddOpenTelemetry()
 
 - **One server per client.** A session lives in the memory of the server that holds its connection: with several servers, the client must always reach the same one (sticky sessions; with WebSockets and `skipNegotiation` a connection stays on its server anyway). A SignalR backplane is **not** needed: a session only talks to its own connection. A session cannot move to another server, and a restart loses them: the clients start new sessions and open their route again. Keep in the view models nothing that must outlive a session; keep it in your services and your database.
 - **No trimming, no Native AOT.** The view models are read by reflection (cached per type): `AddRouteablesSignalR` carries `[RequiresUnreferencedCode]` and `[RequiresDynamicCode]`, and the package is marked not trimmable.
-- **Messages from the browser.** SignalR limits a message to 32 KiB by default (`HubOptions.MaximumReceiveMessageSize`); the limits above apply within it. Rate limiting and the expiration of the authentication: see [SECURITY.md](../../SECURITY.md).
+- **Messages from the browser.** SignalR limits a message to 32 KiB by default (`HubOptions.MaximumReceiveMessageSize`). `AddRouteablesSignalR` raises the limit of `RouteablesHub` so that it holds an argument of `MaxArgumentLength` characters (3 bytes each, and the envelope: about 196 KiB for 64 KiB), and the session refuses a longer one with a reason; a limit the application set higher, or none, is left alone. Lower `MaxArgumentLength` to keep messages smaller. Rate limiting and the expiration of the authentication: see [SECURITY.md](../../SECURITY.md).
 - **What "sent" means.** A call is answered once the messages it caused were written to the connection, not once the client applied them. The client detects what it did not receive (a missing version, a call it still waits for) and asks for it again; nothing else is acknowledged.
 
 The client is in [clients/typescript](../../clients/typescript). The samples are [samples/Server](../../samples/Server) (XAnimals.Server, the server they share), [samples/Angular](../../samples/Angular), [samples/Vue](../../samples/Vue), [samples/React](../../samples/React) and [samples/Flutter](../../samples/Flutter). Security: [SECURITY.md](../../SECURITY.md).

@@ -1,6 +1,6 @@
 import { getCurrentScope, onScopeDispose, ref, shallowRef } from 'vue';
 import type { ShallowRef } from 'vue';
-import { MODAL, PAGE, RouteablesClient, signalRTransport } from '@routeables/client';
+import { MODAL, PAGE, RouteablesClient, browserEssentials, signalRTransport } from '@routeables/client';
 import type { CommandRef, Dialog, Page, Toast } from '@routeables/client';
 
 /**
@@ -10,8 +10,11 @@ import type { CommandRef, Dialog, Page, Toast } from '@routeables/client';
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export type State = any;
 
-// /routeables is the hub of Routeables.SignalR: `npm start` proxies it to the server (vite.config.ts).
-const client = new RouteablesClient(signalRTransport('/routeables'));
+// /routeables is the hub of Routeables.SignalR: `npm start` proxies it to the server (vite.config.ts). The Essentials are the device APIs
+// of the browser the server may call (the Essentials page tests them).
+const client = new RouteablesClient(signalRTransport('/routeables'), {
+  essentials: browserEssentials({ app: { name: 'XAnimals', packageName: 'xanimals.vue', version: '2.0' } }),
+});
 
 function savedDrawerClosed(): boolean {
   try {

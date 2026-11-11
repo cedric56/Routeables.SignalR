@@ -6,6 +6,9 @@ import type {
   ServerMethod, Toast, Welcome,
 } from './types.js';
 
+/** The longest delay of setTimeout (2^31 − 1 ms): a longer one runs at once. */
+const MAX_TIMER_DELAY = 2_147_483_647;
+
 export type PageListener = (page: Page | null) => void;
 export type FailureListener = (failure: FailureMessage) => void;
 export type ConnectionListener = (connected: boolean) => void;
@@ -80,6 +83,8 @@ export class RouteablesClient {
   private session: string | null = null;
   private lastRoute: string | null = null;
   private readonly essentials: EssentialsBridge | null;
+  // Until the server answered Hello: a call sent meanwhile would reach the session the connection opened, not the one it resumes.
+  private greeting: Promise<void> | null = null;
 
   constructor(private readonly transport: RouteableTransport, private readonly options: RouteablesClientOptions = {}) {
     this.essentials = options.essentials ? new EssentialsBridge(options.essentials, (method, ...args) => this.transport.call(method, ...args)) : null;
@@ -274,7 +279,16 @@ export class RouteablesClient {
   private async hello(): Promise<void> {
     const previous = this.session;
     // The calls that go on are named: a resumed session tells again the end of those that ended while the connection was gone.
-    const welcome = await this.transport.call<Welcome>('Hello', { protocol: PROTOCOL, resume: previous, waiting: [...this.operations.keys()] });
+    let greeted!: () => void;
+    const greeting = new Promise<void>(resolve => { greeted = resolve; });
+    this.greeting = greeting;
+    let welcome: Welcome;
+    try {
+      welcome = await this.transport.call<Welcome>('Hello', { protocol: PROTOCOL, resume: previous, waiting: [...this.operations.keys()] });
+    } finally {
+      greeted();
+      if (this.greeting === greeting) this.greeting = null;
+    }
     if (!welcome.success) {
       const message = welcome.error ?? `The server speaks the protocol ${welcome.protocol}, this client ${PROTOCOL}.`;
       this.fail('Hello', undefined, new Error(message), 'protocol');
@@ -328,6 +342,7 @@ export class RouteablesClient {
   private async send(method: ServerMethod, target: string | undefined, ...args: unknown[]): Promise<Ack> {
     let ack: Ack;
     try {
+      if (this.greeting) await this.greeting;
       ack = await this.transport.call<Ack>(method, ...args);
     } catch (error) {
       return this.fail(method, target, error);
@@ -458,10 +473,12 @@ export class RouteablesClient {
     if (this.toastList.some(t => t.id === toast.id)) return;
     this.setToasts([...this.toastList, toast]);
     // A notification closes by itself after its time.
-    if (this.options.expireToasts !== false && toast.expirationSeconds !== null)
+    // A browser runs a longer timer at once (2^31 ms, about 24.8 days): such a notification stays until it is closed.
+    const delay = toast.expirationSeconds === null ? NaN : toast.expirationSeconds * 1000;
+    if (this.options.expireToasts !== false && Number.isFinite(delay) && delay <= MAX_TIMER_DELAY)
       setTimeout(() => {
         if (this.toastList.some(t => t.id === toast.id)) void this.dismiss(toast, false);
-      }, toast.expirationSeconds * 1000);
+      }, Math.max(0, delay));
   }
 
   private setPage(target: string, page: Page | null): void {

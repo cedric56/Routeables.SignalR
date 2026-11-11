@@ -204,6 +204,8 @@ class ServerMessages {
     required this.notified,
     required this.closed,
     required this.completed,
+    this.essentialsInvoke,
+    this.essentialsSubscribe,
   });
 
   final void Function(Map<String, Object?> message) navigated;
@@ -213,6 +215,12 @@ class ServerMessages {
   final void Function(Map<String, Object?> message) notified;
   final void Function(Map<String, Object?> message) closed;
   final void Function(Map<String, Object?> message) completed;
+
+  /// Essentials: a call of a device API (only when the client has `essentials`); answered with `EssentialsResult`.
+  final void Function(Map<String, Object?> message)? essentialsInvoke;
+
+  /// Essentials: an event to start or stop.
+  final void Function(Map<String, Object?> message)? essentialsSubscribe;
 }
 
 /// What the client needs from a connection. SignalR is the first one (see signalr_transport.dart); another can replace it.

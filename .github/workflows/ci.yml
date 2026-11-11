@@ -28,8 +28,9 @@ env:
   # checked out only for the sources of the XAnimals view models the samples are built from (samples/XAnimals): at the revision of that
   # package (2.1.0). Move both together, on purpose.
   ROUTEABLES_REF: ${{ github.event.inputs.routeables-ref || 'ad5b719409425bfb77d0c34be101c21b8f098c1e' }}
-  # The revision of Essentieables whose Essentieables.Facades Routeables.SignalR.Essentials is built against: pin it the same way.
-  ESSENTIEABLES_REF: ${{ github.event.inputs.essentieables-ref || 'master' }}
+  # The revision of Essentieables whose Essentieables.Facades Routeables.SignalR.Essentials is built against: pinned the same way (master of
+  # 10 November 2026), and moved on purpose.
+  ESSENTIEABLES_REF: ${{ github.event.inputs.essentieables-ref || 'f4c05d9a54d1c0e9a699f76fe24cdcd3e3a3db42' }}
 
 jobs:
   dotnet:

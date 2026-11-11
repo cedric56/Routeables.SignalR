@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'essentials.dart';
 import 'patch.dart';
 import 'types.dart';
 
@@ -53,12 +54,17 @@ class RouteablesClient {
   /// [recover] is what to do when the server could not resume the session after a reconnection (the view models are new, nothing is
   /// shown): by default the main router goes back to the route it showed. [recoverAutomatically] false does nothing (listen to
   /// [onSessionLost]). [expireToasts] false keeps a notification that has an expiration until the application dismisses it.
+  ///
+  /// [essentials] are the device APIs the server may call (`AddRouteablesEssentials`): the view models use the .NET MAUI contracts,
+  /// the calls reach this app. They are announced after each Hello, before the client says it is connected.
   RouteablesClient(
     this.transport, {
     Future<void> Function(Recovery recovery)? recover,
     this.recoverAutomatically = true,
     this.expireToasts = true,
-  }) : _recover = recover {
+    Map<String, EssentialsService>? essentials,
+  })  : _recover = recover,
+        _essentials = essentials == null ? null : EssentialsBridge(essentials, transport.call) {
     transport.onConnectionChange((connected) {
       if (!connected) {
         // The pages and the calls that wait stay: the session is resumed when the connection comes back (by itself, or by connect() once
@@ -78,6 +84,9 @@ class RouteablesClient {
   /// Whether a notification that has an expiration is closed by the client after it ([dismiss]).
   final bool expireToasts;
   final Future<void> Function(Recovery recovery)? _recover;
+  // Until the server answered Hello: a call sent meanwhile would reach the session the connection opened, not the one it resumes.
+  Future<void>? _greeting;
+  final EssentialsBridge? _essentials;
 
   final Map<String, Page?> _pages = {};
   final Map<String, Set<PageListener>> _pageListeners = {};
@@ -116,6 +125,7 @@ class RouteablesClient {
 
   /// Opens the connection and says hello (a session that dropped is resumed). Go to a route afterwards.
   Future<void> connect() async {
+    final essentials = _essentials;
     await transport.start(ServerMessages(
       navigated: _onNavigated,
       changed: _onChanged,
@@ -129,12 +139,15 @@ class RouteablesClient {
       notified: (message) => _onToast(Toast.fromJson(message)),
       closed: _onClosed,
       completed: _onCompleted,
+      essentialsInvoke: essentials == null ? null : (message) => unawaited(essentials.invoke(message)),
+      essentialsSubscribe: essentials?.subscribe,
     ));
     await _hello();
   }
 
   /// Closes the connection: the application is done with it. The calls that wait complete with `code: 'disconnected'`; the pages stay.
   Future<void> disconnect() async {
+    _essentials?.stopAll();
     await transport.stop();
     _setConnected(false);
     _abandonCalls(_disconnected);
@@ -258,9 +271,17 @@ class RouteablesClient {
   Future<void> _hello() async {
     final previous = _session;
     // The calls that go on are named: a resumed session tells again the end of those that ended while the connection was gone.
-    final welcome = asMap(await transport.call('Hello', [
-      {'protocol': protocolVersion, 'resume': previous, 'waiting': [..._operations.keys]},
-    ]));
+    final greeted = Completer<void>();
+    _greeting = greeted.future;
+    final Map<String, Object?> welcome;
+    try {
+      welcome = asMap(await transport.call('Hello', [
+        {'protocol': protocolVersion, 'resume': previous, 'waiting': [..._operations.keys]},
+      ]));
+    } finally {
+      greeted.complete();
+      if (identical(_greeting, greeted.future)) _greeting = null;
+    }
     if (welcome['success'] != true) {
       final message = welcome['error'] as String? ?? 'The server speaks the protocol ${welcome['protocol']}, this client $protocolVersion.';
       _fail('Hello', null, message, 'protocol');
@@ -279,6 +300,9 @@ class RouteablesClient {
       _setToasts(const []);
       _abandonCalls(_sessionLost);
     }
+
+    // Before anything is shown or navigated: the view models read the preferences and the network of this device on the server.
+    await _announceEssentials();
 
     _setConnected(true);
     // A resumed session already sent what it watches; a new one watches nothing yet.
@@ -302,6 +326,19 @@ class RouteablesClient {
     }
   }
 
+  Future<void> _announceEssentials() async {
+    final essentials = _essentials;
+    if (essentials == null) return;
+    try {
+      final ack = await essentials.ready();
+      if (ack['success'] != true) {
+        _fail('EssentialsReady', null, ack['error'] as String? ?? 'The server refused the Essentials of this client.', ack['code'] as String? ?? 'failed');
+      }
+    } catch (error) {
+      _fail('EssentialsReady', null, error);
+    }
+  }
+
   void _setConnected(bool connected) {
     if (_connected == connected) return;
     _connected = connected;
@@ -314,6 +351,7 @@ class RouteablesClient {
   Future<Ack> _send(String method, String? target, List<Object?> args) async {
     final Ack ack;
     try {
+      if (_greeting case final greeting?) await greeting;
       ack = Ack.fromJson(await transport.call(method, args));
     } catch (error) {
       return _fail(method, target, error);
@@ -458,9 +496,10 @@ class RouteablesClient {
     if (_toasts.any((t) => t.id == toast.id)) return;
     _setToasts([..._toasts, toast]);
     // A notification closes by itself after its time.
+    // A timer of the web runs a longer delay at once (2^31 ms, about 24.8 days): such a notification stays until it is closed.
     final seconds = toast.expirationSeconds;
-    if (expireToasts && seconds != null) {
-      Timer(Duration(milliseconds: (seconds * 1000).round()), () {
+    if (expireToasts && seconds != null && seconds.isFinite && seconds * 1000 <= 2147483647) {
+      Timer(Duration(milliseconds: (seconds * 1000).round().clamp(0, 2147483647)), () {
         if (_toasts.any((t) => t.id == toast.id)) unawaited(dismiss(toast));
       });
     }

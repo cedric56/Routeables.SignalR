@@ -13,6 +13,9 @@ class FakeTransport implements RouteableTransport {
   Map<String, Object?> welcome = {'success': true, 'protocol': protocolVersion, 'session': 's1', 'resumed': false};
   bool unreachable = false;
 
+  /// When set, the answer to Hello waits for it.
+  Future<void>? helloGate;
+
   @override
   Future<void> start(ServerMessages handlers) async {
     server = handlers;
@@ -25,7 +28,10 @@ class FakeTransport implements RouteableTransport {
   Future<Object?> call(String method, List<Object?> args) async {
     calls.add((method, args));
     if (unreachable) throw StateError('Not connected.');
-    if (method == 'Hello') return welcome;
+    if (method == 'Hello') {
+      if (helloGate case final gate?) await gate;
+      return welcome;
+    }
     return replies[method] ?? reply;
   }
 
@@ -442,6 +448,14 @@ void main() {
       expect(kept.called('Dismiss'), isEmpty);
     });
 
+    test('keeps a notification whose time is beyond what a timer of the web holds (24.8 days)', () async {
+      final (client, transport) = await connected();
+      transport.server.notified({...toast, 'id': 5, 'expirationSeconds': 30 * 24 * 3600});
+      await Future<void>.delayed(const Duration(milliseconds: 20));
+      expect(transport.called('Dismiss'), isEmpty);
+      expect(client.toasts, hasLength(1));
+    });
+
     test('keeps the dialogs that wait, in order, and removes the one the server took the answer of', () async {
       final (client, transport) = await connected();
       final counts = <int>[];
@@ -524,6 +538,24 @@ void main() {
       expect(client.dialogs.length, 1);
       expect(transport.called('Watch'), [['history']]); // the resumed session watches it already
       expect(transport.called('GoTo'), isEmpty);
+    });
+
+    test('sends a call made while it says Hello again after that Hello was answered: it belongs to the resumed session', () async {
+      final (client, transport) = await connected();
+      transport.changeConnection(false);
+      final release = Completer<void>();
+      transport.helloGate = release.future;
+      transport.welcome = {'success': true, 'protocol': protocolVersion, 'session': 's1', 'resumed': true};
+      transport.changeConnection(true);
+      await tick();
+
+      final going = client.goTo('/dogs');
+      await tick();
+      expect(transport.calls.last.$1, 'Hello'); // GoTo waits
+
+      release.complete();
+      expect((await going).success, isTrue);
+      expect([for (final (method, _) in transport.calls.skip(transport.calls.length - 2)) method], ['Hello', 'GoTo']);
     });
 
     test('names the calls it waits for when it resumes its session, and gets their end then', () async {

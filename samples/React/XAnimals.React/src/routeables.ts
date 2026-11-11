@@ -1,4 +1,4 @@
-import { MODAL, PAGE, RouteablesClient, signalRTransport } from '@routeables/client';
+import { MODAL, PAGE, RouteablesClient, browserEssentials, signalRTransport } from '@routeables/client';
 import type { CommandRef, Dialog, Page, Toast } from '@routeables/client';
 
 /**
@@ -25,7 +25,10 @@ export interface Snapshot {
 }
 
 // /routeables is the hub of Routeables.SignalR: `npm start` proxies it to the server (vite.config.ts).
-const client = new RouteablesClient(signalRTransport('/routeables'));
+const client = new RouteablesClient(signalRTransport('/routeables'), {
+  // The device APIs of the browser the server may call (the Essentials page tests them).
+  essentials: browserEssentials({ app: { name: 'XAnimals', packageName: 'xanimals.react', version: '2.0' } }),
+});
 const listeners = new Set<(snapshot: Snapshot) => void>();
 
 function savedDrawerClosed(): boolean {

@@ -7,6 +7,12 @@ namespace Routeables.Remote;
 public static class RemoteProtocol
 {
     public const int Version = 1;
+
+    /// <summary>
+    /// The largest value of a counter, and of an increment, either way (2^53 − 1): what a number of JavaScript holds exactly. Every
+    /// implementation then adds the same way; the server refuses a change that would go beyond.
+    /// </summary>
+    public const long MaxCounter = 9_007_199_254_740_991;
 }
 
 /// <summary>
@@ -99,6 +105,12 @@ public static class RemoteErrorCodes
 
     /// <summary>The replica belongs to another user.</summary>
     public const string ReplicaTaken = "replica-taken";
+
+    /// <summary>
+    /// The user cannot be told apart from another one (anonymous, or authenticated without an identifier): such a user reads what the
+    /// rules let him read, and writes nothing, since nothing would keep another one from writing in his name.
+    /// </summary>
+    public const string Unidentified = "unidentified";
 
     /// <summary>A change is missing before this one: push from <see cref="RemoteWelcome.LastSeq"/> + 1.</summary>
     public const string OutOfOrder = "out-of-order";

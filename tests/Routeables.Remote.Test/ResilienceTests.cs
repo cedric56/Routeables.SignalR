@@ -11,7 +11,7 @@ public class ResilienceTests
     [Fact]
     public async Task A_push_whose_answer_was_lost_is_not_applied_twice()
     {
-        var server = new ReplicationServer();
+        var server = new ReplicationServer(AllowAllReplicationPolicy.Instance);
         var a = await Device.StartAsync("A", server);
         await a.Replica.Edit().Create(Ana).Increment(Ana, "visits", 1).CommitAsync();
 
@@ -42,7 +42,7 @@ public class ResilienceTests
     [Fact]
     public async Task A_restart_keeps_the_offline_changes_and_the_cursor()
     {
-        var server = new ReplicationServer();
+        var server = new ReplicationServer(AllowAllReplicationPolicy.Instance);
         var a = await Device.StartAsync("A", server);
         var b = await Device.StartAsync("B", server);
         await b.Replica.Edit().Create(Ana).Set(Ana, "name", "\"Ana\"").CommitAsync();
@@ -69,7 +69,7 @@ public class ResilienceTests
     [Fact]
     public async Task A_stop_between_the_push_and_the_pull_loses_nothing_and_duplicates_nothing()
     {
-        var server = new ReplicationServer();
+        var server = new ReplicationServer(AllowAllReplicationPolicy.Instance);
         var a = await Device.StartAsync("A", server);
         await a.Replica.Edit().Create(Ana).Increment(Ana, "visits", 1).CommitAsync();
 
@@ -87,14 +87,14 @@ public class ResilienceTests
     public async Task A_server_restarted_over_its_store_goes_on_where_it_stopped()
     {
         var store = new MemoryReplicationStore();
-        var server = new ReplicationServer(store: store);
+        var server = new ReplicationServer(AllowAllReplicationPolicy.Instance, store: store);
         var a = await Device.StartAsync("A", server);
         var b = await Device.StartAsync("B", server);
         await a.Replica.Edit().Create(Ana).Increment(Ana, "visits", 1).CommitAsync();
         a.Network.LoseNextPushAnswer = true;               // decided, the answer lost; then the server stops
         Assert.False(await a.TrySyncAsync());
 
-        var restarted = new ReplicationServer(store: store);
+        var restarted = new ReplicationServer(AllowAllReplicationPolicy.Instance, store: store);
         a.ConnectTo(restarted);
         b.ConnectTo(restarted);
         await b.Replica.Edit().Increment(Ana, "visits", 2).CommitAsync();
@@ -111,7 +111,7 @@ public class ResilienceTests
     [Fact]
     public async Task A_replica_far_behind_a_compacted_log_gets_a_snapshot_and_counts_its_own_changes_once()
     {
-        var server = new ReplicationServer();
+        var server = new ReplicationServer(AllowAllReplicationPolicy.Instance);
         var a = await Device.StartAsync("A", server);
         var b = await Device.StartAsync("B", server);
         await b.Replica.Edit().Create(Ana).Increment(Ana, "visits", 10).CommitAsync();
@@ -140,7 +140,7 @@ public class ResilienceTests
     {
         var serverTime = new ManualTime(DateTimeOffset.UnixEpoch.AddDays(20_000));
         var deviceTime = new ManualTime(serverTime.Now.AddDays(3));     // a device three days ahead
-        var server = new ReplicationServer(time: serverTime);
+        var server = new ReplicationServer(AllowAllReplicationPolicy.Instance, time: serverTime);
         var a = await Device.StartAsync("A", server, time: deviceTime);
         await a.Replica.Edit().Create(Ana).Set(Ana, "name", "\"Ana\"").CommitAsync();
 
@@ -156,7 +156,7 @@ public class ResilienceTests
     {
         var serverTime = new ManualTime(DateTimeOffset.UnixEpoch.AddDays(20_000));
         var deviceTime = new ManualTime(serverTime.Now.AddDays(3));
-        var server = new ReplicationServer(time: serverTime);
+        var server = new ReplicationServer(AllowAllReplicationPolicy.Instance, time: serverTime);
         var a = await Device.StartAsync("A", server, time: deviceTime);
         await a.Replica.Edit().Create(Ana).AddElement(Ana, "tags", "x").CommitAsync();
         await a.Replica.Edit().RemoveElement(Ana, "tags", "x").CommitAsync();
@@ -173,7 +173,7 @@ public class ResilienceTests
     {
         var serverTime = new ManualTime(DateTimeOffset.UnixEpoch.AddDays(20_000));
         var deviceTime = new ManualTime(serverTime.Now.AddDays(3));
-        var server = new ReplicationServer(time: serverTime);
+        var server = new ReplicationServer(AllowAllReplicationPolicy.Instance, time: serverTime);
         var a = await Device.StartAsync("A", server, time: deviceTime);
         await a.Replica.Edit().Create(Ana).Set(Ana, "name", "\"Ana\"").CommitAsync();
 
@@ -342,7 +342,7 @@ public class AdmissionTests
     [Fact]
     public async Task A_replica_cannot_be_used_by_another_user()
     {
-        var server = new ReplicationServer();
+        var server = new ReplicationServer(AllowAllReplicationPolicy.Instance);
         var ana = await Device.StartAsync("A", server, user: "ana");
         await ana.Replica.Edit().Create(Ana).CommitAsync();
         await ana.SyncAsync();
@@ -360,7 +360,7 @@ public class AdmissionTests
     [Fact]
     public async Task A_client_of_another_version_is_refused_with_a_reason()
     {
-        var welcome = await new ReplicationServer().Connect(null)
+        var welcome = await new ReplicationServer(AllowAllReplicationPolicy.Instance).Connect(null)
             .HelloAsync(new RemoteHello(RemoteProtocol.Version + 1, ReplicaId.New(), default));
         Assert.False(welcome.Success);
         Assert.Contains("update the client", welcome.Error);

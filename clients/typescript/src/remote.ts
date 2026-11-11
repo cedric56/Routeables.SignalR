@@ -40,6 +40,12 @@ export function compareStamps(a: OpStamp, b: OpStamp): number {
 
 const sameDot = (a: Dot, b: Dot): boolean => a.seq === b.seq && a.replica === b.replica;
 
+/** The largest counter of a stamp: an int of .NET. When it is used up, the clock moves to the next millisecond rather than wrap around. */
+const MAX_STAMP_COUNTER = 2_147_483_647;
+
+const after = (wall: number, counter: number): { wall: number; counter: number } =>
+  counter >= MAX_STAMP_COUNTER ? { wall: wall + 1, counter: 0 } : { wall, counter: counter + 1 };
+
 /** A hybrid logical clock (Kulkarni et al.): never goes back, and moves past every value it observes. */
 export class HybridClock {
   private value: Hlc;
@@ -55,19 +61,24 @@ export class HybridClock {
   next(): Hlc {
     const wall = Math.max(this.now(), this.value.wall);
     this.value = wall === this.value.wall
-      ? { wall, counter: this.value.counter + 1, replica: this.replica }
+      ? { ...after(wall, this.value.counter), replica: this.replica }
       : { wall, counter: 0, replica: this.replica };
     return this.value;
   }
 
+  /** A value of another replica: the next values come after it. A counter out of range is never sent by a replica: not followed. */
   observe(remote: Hlc): void {
+    if (!Number.isSafeInteger(remote.counter) || remote.counter < 0 || remote.counter > MAX_STAMP_COUNTER) return;
     const last = this.value;
     const wall = Math.max(this.now(), last.wall, remote.wall);
+    if (wall !== last.wall && wall !== remote.wall) {
+      this.value = { wall, counter: 0, replica: this.replica };
+      return;
+    }
     const counter = wall === last.wall && wall === remote.wall ? Math.max(last.counter, remote.counter)
       : wall === last.wall ? last.counter
-        : wall === remote.wall ? remote.counter
-          : -1;
-    this.value = { wall, counter: counter + 1, replica: this.replica };
+        : remote.counter;
+    this.value = { ...after(wall, counter), replica: this.replica };
   }
 
   /** Falls back from a clock that ran ahead to the later of now and `floor` (the server's): only after a clock-skew refusal. */
@@ -120,7 +131,7 @@ export interface LogAdvanced { collections: string[]; position: number }
 
 export const RemoteErrorCodes = {
   forbidden: 'forbidden', invalid: 'invalid', tooLarge: 'too-large', clockSkew: 'clock-skew',
-  replicaTaken: 'replica-taken', outOfOrder: 'out-of-order', lost: 'lost',
+  replicaTaken: 'replica-taken', outOfOrder: 'out-of-order', lost: 'lost', unidentified: 'unidentified',
 } as const;
 
 /** The four calls of a replica: over SignalR (`signalRReplicationChannel`), HTTP, or in memory in a test. */

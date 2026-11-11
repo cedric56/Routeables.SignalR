@@ -15,7 +15,7 @@ await replica.SyncAsync(channel);        // when the network is back; call again
 replica.Rejected;                        // what the server refused, for the UI
 
 // Server
-var server = new ReplicationServer(policy, store: store);   // IReplicationPolicy, IReplicationStore (memory by default)
+var server = new ReplicationServer(policy, store: store);   // IReplicationPolicy (required), IReplicationStore (memory by default)
 IReplicationChannel channel = server.Connect(user);         // in process; Routeables.SignalR serves it over a hub
 ```
 

@@ -1,6 +1,6 @@
 # Routeables with React
 
-The same view models and the same server as the [Angular sample](../Angular), drawn by a React 19 app. The server runs the view models; the browser receives their state and sends what the user does. Every page of the menu is there: the animal lists and details, History, Regions, Adopt a pet, Dialogs (messages, content and task dialogs, notifications, the note modal), Features (guard, lock, measures), Members, Tabs and About, with the same side panel and theme button as the other web samples.
+The same view models and the same server as the [Angular sample](../Angular), drawn by a React 19 app. The server runs the view models; the browser receives their state and sends what the user does. Every page of the menu is there: the animal lists and details, History, Regions, Adopt a pet, Dialogs (messages, content and task dialogs, notifications, the note modal), Features (guard, lock, measures), Members, Tabs, Essentials (the device APIs of the browser, tested from the server) and About, with the same side panel and theme button as the other web samples.
 
 ```
 React app (xanimals-react)  ──SignalR──▶  XAnimals.Server (samples/Server)

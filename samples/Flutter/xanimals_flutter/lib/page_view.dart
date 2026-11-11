@@ -5,6 +5,7 @@ import 'pages/about.dart';
 import 'pages/adopt.dart';
 import 'pages/animals.dart';
 import 'pages/dialogs.dart';
+import 'pages/essentials.dart';
 import 'pages/features.dart';
 import 'pages/history.dart';
 import 'pages/layout.dart';
@@ -22,6 +23,7 @@ final Map<String, RouteablePageBuilder> _pages = {
   'AboutViewModel': (page, target) => AboutPage(page: page, target: target),
   'AdoptViewModel': (page, target) => AdoptPage(page: page, target: target),
   'DialogsViewModel': (page, target) => DialogsPage(page: page, target: target),
+  'EssentialsViewModel': (page, target) => EssentialsPage(page: page, target: target),
   'FeaturesViewModel': (page, target) => FeaturesPage(page: page, target: target),
   'HistoryViewModel': (page, target) => HistoryPage(page: page, target: target),
   'MembersViewModel': (page, target) => MembersPage(page: page, target: target),

@@ -13,6 +13,16 @@ dependencies:
   # The client of Routeables.SignalR for Dart, from its sources: there is nothing to publish first.
   routeables_client:
     path: ../../../clients/dart
+  # The device APIs the server may call (lib/essentials.dart, the Essentials page): each one on the platforms it supports.
+  battery_plus: ^7.1.2
+  connectivity_plus: ^7.3.2
+  device_info_plus: ^13.2.0
+  geolocator: ^14.0.2
+  package_info_plus: ^10.2.2
+  sensors_plus: ^7.1.1
+  share_plus: ^13.3.1
+  shared_preferences: ^2.5.3
+  url_launcher: ^6.3.2
 
 dev_dependencies:
   flutter_test:

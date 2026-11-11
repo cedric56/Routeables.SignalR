@@ -8,7 +8,7 @@ public class TextTests
     private static async Task<(ReplicationServer Server, Device A, Device B, ManualTime Time)> StartAsync(string text)
     {
         var time = new ManualTime(DateTimeOffset.UnixEpoch.AddDays(20_000));
-        var server = new ReplicationServer(time: time);
+        var server = new ReplicationServer(AllowAllReplicationPolicy.Instance, time: time);
         var a = await Device.StartAsync("A", server, collections: ["Note"], time: time);
         var b = await Device.StartAsync("B", server, collections: ["Note"], time: time);
         await a.Replica.Edit().Create(Note).InsertText(Note, "body", 0, text).CommitAsync();
@@ -84,7 +84,7 @@ public class TextTests
     [Fact]
     public async Task The_operations_of_one_change_see_the_ones_before_them()
     {
-        var server = new ReplicationServer();
+        var server = new ReplicationServer(AllowAllReplicationPolicy.Instance);
         var a = await Device.StartAsync("A", server, collections: ["Note"]);
         await a.Replica.Edit().Create(Note)
             .InsertText(Note, "body", 0, "ac")
@@ -125,7 +125,7 @@ public class TextTests
     {
         var serverTime = new ManualTime(DateTimeOffset.UnixEpoch.AddDays(20_000));
         var deviceTime = new ManualTime(serverTime.Now.AddDays(3));
-        var server = new ReplicationServer(time: serverTime);
+        var server = new ReplicationServer(AllowAllReplicationPolicy.Instance, time: serverTime);
         var a = await Device.StartAsync("A", server, collections: ["Note"], time: deviceTime);
         await a.Replica.Edit().Create(Note).InsertText(Note, "body", 0, "abc").CommitAsync();
         await a.Replica.Edit().InsertText(Note, "body", 3, "d").EraseText(Note, "body", 0, 1).CommitAsync();
@@ -150,7 +150,7 @@ public class TextTests
     [Fact]
     public async Task Positions_count_UTF16_code_units_and_a_whole_new_value_never_splits_a_character()
     {
-        var server = new ReplicationServer();
+        var server = new ReplicationServer(AllowAllReplicationPolicy.Instance);
         var a = await Device.StartAsync("A", server, collections: ["Note"]);
         await a.Replica.Edit().Create(Note).InsertText(Note, "body", 0, "a\U0001F600b").CommitAsync();   // a 😀 b: 4 code units
         await a.Replica.Edit().ReplaceText(Note, "body", "a\U0001F601b").CommitAsync();
@@ -166,7 +166,7 @@ public class TextTests
         {
             var random = new Random(seed);
             var time = new ManualTime(DateTimeOffset.UnixEpoch.AddDays(20_000));
-            var server = new ReplicationServer(time: time);
+            var server = new ReplicationServer(AllowAllReplicationPolicy.Instance, time: time);
             var devices = new List<Device>();
             for (var i = 0; i < 3; i++)
                 devices.Add(await Device.StartAsync($"D{i}", server, collections: ["Note"], time: time));

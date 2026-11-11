@@ -4,7 +4,7 @@ import { dirname, join } from 'node:path';
 import { describe, it } from 'node:test';
 import { fileURLToPath } from 'node:url';
 import {
-  AckStatus, DocumentSet, DocumentState, MemoryReplicaStorage, REMOTE_PROTOCOL, RemoteErrorCodes, Replica, compareHlc,
+  AckStatus, DocumentSet, DocumentState, HybridClock, MemoryReplicaStorage, REMOTE_PROTOCOL, RemoteErrorCodes, Replica, compareHlc,
 } from '../src/index.js';
 import type {
   Change, ChangeAck, DocumentId, DocumentSnapshot, LogEntry, PullRequest, PullResult, PushRequest, PushResult, RemoteHello, RemoteWelcome,
@@ -294,5 +294,24 @@ describe('a replica', () => {
       assert.equal(server.log.length, commits, `seed ${seed}: every change in the log once`);
       for (const d of list) { assert.equal(d.replica.pendingCount, 0); assert.equal(d.replica.rejected.length, 0); }
     }
+  });
+});
+
+describe('the hybrid clock', () => {
+  it('moves to the next millisecond when its counter is used up, as the server does', () => {
+    const max = 2_147_483_647;
+    const clock = new HybridClock('a', () => 1000, { wall: 1000, counter: max, replica: 'a' });
+    assert.deepEqual(clock.next(), { wall: 1001, counter: 0, replica: 'a' });
+
+    const observer = new HybridClock('b', () => 1000);
+    observer.observe({ wall: 1000, counter: max, replica: 'a' });
+    assert.ok(compareHlc(observer.last, { wall: 1000, counter: max, replica: 'a' }) > 0);
+    assert.ok(observer.last.counter <= max);
+  });
+
+  it('does not follow a counter no replica sends', () => {
+    const clock = new HybridClock('b', () => 1000);
+    for (const counter of [-1, 2_147_483_648, 1.5]) clock.observe({ wall: 5000, counter, replica: 'a' });
+    assert.equal(clock.last.wall, 0);
   });
 });

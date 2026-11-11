@@ -87,7 +87,13 @@ public sealed class RouteableSession : IAsyncDisposable
         _interactions.ModalClosed += OnModalClosed;
 
         // The page of the main router is told to the client whoever asked for it: the client (GoTo) or a command of a view model that navigates.
-        Dispatcher.InvokeAsync(() => Put(RouteableTargets.Page, new WatchedTarget(RouteableTargets.Page, this, _router))).GetAwaiter().GetResult();
+        // A new session is idle: this runs now, on this thread. Nothing waits for it otherwise: the work queued after it runs after it.
+        var opened = Dispatcher.InvokeAsync(() => Put(RouteableTargets.Page, new WatchedTarget(RouteableTargets.Page, this, _router)));
+        if (opened.IsCompleted)
+            opened.GetAwaiter().GetResult();   // completed: rethrows a failure, never blocks
+        else
+            _ = opened.ContinueWith(static (t, logger) => ((ILogger)logger!).LogError(t.Exception, "The page target of a session could not be opened."),
+                _logger, CancellationToken.None, TaskContinuationOptions.OnlyOnFaulted, TaskScheduler.Default);
     }
 
     private static readonly AsyncLocal<RouteableSession?> AmbientSession = new();

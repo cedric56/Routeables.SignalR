@@ -318,10 +318,10 @@ internal sealed class WatchedTarget : IDisposable
             return;
         _reveals.Remove(member.Name);
 
-        // An item of a list held by the property: only that item is sent again.
+        // An item of a list held by the property: only that item is sent again. An item the list holds twice is sent with the whole list.
         if (source is not ICommand
             && RouteableStateProjector.TryRead(viewModel, member.Property, out var value) && value is IList list && !ReferenceEquals(list, source)
-            && IndexOf(list, source) is var index and >= 0)
+            && OnlyIndexOf(list, source) is var index and >= 0)
         {
             var path = member.Name + "." + index.ToString(System.Globalization.CultureInfo.InvariantCulture);
             var item = _session.Projector.ProjectAt(member.Name, path, source, depth: 2, issue => Report(issue), _guard);
@@ -398,12 +398,19 @@ internal sealed class WatchedTarget : IDisposable
         return new RouteablePatch(RouteablePatch.Splice, [member.Name], projected, index, remove);
     }
 
-    private static int IndexOf(IList list, object item)
+    // The index of the item when the list holds it once; -1 when it holds it never or more than once.
+    private static int OnlyIndexOf(IList list, object item)
     {
+        var found = -1;
         for (var i = 0; i < list.Count; i++)
-            if (ReferenceEquals(list[i], item))
-                return i;
-        return -1;
+        {
+            if (!ReferenceEquals(list[i], item))
+                continue;
+            if (found >= 0)
+                return -1;
+            found = i;
+        }
+        return found;
     }
 
     private bool IsCurrent(object viewModel) => !_disposed && _visible && ReferenceEquals(_viewModel, viewModel);

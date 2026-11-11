@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart';
 import 'package:routeables_client/routeables_client.dart' as rt;
 
+import 'essentials.dart';
 import 'server.dart';
 
 /// The entries of the menu, as the server sends them (`$shell`).
@@ -25,7 +26,8 @@ class ShellEntry {
 /// What the server shows is a set of targets (see routeables_client): the page of the main router, the modal, the regions, and the view
 /// models the server registered (`$shell` is the menu, `$pets` the cards of the Adopt page).
 class AppState extends ChangeNotifier {
-  AppState(String url) : client = rt.RouteablesClient(rt.SignalRTransport(url)) {
+  // The Essentials are the device APIs of this app the server may call (the Essentials page tests them).
+  AppState(String url) : client = rt.RouteablesClient(rt.SignalRTransport(url), essentials: flutterEssentials()) {
     client.subscribe((page) => _update(() => this.page = page));
     client.subscribeTo(rt.modalTarget, (modal) => _update(() => this.modal = modal));
     client.subscribeTo(r'$shell', (shell) => _update(() => this.shell = shell));

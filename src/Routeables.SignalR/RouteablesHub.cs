@@ -56,6 +56,9 @@ public class RouteablesHub(IServiceProvider services, RouteableSessions sessions
         current.Greeted = true;   // a client that never says Hello is not waited for when its connection drops
         if (!string.IsNullOrEmpty(hello.Resume) && hello.Resume != current.Token)
         {
+            // The calls that arrive meanwhile (HubOptions.MaximumParallelInvocationsPerClient above 1) wait: they belong to the session
+            // that is resumed, not to the one the connection opened.
+            using var greeting = sessions.BeginGreeting(Context.ConnectionId);
             var context = Context;
             var resumed = await sessions.ResumeAsync(hello.Resume, Context.ConnectionId, Clients.Caller, Context.User, context.Abort).ConfigureAwait(false);
             if (resumed is not null)
@@ -69,69 +72,70 @@ public class RouteablesHub(IServiceProvider services, RouteableSessions sessions
     }
 
     /// <summary>Goes to a route, as the address bar of a browser would.</summary>
-    public Task<RouteableAck> GoTo(string route)
-        => Session.GoToAsync(route, Context.ConnectionAborted);
+    public async Task<RouteableAck> GoTo(string route)
+        => await (await SessionAsync()).GoToAsync(route, Context.ConnectionAborted).ConfigureAwait(false);
 
     /// <summary>
     /// Calls a command of the current view model. SignalR does not support optional parameters: the client always sends the
     /// arguments, an empty array when the command has none.
     /// </summary>
-    public Task<RouteableAck> Invoke(string command, JsonElement[]? arguments)
-        => Session.InvokeAsync(command, arguments);
+    public async Task<RouteableAck> Invoke(string command, JsonElement[]? arguments)
+        => await (await SessionAsync()).InvokeAsync(command, arguments).ConfigureAwait(false);
 
     /// <summary>Sets a property of the current view model.</summary>
-    public Task<RouteableAck> Set(string property, JsonElement value)
-        => Session.SetAsync(property, value);
+    public async Task<RouteableAck> Set(string property, JsonElement value)
+        => await (await SessionAsync()).SetAsync(property, value).ConfigureAwait(false);
 
     /// <summary>Starts to follow a region or a registered view model (<c>$name</c>): the client is told what it shows and what changes.</summary>
-    public Task<RouteableAck> Watch(string target) => Session.WatchAsync(target);
+    public async Task<RouteableAck> Watch(string target) => await (await SessionAsync()).WatchAsync(target).ConfigureAwait(false);
 
     /// <summary>Stops following a target.</summary>
-    public Task<RouteableAck> Unwatch(string target) => Session.UnwatchAsync(target);
+    public async Task<RouteableAck> Unwatch(string target) => await (await SessionAsync()).UnwatchAsync(target).ConfigureAwait(false);
 
     /// <summary>Sends the full state of a target again (a change was lost).</summary>
-    public Task<RouteableAck> Resync(string target) => Session.ResyncAsync(target);
+    public async Task<RouteableAck> Resync(string target) => await (await SessionAsync()).ResyncAsync(target).ConfigureAwait(false);
 
     /// <summary>Goes to a route in the router of a target (the main page is the empty target, a region its name).</summary>
-    public Task<RouteableAck> GoToIn(string target, string route)
-        => Session.GoToInAsync(target, route, Context.ConnectionAborted);
+    public async Task<RouteableAck> GoToIn(string target, string route)
+        => await (await SessionAsync()).GoToInAsync(target, route, Context.ConnectionAborted).ConfigureAwait(false);
 
     /// <summary>Calls a command of the view model a target shows: a method that says so, or a command of its state by path.</summary>
-    public Task<RouteableAck> InvokeOn(string target, string command, JsonElement[]? arguments)
-        => Session.InvokeOnAsync(target, command, arguments);
+    public async Task<RouteableAck> InvokeOn(string target, string command, JsonElement[]? arguments)
+        => await (await SessionAsync()).InvokeOnAsync(target, command, arguments).ConfigureAwait(false);
 
     /// <summary>Sets a property of the view model a target shows.</summary>
-    public Task<RouteableAck> SetOn(string target, string property, JsonElement value)
-        => Session.SetOnAsync(target, property, value);
+    public async Task<RouteableAck> SetOn(string target, string property, JsonElement value)
+        => await (await SessionAsync()).SetOnAsync(target, property, value).ConfigureAwait(false);
 
     /// <summary>Answers a dialog: the index of the button that was chosen.</summary>
-    public Task<RouteableAck> Answer(string id, int button) => Session.AnswerAsync(id, button);
+    public async Task<RouteableAck> Answer(string id, int button) => await (await SessionAsync()).AnswerAsync(id, button).ConfigureAwait(false);
 
     /// <summary>A notification was closed (or clicked when <paramref name="click"/> is true).</summary>
-    public Task<RouteableAck> Dismiss(int id, bool click) => Session.DismissAsync(id, click);
+    public async Task<RouteableAck> Dismiss(int id, bool click) => await (await SessionAsync()).DismissAsync(id, click).ConfigureAwait(false);
 
     /// <summary>
     /// The client says which Essentials services it implements, and their state. Call it after <c>Hello</c> (on the session that was resumed),
     /// and again after each reconnection.
     /// </summary>
-    public Task<RouteableAck> EssentialsReady(EssentialsReady ready) => Session.Essentials.OnReadyAsync(ready);
+    public async Task<RouteableAck> EssentialsReady(EssentialsReady ready)
+        => await (await SessionAsync()).Essentials.OnReadyAsync(ready).ConfigureAwait(false);
 
     /// <summary>The answer of the client to an Essentials call.</summary>
-    public Task EssentialsResult(EssentialsResult result)
-    {
-        Session.Essentials.OnResult(result);
-        return Task.CompletedTask;
-    }
+    public async Task EssentialsResult(EssentialsResult result) => (await SessionAsync()).Essentials.OnResult(result);
 
     /// <summary>An event of a device API of the client, for a subscription the server asked.</summary>
-    public Task EssentialsEvent(EssentialsEvent message)
-    {
-        Session.Essentials.OnEvent(message);
-        return Task.CompletedTask;
-    }
+    public async Task EssentialsEvent(EssentialsEvent message) => (await SessionAsync()).Essentials.OnEvent(message);
 
     private RouteableSession Session
         => sessions.Get(Context.ConnectionId) ?? throw new HubException("The session of this connection is closed.");
+
+    // The session of the connection, once a Hello that resumes another one has ended.
+    private async ValueTask<RouteableSession> SessionAsync()
+    {
+        if (sessions.GreetingOf(Context.ConnectionId) is { } greeting)
+            await greeting.ConfigureAwait(false);
+        return Session;
+    }
 }
 
 /// <summary>
@@ -168,6 +172,27 @@ public sealed class RouteableSessions : IAsyncDisposable
     }
 
     private sealed record Detached(RouteableSession Session, Timer Expiry, long Order);
+
+    // The Hello that resumes a session, by connection: the other calls of the connection wait for it.
+    private readonly ConcurrentDictionary<string, TaskCompletionSource> _greetings = new(StringComparer.Ordinal);
+
+    internal IDisposable BeginGreeting(string connectionId)
+    {
+        var greeting = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        _greetings[connectionId] = greeting;
+        return new Greeting(this, connectionId, greeting);
+    }
+
+    internal Task? GreetingOf(string connectionId) => _greetings.TryGetValue(connectionId, out var greeting) ? greeting.Task : null;
+
+    private sealed class Greeting(RouteableSessions sessions, string connectionId, TaskCompletionSource greeting) : IDisposable
+    {
+        public void Dispose()
+        {
+            sessions._greetings.TryRemove(new KeyValuePair<string, TaskCompletionSource>(connectionId, greeting));
+            greeting.TrySetResult();
+        }
+    }
 
     internal void Add(string connectionId, RouteableSession session)
     {

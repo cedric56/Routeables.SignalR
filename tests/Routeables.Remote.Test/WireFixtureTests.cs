@@ -72,7 +72,7 @@ public class WireFixtureTests
     {
         var random = new Random(56);
         var time = new ManualTime(DateTimeOffset.UnixEpoch.AddDays(20_000));
-        var server = new ReplicationServer(time: time);
+        var server = new ReplicationServer(AllowAllReplicationPolicy.Instance, time: time);
         string[] collections = ["Person", "Note"];
         var devices = new List<Device>();
         for (var i = 0; i < 3; i++)

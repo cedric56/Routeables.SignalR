@@ -36,14 +36,22 @@ public class ReplicationHub(ReplicationServer server) : Hub
     public async Task<PullResult> Pull(PullRequest request)
     {
         ArgumentNullException.ThrowIfNull(request);
+        if (request.Collections is null || request.Collections.Any(c => c is null))
+            throw new HubException("A pull names its collections.");
         if (request.Collections.Count > server.Options.MaxCollectionsPerPull)
             throw new HubException($"At most {server.Options.MaxCollectionsPerPull} collections per pull.");
         var joined = Context.Items.TryGetValue(Joined, out var value) && value is HashSet<string> set ? set : null;
         if (joined is null)
             Context.Items[Joined] = joined = new HashSet<string>(StringComparer.Ordinal);
-        foreach (var collection in request.Collections)
-            if (joined.Add(collection))
-                await Groups.AddToGroupAsync(Context.ConnectionId, GroupOf(collection), Context.ConnectionAborted).ConfigureAwait(false);
+        // Only the collections the user may follow: what moves, and when, is told to those the rules allow (IReplicationPolicy.CanFollow).
+        var added = request.Collections.Where(c => !joined.Contains(c) && server.CanFollow(Context.User, c)).Distinct(StringComparer.Ordinal).ToList();
+        if (joined.Count + added.Count > server.Options.MaxCollectionsPerConnection)
+            throw new HubException($"A connection follows at most {server.Options.MaxCollectionsPerConnection} collections.");
+        foreach (var collection in added)
+        {
+            joined.Add(collection);
+            await Groups.AddToGroupAsync(Context.ConnectionId, GroupOf(collection), Context.ConnectionAborted).ConfigureAwait(false);
+        }
         return await Channel.PullAsync(request, Context.ConnectionAborted).ConfigureAwait(false);
     }
 
@@ -56,15 +64,17 @@ public static class ReplicationExtensions
     /// <summary>
     /// Registers the <see cref="ReplicationServer"/> the hub serves, and the notification of the connected clients when its
     /// log grows. <paramref name="create"/> builds it: its policy (who may write and read what), its store (memory by
-    /// default; a database with Queryeables.Replication), its limits.
+    /// default; a database with Queryeables.Replication), its limits. There is no server by default: one without rules would let
+    /// anyone read and write everything.
     /// </summary>
-    public static IServiceCollection AddRouteablesReplication(this IServiceCollection services, Func<IServiceProvider, ReplicationServer>? create = null)
+    public static IServiceCollection AddRouteablesReplication(this IServiceCollection services, Func<IServiceProvider, ReplicationServer> create)
     {
         ArgumentNullException.ThrowIfNull(services);
+        ArgumentNullException.ThrowIfNull(create);
         services.AddSignalR();
         services.TryAddSingleton(provider =>
         {
-            var server = create?.Invoke(provider) ?? new ReplicationServer();
+            var server = create(provider);
             var hub = provider.GetRequiredService<IHubContext<ReplicationHub>>();
             // A hint to pull, never the data: a notification lost costs only delay, the next pull gets the changes.
             server.Admitted += (entry, documents) =>

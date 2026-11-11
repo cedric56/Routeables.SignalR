@@ -137,8 +137,9 @@ public sealed class RouteableCommandInvoker
             return null;
 
         object? current = viewModel;
-        foreach (var segment in segments)
+        for (var at = 0; at < segments.Length; at++)
         {
+            var segment = segments[at];
             switch (current)
             {
                 case null:
@@ -146,7 +147,7 @@ public sealed class RouteableCommandInvoker
                 case ICommand:
                     return null;   // a path goes on past a command
                 case IDictionary dictionary:
-                    current = dictionary.Contains(segment) ? dictionary[segment] : null;
+                    current = Entry(dictionary, segments, ref at);
                     break;
                 case IList list:
                     current = int.TryParse(segment, System.Globalization.NumberStyles.None, System.Globalization.CultureInfo.InvariantCulture, out var index) && index < list.Count ? list[index] : null;
@@ -161,6 +162,27 @@ public sealed class RouteableCommandInvoker
             }
         }
         return current as ICommand;
+    }
+
+    /// <summary>
+    /// The value of the entry the path names, as the projector named it (the key as invariant text): an <see cref="int"/> key is found by
+    /// its digits, and a key with dots takes as many segments as it has parts (the longest key that matches wins).
+    /// </summary>
+    private static object? Entry(IDictionary dictionary, string[] segments, ref int at)
+    {
+        var names = new Dictionary<string, object?>(StringComparer.Ordinal);
+        foreach (DictionaryEntry entry in dictionary)
+            names.TryAdd(RouteableStateProjector.KeyText(entry.Key), entry.Value);   // the first of two keys with one text, as the projector
+        for (var last = segments.Length - 1; last >= at; last--)
+        {
+            var name = last == at ? segments[at] : string.Join('.', segments, at, last - at + 1);
+            if (names.TryGetValue(name, out var value))
+            {
+                at = last;
+                return value;
+            }
+        }
+        return null;
     }
 
     private async Task<Outcome> InvokeCommandAsync(object viewModel, TypeShape shape, string path, IReadOnlyList<JsonElement> arguments, RouteableAuthorizer? authorizer)

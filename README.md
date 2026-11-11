@@ -79,7 +79,7 @@ The CI checks Routeables out at the revision of the package (`ROUTEABLES_REF` in
 
 ## Run the samples
 
-Every web sample is the same application (the XAnimals pages, the menu, the regions, the dialogs, the notifications, the modal) drawn by another front end, against one server:
+Every web sample is the same application (the XAnimals pages, the menu, the regions, the dialogs, the notifications, the modal) drawn by another front end, against one server. Its **Essentials** page (`/essentials`) tests from the server the device APIs each front end gives (`browserEssentials()` on the web, Flutter plugins in the Flutter sample):
 
 | Sample | Front end | Address |
 | --- | --- | --- |

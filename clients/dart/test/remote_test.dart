@@ -182,4 +182,25 @@ void main() {
       expect(a.pendingCount, 0);
     });
   });
+
+  group('the hybrid clock', () {
+    test('moves to the next millisecond when its counter is used up, as the server does', () {
+      const max = 2147483647;
+      final clock = HybridClock('a', now: () => 1000, last: const Hlc(1000, max, 'a'));
+      final next = clock.next();
+      expect((next.wall, next.counter), (1001, 0));
+
+      final observer = HybridClock('b', now: () => 1000)..observe(const Hlc(1000, max, 'a'));
+      expect(observer.last.compareTo(const Hlc(1000, max, 'a')), greaterThan(0));
+      expect(observer.last.counter, lessThanOrEqualTo(max));
+
+      observer.observe(const Hlc(5000, -1, 'a'));
+      expect(observer.last.wall, 1001);
+    });
+
+    test('refuses an increment no implementation adds exactly', () async {
+      final replica = await Replica.open(MemoryReplicaStorage(), ['Person']);
+      expect(() => replica.edit().increment(const DocumentId('Person', 'p'), 'n', remoteMaxCounter + 1), throwsRangeError);
+    });
+  });
 }

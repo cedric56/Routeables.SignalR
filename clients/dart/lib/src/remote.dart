@@ -17,6 +17,9 @@ abstract final class RemoteErrorCodes {
   static const replicaTaken = 'replica-taken';
   static const outOfOrder = 'out-of-order';
   static const lost = 'lost';
+
+  /// The user cannot be told apart from another one (anonymous, or without an identifier): he reads, and writes nothing.
+  static const unidentified = 'unidentified';
 }
 
 typedef Json = Map<String, Object?>;
@@ -99,6 +102,14 @@ class OpStamp implements Comparable<OpStamp> {
   }
 }
 
+/// The largest counter of a stamp: an int of .NET. When it is used up, the clock moves to the next millisecond rather than wrap around.
+const int _maxStampCounter = 2147483647;
+
+/// The largest value of a counter, and of an increment, either way (2^53 − 1): what a number of JavaScript holds exactly.
+const int remoteMaxCounter = 9007199254740991;
+
+Hlc _after(int wall, int counter, String replica) => counter >= _maxStampCounter ? Hlc(wall + 1, 0, replica) : Hlc(wall, counter + 1, replica);
+
 /// A hybrid logical clock (Kulkarni et al.): never goes back, and moves past every value it observes.
 class HybridClock {
   HybridClock(this.replica, {int Function()? now, Hlc? last})
@@ -113,21 +124,25 @@ class HybridClock {
 
   Hlc next() {
     final wall = max(_now(), _last.wall);
-    _last = wall == _last.wall ? Hlc(wall, _last.counter + 1, replica) : Hlc(wall, 0, replica);
+    _last = wall == _last.wall ? _after(wall, _last.counter, replica) : Hlc(wall, 0, replica);
     return _last;
   }
 
+  /// A value of another replica: the next values come after it. A counter out of range is never sent by a replica: not followed.
   void observe(Hlc remote) {
+    if (remote.counter < 0 || remote.counter > _maxStampCounter) return;
     final last = _last;
     final wall = max(_now(), max(last.wall, remote.wall));
+    if (wall != last.wall && wall != remote.wall) {
+      _last = Hlc(wall, 0, replica);
+      return;
+    }
     final counter = wall == last.wall && wall == remote.wall
         ? max(last.counter, remote.counter)
         : wall == last.wall
             ? last.counter
-            : wall == remote.wall
-                ? remote.counter
-                : -1;
-    _last = Hlc(wall, counter + 1, replica);
+            : remote.counter;
+    _last = _after(wall, counter, replica);
   }
 
   /// Falls back from a clock that ran ahead to the later of now and [floor] (the server's): only after a clock-skew refusal.
@@ -925,7 +940,10 @@ class ChangeBuilder {
   /// Removes the element as this replica sees it: an addition made elsewhere and not seen yet survives.
   ChangeBuilder removeElement(DocumentId document, String field, String element) =>
       _add(document, (view) => [RemoveElement(field, element, view(document)?.tagsOf(field, element) ?? const [])]);
-  ChangeBuilder increment(DocumentId document, String field, int delta) => _add(document, (_) => [IncrementCounter(field, delta)]);
+  ChangeBuilder increment(DocumentId document, String field, int delta) {
+    if (delta < -remoteMaxCounter || delta > remoteMaxCounter) throw RangeError.range(delta, -remoteMaxCounter, remoteMaxCounter, 'delta');
+    return _add(document, (_) => [IncrementCounter(field, delta)]);
+  }
 
   /// Inserts [text] at [position] (UTF-16 code units) of the text this replica sees.
   ChangeBuilder insertText(DocumentId document, String field, int position, String text) => _add(document, (view) {

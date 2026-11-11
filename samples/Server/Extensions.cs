@@ -5,6 +5,7 @@ using Routeables.Abstraction.Guards;
 using Routeables.Abstraction.Registrations;
 using Routeables.Services;
 using Routeables.SignalR;
+using Routeables.SignalR.Essentials;
 using XAnimals.Common;
 using XAnimals.ViewModels;
 
@@ -53,6 +54,10 @@ internal static class Extensions
         services.RegisterPage<MembersViewModel>("members");
         services.RegisterPage<AboutViewModel>("about");
         services.RegisterPage<TabsViewModel>("tabs");
+
+        // The device APIs of the client (Routeables.SignalR.Essentials), tested from the server: a page of this server only.
+        services.AddRouteablesEssentials();
+        services.RegisterPage<EssentialsViewModel>("essentials");
 
         // The pages that the Regions, History and Adopt pages send to their regions.
         services.RegisterPage<LayoutMenuViewModel>("layout-menu");

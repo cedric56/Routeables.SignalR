@@ -194,7 +194,8 @@ public class AngularServerTests : IAsyncLifetime
         await using var connection = new Connection(_provider);
         Assert.True((await connection.Session.WatchAsync("$shell")).Success);
         var entries = Entries(connection.Client);
-        Assert.Equal(13, entries.Count);
+        Assert.Equal(14, entries.Count);
+        Assert.Equal("/essentials", entries[^1]["route"]);
         Assert.Equal("Cats", entries[0]["name"]);
         Assert.Equal("/cats", entries[0]["route"]);
         Assert.All(entries, e => Assert.NotEqual(string.Empty, (string)e["glyph"]!));
@@ -215,6 +216,39 @@ public class AngularServerTests : IAsyncLifetime
             Assert.NotNull(connection.Session.Current);
         }
         Assert.Empty(connection.Client.Failed);
+    }
+
+    // ---------------------------------------------------------------- essentials
+
+    /// <summary>
+    /// The Essentials page of a client that announced none: every test of a device API says it is not supported, and fails so when it runs;
+    /// what runs on the server alone (the file system of the session) works.
+    /// </summary>
+    [Fact]
+    public async Task The_Essentials_page_of_a_client_without_Essentials_says_what_it_cannot_test()
+    {
+        await using var connection = new Connection(_provider);
+        Assert.True((await connection.GoToAsync("/essentials")).Success);
+        Assert.Equal("EssentialsViewModel", connection.Client.ViewModelOf(""));
+        Assert.Contains("announced no Essentials", (string)connection.Client.State("")["summary"]!, StringComparison.Ordinal);
+
+        List<Dictionary<string, object?>> Checks() => [.. ((List<object?>)connection.Client.State("")["checks"]!).Cast<Dictionary<string, object?>>()];
+        Assert.True(Checks().Count > 30);
+        Assert.All(Checks().Where(c => (string)c["service"]! != ""), c => Assert.Equal("unsupported", c["status"]));
+
+        async Task<Dictionary<string, object?>> RunAsync(string name)
+        {
+            var index = Checks().FindIndex(c => (string)c["name"]! == name);
+            var token = (Dictionary<string, object?>)Checks()[index]["runCommand"]!;
+            Assert.True((await connection.Session.InvokeOnAsync("", (string)token["$command"]!, [])).Success);
+            Assert.True(await EventuallyAsync(() => (string)Checks()[index]["status"]! is not ("running" or "ready")));
+            return Checks()[index];
+        }
+
+        var fileSystem = await RunAsync("File system");
+        Assert.Equal("ok", fileSystem["status"]);
+        Assert.Contains("bytes", (string)fileSystem["result"]!, StringComparison.Ordinal);
+        Assert.Equal("unsupported", (await RunAsync("Clipboard"))["status"]);
     }
 
     /// <summary>An unknown route fails and leaves the current page unchanged.</summary>

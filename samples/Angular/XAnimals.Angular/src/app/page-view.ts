@@ -4,6 +4,7 @@ import { AboutPage } from './pages/about';
 import { AdoptPage, PetCard } from './pages/adopt';
 import { AnimalDetail, AnimalList } from './pages/animals';
 import { DialogsPage } from './pages/dialogs';
+import { EssentialsPage } from './pages/essentials';
 import { FeaturesPage } from './pages/features';
 import { HistoryPage } from './pages/history';
 import { LayoutBar, LayoutLogo, LayoutMenu, RegionsPage } from './pages/regions';
@@ -20,7 +21,7 @@ const details = [...['Cat', 'Dog', 'Monkey', 'Elephant', 'Bear'].map(name => `${
 @Component({
   selector: 'app-page',
   imports: [
-    AboutPage, AdoptPage, PetCard, AnimalList, AnimalDetail, DialogsPage, FeaturesPage, HistoryPage, MembersPage,
+    AboutPage, AdoptPage, PetCard, AnimalList, AnimalDetail, DialogsPage, EssentialsPage, FeaturesPage, HistoryPage, MembersPage,
     RegionsPage, LayoutBar, LayoutMenu, LayoutLogo, TabsPage,
   ],
   template: `
@@ -31,6 +32,7 @@ const details = [...['Cat', 'Dog', 'Monkey', 'Elephant', 'Bear'].map(name => `${
       @case ('AdoptViewModel') { <app-adopt [page]="page()" [target]="target()" /> }
       @case ('PetViewModel') { <app-pet [page]="page()" /> }
       @case ('DialogsViewModel') { <app-dialogs [page]="page()" [target]="target()" /> }
+      @case ('EssentialsViewModel') { <app-essentials [page]="page()" [target]="target()" /> }
       @case ('FeaturesViewModel') { <app-features [page]="page()" [target]="target()" /> }
       @case ('HistoryViewModel') { <app-history [page]="page()" [target]="target()" /> }
       @case ('MembersViewModel') { <app-members [page]="page()" [target]="target()" /> }

@@ -24,6 +24,10 @@ public sealed class DocumentState
     private readonly Dictionary<string, Dictionary<string, HashSet<ElementTag>>> _sets = new(StringComparer.Ordinal);
     private readonly Dictionary<string, long> _counters = new(StringComparer.Ordinal);
     private readonly Dictionary<string, List<TextNode>> _texts = new(StringComparer.Ordinal);
+    // The identities of the characters of each text, built when an insertion first needs them: whether one is known costs nothing.
+    private readonly Dictionary<string, HashSet<TextId>> _textIds = new(StringComparer.Ordinal);
+    // Where the last insertion of each text ended: typing anchors the next character there, found without a search.
+    private readonly Dictionary<string, int> _lastInsert = new(StringComparer.Ordinal);
 
     public DocumentState(DocumentId id) => Id = id;
 
@@ -72,6 +76,9 @@ public sealed class DocumentState
                 text.Append(node.Value);
         return text.ToString();
     }
+
+    /// <summary>How many characters a text field holds, the erased ones included: what it weighs.</summary>
+    public int TextSize(string field) => _texts.TryGetValue(field, out var nodes) ? nodes.Count : 0;
 
     /// <summary>The identities of the characters of a text field that are not erased, in order: what an edit refers to.</summary>
     public IReadOnlyList<TextId> TextIds(string field)
@@ -123,31 +130,45 @@ public sealed class DocumentState
             return;
         if (!_texts.TryGetValue(insert.Field, out var nodes))
             _texts[insert.Field] = nodes = [];
+        if (!_textIds.TryGetValue(insert.Field, out var ids))
+            _textIds[insert.Field] = ids = [.. nodes.Select(n => n.Id)];
         var first = new TextId(dot, stamp.Index, 0);
-        if (nodes.Exists(n => n.Id == first))
+        if (ids.Contains(first))
             return;
         var at = 0;
-        if (insert.After is { } after)
-        {
-            var anchor = nodes.FindIndex(n => n.Id == after);
-            at = anchor < 0 ? 0 : anchor + 1;
-        }
+        if (insert.After is { } after && ids.Contains(after))
+            at = (_lastInsert.TryGetValue(insert.Field, out var last) && last < nodes.Count && nodes[last].Id == after
+                ? last
+                : nodes.FindIndex(n => n.Id == after)) + 1;
         while (at < nodes.Count && nodes[at].IsAfter(stamp, 0))
             at++;
         var run = new TextNode[insert.Text.Length];
         for (var offset = 0; offset < run.Length; offset++)
             run[offset] = new TextNode(new TextId(dot, stamp.Index, offset), insert.Text[offset], stamp, false);
         nodes.InsertRange(at, run);
+        foreach (var node in run)
+            ids.Add(node.Id);
+        _lastInsert[insert.Field] = at + run.Length - 1;
     }
 
+    // One pass over the text: the spans are looked up by the insertion they belong to.
     private static void Erase(List<TextNode> nodes, IReadOnlyList<TextSpan> spans)
     {
+        var byInsertion = new Dictionary<(Dot, int), List<TextSpan>>();
+        foreach (var span in spans)
+        {
+            if (!byInsertion.TryGetValue((span.Dot, span.Index), out var list))
+                byInsertion[(span.Dot, span.Index)] = list = [];
+            list.Add(span);
+        }
         for (var i = 0; i < nodes.Count; i++)
         {
             var id = nodes[i].Id;
-            foreach (var span in spans)
+            if (nodes[i].Erased || !byInsertion.TryGetValue((id.Dot, id.Index), out var list))
+                continue;
+            foreach (var span in list)
             {
-                if (span.Dot == id.Dot && span.Index == id.Index && id.Offset >= span.Offset && id.Offset < span.Offset + span.Length)
+                if (id.Offset >= span.Offset && id.Offset < span.Offset + span.Length)
                 {
                     nodes[i] = nodes[i] with { Erased = true };
                     break;

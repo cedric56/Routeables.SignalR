@@ -218,3 +218,21 @@ button.adopt-choice:hover { background: var(--an-canopy); color: var(--an-paper)
 /* A custom transition: the name registered by the page, "Grow", is a CSS animation for .rt-enter.rt-grow (see Routeables.Blazor/wwwroot/theme.css). */
 @keyframes rt-grow { from { opacity: 0; transform: scale(.85); } 60% { transform: scale(1.03); } to { opacity: 1; transform: none; } }
 .rt-enter.rt-grow { animation-name: rt-grow; }
+
+/* Essentials: the device APIs of the client, tested from the server. */
+.essentials-page { display: grid; gap: 1.25rem; }
+.essentials-page .essentials-summary { margin: 0; color: var(--an-muted); }
+.essentials-page .essentials-capabilities { display: flex; flex-wrap: wrap; gap: .3rem; margin: 0; padding: 0; list-style: none; }
+.essentials-page .essentials-capabilities li { padding: .1rem .55rem; border-radius: 999px; background: var(--an-canopy-soft); font-size: .8rem; }
+.essentials-page .essentials-group { display: grid; gap: .5rem; }
+.essentials-page .essentials-group h2 { margin: .25rem 0 0; font-size: 1.05rem; }
+.essentials-page .essentials-check { display: grid; grid-template-columns: 1fr auto; gap: .2rem 1rem; align-items: center; padding: .7rem .9rem; border: 1px solid var(--an-line); border-radius: 12px; background: var(--an-paper); }
+.essentials-page .essentials-check.unsupported { opacity: .6; }
+.essentials-page .essentials-name { font-weight: 600; display: flex; gap: .5rem; align-items: center; }
+.essentials-page .essentials-description { grid-column: 1; margin: 0; color: var(--an-muted); font-size: .85rem; }
+.essentials-page .essentials-check button { grid-column: 2; grid-row: 1 / span 2; }
+.essentials-page .essentials-result { grid-column: 1 / -1; margin: .2rem 0 0; font-family: ui-monospace, monospace; font-size: .8rem; white-space: pre-wrap; word-break: break-word; }
+.essentials-page .essentials-status { padding: .05rem .5rem; border-radius: 999px; font-size: .7rem; font-weight: 600; text-transform: uppercase; letter-spacing: .03em; background: var(--an-lichen); color: var(--an-muted); }
+.essentials-page .essentials-status.ok { background: var(--an-canopy); color: #fff; }
+.essentials-page .essentials-status.running { background: var(--an-saffron); color: var(--an-ink); }
+.essentials-page .essentials-status.failed, .essentials-page .essentials-status.denied { background: #B3412F; color: #fff; }

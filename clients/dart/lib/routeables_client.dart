@@ -7,6 +7,7 @@
 library;
 
 export 'src/client.dart';
+export 'src/essentials.dart';
 export 'src/patch.dart' show applyPatch;
 export 'src/remote.dart';
 export 'src/remote_signalr.dart';

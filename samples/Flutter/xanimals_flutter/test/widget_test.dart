@@ -102,6 +102,20 @@ void main() {
     await draw(tester, page('AboutViewModel', {'polarBearsCommand': command('polarBearsCommand')}, route: '/about'));
     expect(find.text('Polar bears'), findsOneWidget);
 
+    await draw(tester, page('EssentialsViewModel', {
+      'summary': 'This client announced 2 services: 2 of the 3 tests can run.',
+      'capabilities': ['battery', 'clipboard'],
+      'checks': [
+        {'group': 'Device', 'name': 'Battery', 'description': 'IBattery', 'label': 'Read', 'supported': true, 'status': 'ok', 'result': '80 %', 'runCommand': command('checks.0.runCommand')},
+        {'group': 'Communication', 'name': 'Clipboard', 'description': 'IClipboard', 'label': 'Copy and paste', 'supported': true, 'status': 'ready', 'result': '', 'runCommand': command('checks.1.runCommand')},
+        {'group': 'Media', 'name': 'Text to speech', 'description': 'ITextToSpeech', 'label': 'Speak', 'supported': false, 'status': 'unsupported', 'result': '', 'runCommand': command('checks.2.runCommand')},
+      ],
+    }, route: '/essentials'));
+    expect(find.text('Communication'), findsOneWidget);
+    expect(find.text('80 %'), findsOneWidget);
+    final speak = tester.widget<FilledButton>(find.ancestor(of: find.text('Speak'), matching: find.byType(FilledButton)));
+    expect(speak.onPressed, isNull);
+
     await draw(tester, page('UnknownViewModel', {}));
     expect(find.text('No view for UnknownViewModel.'), findsOneWidget);
   });

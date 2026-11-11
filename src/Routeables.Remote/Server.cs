@@ -39,6 +39,12 @@ public interface IReplicationPolicy
 
     /// <summary>Whether the user may read a document: decides what a pull or a snapshot sends to this user.</summary>
     bool CanRead(ClaimsPrincipal? user, DocumentId document, DocumentState? state);
+
+    /// <summary>
+    /// Whether the user is told when a collection moves on (<c>LogAdvanced</c>: its name and the position, never a document). Every user
+    /// by default; refuse it for a collection whose activity alone tells too much (the user still pulls what he may read).
+    /// </summary>
+    bool CanFollow(ClaimsPrincipal? user, string collection) => true;
 }
 
 /// <summary>Admits everything, lets everyone read everything: tests and closed networks only.</summary>
@@ -69,6 +75,21 @@ public sealed class ReplicationServerOptions
     /// <summary>How many collections one pull or one snapshot may name.</summary>
     public int MaxCollectionsPerPull { get; set; } = 64;
 
+    /// <summary>
+    /// How many collections one connection may follow (<see cref="LogAdvanced"/>), all its pulls together: what the server keeps for it
+    /// stays bounded. 256 by default.
+    /// </summary>
+    public int MaxCollectionsPerConnection { get; set; } = 256;
+
+    /// <summary>How many characters one text field may hold, the erased ones included (they stay for the anchors). 1 000 000 by default.</summary>
+    public int MaxTextLength { get; set; } = 1_000_000;
+
+    /// <summary>
+    /// How many snapshots are made at once. A snapshot does not stop the writes (it reads the documents between two of them), but each
+    /// one reads whole collections. 4 by default.
+    /// </summary>
+    public int MaxConcurrentSnapshots { get; set; } = 4;
+
     /// <summary>How many decisions are remembered per replica, to answer a push sent again after a lost answer.</summary>
     public int RememberedAcksPerReplica { get; set; } = 1024;
 }
@@ -84,12 +105,23 @@ public sealed class ReplicationServer
     private readonly TimeProvider _time;
     // One decision at a time: the order of admission is the order of the log, and a rule sees the state it decides on.
     private readonly SemaphoreSlim _admission = new(1, 1);
+    private readonly SemaphoreSlim _snapshots;
 
-    public ReplicationServer(IReplicationPolicy? policy = null, ReplicationServerOptions? options = null, TimeProvider? time = null,
+    /// <param name="policy">
+    /// Who may write and read what: always given, since nothing is shared without a rule (<see cref="AllowAllReplicationPolicy"/> lets anyone
+    /// identified write and read everything, on purpose).
+    /// </param>
+    /// <param name="options">The limits.</param>
+    /// <param name="time">The clock (tests).</param>
+    /// <param name="store">Where the log and the documents are kept: memory by default.</param>
+    /// <param name="replica">The replica of the server's clock.</param>
+    public ReplicationServer(IReplicationPolicy policy, ReplicationServerOptions? options = null, TimeProvider? time = null,
         IReplicationStore? store = null, ReplicaId? replica = null)
     {
-        _policy = policy ?? AllowAllReplicationPolicy.Instance;
+        ArgumentNullException.ThrowIfNull(policy);
+        _policy = policy;
         Options = options ?? new ReplicationServerOptions();
+        _snapshots = new SemaphoreSlim(Math.Max(1, Options.MaxConcurrentSnapshots));
         _time = time ?? TimeProvider.System;
         Store = store ?? new MemoryReplicationStore();
         Clock = new HybridClock(replica ?? ReplicaId.New(), _time);
@@ -109,6 +141,9 @@ public sealed class ReplicationServer
     /// (<see cref="LogAdvanced"/>) or updates a read model.
     /// </summary>
     public event Action<LogEntry, IReadOnlyCollection<DocumentId>>? Admitted;
+
+    /// <summary>Whether <paramref name="user"/> is told when <paramref name="collection"/> moves on (<see cref="IReplicationPolicy.CanFollow"/>).</summary>
+    public bool CanFollow(ClaimsPrincipal? user, string collection) => _policy.CanFollow(user, collection);
 
     /// <summary>A channel for one connected client, authenticated as <paramref name="user"/>.</summary>
     public IReplicationChannel Connect(ClaimsPrincipal? user) => new Channel(this, user);
@@ -130,8 +165,22 @@ public sealed class ReplicationServer
         }
     }
 
-    private static string UserKey(ClaimsPrincipal? user)
-        => user?.FindFirst(ClaimTypes.NameIdentifier)?.Value ?? user?.Identity?.Name ?? string.Empty;
+    /// <summary>
+    /// Who owns a replica: the scheme, the issuer and the identifier of an authenticated user (<c>NameIdentifier</c>, else <c>sub</c>), as for
+    /// the sessions of Routeables.SignalR; <see langword="null"/> for a user that cannot be told apart from another one (anonymous, or
+    /// without an identifier), who then writes nothing.
+    /// </summary>
+    internal static string? UserKey(ClaimsPrincipal? user)
+    {
+        var identity = user?.Identity;
+        if (identity is not { IsAuthenticated: true })
+            return null;
+        var claim = user!.FindFirst(ClaimTypes.NameIdentifier) ?? user.FindFirst("sub");
+        if (claim is null || string.IsNullOrWhiteSpace(claim.Value))
+            return null;
+        var scheme = identity.AuthenticationType ?? string.Empty;
+        return $"{scheme.Length}:{scheme}|{claim.Issuer.Length}:{claim.Issuer}|{claim.Value}";
+    }
 
     private long LatestAllowedWall() => _time.GetUtcNow().Add(Options.MaxClockSkew).ToUnixTimeMilliseconds();
 
@@ -155,6 +204,8 @@ public sealed class ReplicationServer
     private async Task<PushResult> PushAsync(ClaimsPrincipal? user, PushRequest request, CancellationToken ct)
     {
         ArgumentNullException.ThrowIfNull(request);
+        if (request.Changes is null || request.Changes.Any(c => c is null))
+            throw new ArgumentException("A push holds changes.", nameof(request));
         if (request.Changes.Count > Options.MaxChangesPerPush)
             throw new ArgumentException($"At most {Options.MaxChangesPerPush} changes per push.", nameof(request));
 
@@ -174,7 +225,10 @@ public sealed class ReplicationServer
 
     private async Task<ChangeAck> AdmitAsync(ClaimsPrincipal? user, Change change, CancellationToken ct)
     {
-        var owner = UserKey(user);
+        // Anyone may read the replica of a change in the log: only a user told apart from the others may own one.
+        if (UserKey(user) is not { } owner)
+            return new ChangeAck(change.Dot, AckStatus.Rejected, Code: RemoteErrorCodes.Unidentified,
+                Message: "An anonymous user, or one without an identifier, cannot write: sign in.");
         var record = await Store.FindReplicaAsync(change.Dot.Replica, ct) ?? new ReplicaRecord(change.Dot.Replica, owner, 0, []);
         if (record.User != owner)
             return new ChangeAck(change.Dot, AckStatus.Rejected, Code: RemoteErrorCodes.ReplicaTaken, Message: "This replica belongs to another user.");
@@ -207,16 +261,29 @@ public sealed class ReplicationServer
         ChangeAck ack;
         if (decision.Accepted)
         {
-            var head = await Store.HeadAsync(ct);
-            entry = new LogEntry(head.Position + 1, change);
             foreach (var id in change.Ops.Select(o => o.Document).Distinct())
             {
                 var state = await Current(id) ?? new DocumentState(id);
                 for (var index = 0; index < change.Ops.Count; index++)
-                    if (change.Ops[index].Document == id)
-                        state.Apply(change.Ops[index].Op, new OpStamp(change.Stamp, index), change.Dot);
+                {
+                    if (change.Ops[index].Document != id)
+                        continue;
+                    // The sum of a counter stays where every implementation adds it exactly.
+                    if (change.Ops[index].Op is Increment increment && Math.Abs(state.Counter(increment.Field) + increment.Delta) > RemoteProtocol.MaxCounter)
+                        decision = Admission.Reject(RemoteErrorCodes.TooLarge, $"The counter '{increment.Field}' would go beyond ±{RemoteProtocol.MaxCounter}.");
+                    if (change.Ops[index].Op is InsertText insert && (long)state.TextSize(insert.Field) + insert.Text.Length > Options.MaxTextLength)
+                        decision = Admission.Reject(RemoteErrorCodes.TooLarge, $"The text '{insert.Field}' would hold more than {Options.MaxTextLength} characters.");
+                    state.Apply(change.Ops[index].Op, new OpStamp(change.Stamp, index), change.Dot);
+                }
                 changed.Add(state);
             }
+            if (!decision.Accepted)
+                changed.Clear();
+        }
+        if (decision.Accepted)
+        {
+            var head = await Store.HeadAsync(ct);
+            entry = new LogEntry(head.Position + 1, change);
             ack = new ChangeAck(change.Dot, AckStatus.Accepted, entry.Position);
         }
         else
@@ -236,9 +303,36 @@ public sealed class ReplicationServer
         return ack;
     }
 
+    // What a change must hold to be read at all: what is deserialized may lack anything.
+    private static string? Malformed(Change change)
+    {
+        if (change.Ops is null)
+            return "A change has operations.";
+        foreach (var op in change.Ops)
+        {
+            if (op is null || op.Document.Collection is null || op.Document.Key is null || op.Op is null)
+                return "An operation names its document and what it does.";
+            var complete = op.Op switch
+            {
+                SetField set => set.Field is not null,
+                AddElement add => add.Field is not null && add.Element is not null,
+                RemoveElement remove => remove.Field is not null && remove.Element is not null && remove.Observed is not null,
+                Increment increment => increment.Field is not null,
+                InsertText insert => insert.Field is not null && insert.Text is not null,
+                EraseText erase => erase.Field is not null && erase.Spans is not null,
+                _ => true,
+            };
+            if (!complete)
+                return $"An operation '{op.Op.GetType().Name}' lacks a field, an element, a text or a list.";
+        }
+        return null;
+    }
+
     // The limits every change must respect, before the rules of the application.
     private Admission Check(Change change)
     {
+        if (Malformed(change) is { } malformed)
+            return Admission.Reject(RemoteErrorCodes.Invalid, malformed);
         if (change.Ops.Count == 0)
             return Admission.Reject(RemoteErrorCodes.Invalid, "A change has at least one operation.");
         if (change.Ops.Count > Options.MaxOpsPerChange)
@@ -247,6 +341,8 @@ public sealed class ReplicationServer
             return Admission.Reject(RemoteErrorCodes.Invalid, "A change is stamped by its own replica.");
         if (change.Stamp.Wall > LatestAllowedWall())
             return Admission.Reject(RemoteErrorCodes.ClockSkew, "The change is stamped in the future: the clock of the device is wrong.");
+        if (change.Stamp.Counter < 0)
+            return Admission.Reject(RemoteErrorCodes.Invalid, "The counter of a stamp starts at 0.");
         foreach (var op in change.Ops)
         {
             var length = op.Op switch
@@ -258,6 +354,8 @@ public sealed class ReplicationServer
                 EraseText erase => erase.Spans.Count,
                 _ => 0,
             };
+            if (op.Op is Increment { Delta: < -RemoteProtocol.MaxCounter or > RemoteProtocol.MaxCounter })
+                return Admission.Reject(RemoteErrorCodes.TooLarge, $"An increment is at most ±{RemoteProtocol.MaxCounter}.");
             if (length > Options.MaxValueLength || op.Document.Key.Length > 256 || op.Document.Collection.Length > 256)
                 return Admission.Reject(RemoteErrorCodes.TooLarge, "A value, a key or a collection name is too long.");
             if (op.Op is InsertText { After: { } after } && after.Dot.Seq <= 0 || op.Op is EraseText e && e.Spans.Any(s => s.Length <= 0))
@@ -269,6 +367,8 @@ public sealed class ReplicationServer
     private HashSet<string> Collections(IReadOnlyList<string> collections)
     {
         ArgumentNullException.ThrowIfNull(collections);
+        if (collections.Any(c => c is null))
+            throw new ArgumentException("A collection has a name.", nameof(collections));
         if (collections.Count > Options.MaxCollectionsPerPull)
             throw new ArgumentException($"At most {Options.MaxCollectionsPerPull} collections per pull.", nameof(collections));
         return collections.ToHashSet(StringComparer.Ordinal);
@@ -284,6 +384,10 @@ public sealed class ReplicationServer
             return new PullResult([], request.Since, More: false, SnapshotRequired: true);
 
         var read = await Store.ReadAsync(request.Since, head.Position, collections, max, ct);
+        // The log may have been compacted between the two reads: the entries after the cursor that were removed are not in what was
+        // read, and the client would move past them. It starts again from a snapshot instead.
+        if (request.Since < (await Store.HeadAsync(ct)).Horizon)
+            return new PullResult([], request.Since, More: false, SnapshotRequired: true);
         var visibility = new Dictionary<DocumentId, bool>();
         var entries = new List<LogEntry>(read.Count);
         foreach (var entry in read)
@@ -310,19 +414,38 @@ public sealed class ReplicationServer
     {
         ArgumentNullException.ThrowIfNull(request);
         var collections = Collections(request.Collections);
-        // Between two decisions: the documents hold exactly the log up to the position given with them.
-        await _admission.WaitAsync(ct);
+        await _snapshots.WaitAsync(ct);
         try
         {
-            var head = await Store.HeadAsync(ct);
-            var documents = await Store.DocumentsAsync(collections, ct);
-            return new SnapshotResult([.. documents.Where(d => _policy.CanRead(user, d.Id, d)).Select(d => d.ToSnapshot())], head.Position);
+            // The documents hold exactly the log up to the position given with them. They are read between two decisions without
+            // stopping the writes: when no change was admitted while they were read (the position did not move; a decision writes its
+            // entry and its documents at once), they are those of that position. A log too busy for that is read between two decisions.
+            for (var attempt = 0; attempt < 3; attempt++)
+            {
+                var before = await Store.HeadAsync(ct);
+                var documents = await Store.DocumentsAsync(collections, ct);
+                if ((await Store.HeadAsync(ct)).Position == before.Position)
+                    return Snapshot(user, documents, before.Position);
+            }
+            await _admission.WaitAsync(ct);
+            try
+            {
+                var head = await Store.HeadAsync(ct);
+                return Snapshot(user, await Store.DocumentsAsync(collections, ct), head.Position);
+            }
+            finally
+            {
+                _admission.Release();
+            }
         }
         finally
         {
-            _admission.Release();
+            _snapshots.Release();
         }
     }
+
+    private SnapshotResult Snapshot(ClaimsPrincipal? user, IReadOnlyList<DocumentState> documents, long position)
+        => new([.. documents.Where(d => _policy.CanRead(user, d.Id, d)).Select(d => d.ToSnapshot())], position);
 
     private sealed class Channel(ReplicationServer server, ClaimsPrincipal? user) : IReplicationChannel
     {
