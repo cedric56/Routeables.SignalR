@@ -1,4 +1,4 @@
-<Project Sdk="Microsoft.NET.Sdk">
+﻿<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
     <TargetFramework>net10.0</TargetFramework>
@@ -17,20 +17,6 @@
     <FrameworkReference Include="Microsoft.AspNetCore.App" />
   </ItemGroup>
 
-  <!--
-    Routeables: its sources, checked out next to this repository (RouteablesRoot), while it is developed; its packages when RouteablesVersion
-    is given (dotnet pack -p:RouteablesVersion=2.0.0), so that the package of Routeables.SignalR depends on published packages only.
-  -->
-  <ItemGroup Condition="'$(RouteablesVersion)' == ''">
-    <ProjectReference Include="$(RouteablesRoot)src\Routeables.Core\Routeables.Core.csproj" />
-    <ProjectReference Include="$(RouteablesRoot)src\Routeables.Abstraction\Routeables.Abstraction.csproj" />
-    <ProjectReference Include="$(RouteablesRoot)src\Routeables.Segments\Routeables.Segments.csproj" />
-  </ItemGroup>
-  <ItemGroup Condition="'$(RouteablesVersion)' != ''">
-    <PackageReference Include="Routeables" Version="$(RouteablesVersion)" />
-    <PackageReference Include="Routeables.Abstraction" Version="$(RouteablesVersion)" />
-  </ItemGroup>
-
   <!-- The Routeables Remote Protocol, served by ReplicationHub: a package of its own (no dependency), at the version of this one. -->
   <ItemGroup>
     <ProjectReference Include="..\Routeables.Remote\Routeables.Remote.csproj" />
@@ -38,6 +24,10 @@
 
   <ItemGroup>
     <InternalsVisibleTo Include="Routeables.SignalR.Test" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Routeables" Version="2.1.0" />
   </ItemGroup>
 
 </Project>

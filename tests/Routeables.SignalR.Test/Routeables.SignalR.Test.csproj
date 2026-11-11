@@ -27,12 +27,6 @@
     <ProjectReference Include="..\..\src\Routeables.SignalR.Essentials\Routeables.SignalR.Essentials.csproj" />
   </ItemGroup>
 
-  <!-- Routeables: its sources while it is developed; its packages, through Routeables.SignalR, when RouteablesVersion is given (the release). -->
-  <ItemGroup Condition="'$(RouteablesVersion)' == ''">
-    <ProjectReference Include="$(RouteablesRoot)src\Routeables.Routing\Routeables.Routing.csproj" />
-    <ProjectReference Include="$(RouteablesRoot)src\Routeables.Services\Routeables.Services.csproj" />
-  </ItemGroup>
-
   <ItemGroup>
     <Using Include="Xunit" />
     <Using Include="Microsoft.Extensions.DependencyInjection" />
