@@ -1,4 +1,4 @@
-using System.Runtime.CompilerServices;
+using System.Reflection;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 
@@ -10,9 +10,10 @@ namespace Routeables.Remote.Tests;
 /// </summary>
 public class WireFixtureTests
 {
-    private static string FixturePath([CallerFilePath] string source = "")
+    // RRP_FIXTURE, else the path the project gave at build time (see the csproj: [CallerFilePath] is /_/... in a deterministic CI build).
+    private static string FixturePath()
         => Environment.GetEnvironmentVariable("RRP_FIXTURE")
-           ?? Path.GetFullPath(Path.Combine(Path.GetDirectoryName(source)!, "..", "..", "clients", "fixtures", "remote-v1.json"));
+           ?? typeof(WireFixtureTests).Assembly.GetCustomAttributes<AssemblyMetadataAttribute>().Single(a => a.Key == "RrpFixture").Value!;
 
     /// <summary>What a document shows, field by field, sorted: compared as JSON across languages.</summary>
     internal static JsonObject Fingerprint(DocumentState state)

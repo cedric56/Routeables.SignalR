@@ -29,4 +29,15 @@
     <Using Include="Xunit" />
   </ItemGroup>
 
+  <!--
+    Where the shared fixture of the clients is, as a full path known at build time. Not [CallerFilePath]: a CI build is deterministic and maps
+    the source paths to /_/, where nothing is. The fixture is read there, and written there with RRP_WRITE_FIXTURE=1.
+  -->
+  <ItemGroup>
+    <AssemblyAttribute Include="System.Reflection.AssemblyMetadataAttribute">
+      <_Parameter1>RrpFixture</_Parameter1>
+      <_Parameter2>$([MSBuild]::NormalizePath('$(MSBuildThisFileDirectory)../../clients/fixtures/remote-v1.json'))</_Parameter2>
+    </AssemblyAttribute>
+  </ItemGroup>
+
 </Project>
