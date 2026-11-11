@@ -4,7 +4,8 @@ The server of every sample: Angular, Vue, React and Flutter draw the same view m
 
 ```
 Angular · Vue · React · Flutter  ──SignalR (/routeables)──▶  XAnimals.Server
-                                                             the view models of XAnimals.ViewModels (Routeables, samples/Bases)
+                                                             the view models of XAnimals.ViewModels (samples/XAnimals: the sources of Routeables,
+                                                             compiled against the Routeables package)
 ```
 
 ## Run it

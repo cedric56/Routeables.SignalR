@@ -24,9 +24,10 @@ env:
   DOTNET_NOLOGO: true
   DOTNET_CLI_TELEMETRY_OPTOUT: true
   CONFIGURATION: Release
-  # The revision of Routeables this repository is built and tested against. Move it on purpose, in its own commit:
-  # a change of Routeables never breaks this build by surprise.
-  ROUTEABLES_REF: ${{ github.event.inputs.routeables-ref || '649af26d6776733749c25751a6b61892fc310559' }}
+  # Routeables.SignalR depends on the Routeables package (RouteablesPackageVersion, Directory.Build.props). The repository of Routeables is
+  # checked out only for the sources of the XAnimals view models the samples are built from (samples/XAnimals): at the revision of that
+  # package (2.1.0). Move both together, on purpose.
+  ROUTEABLES_REF: ${{ github.event.inputs.routeables-ref || 'ad5b719409425bfb77d0c34be101c21b8f098c1e' }}
   # The revision of Essentieables whose Essentieables.Facades Routeables.SignalR.Essentials is built against: pin it the same way.
   ESSENTIEABLES_REF: ${{ github.event.inputs.essentieables-ref || 'master' }}
 
@@ -37,7 +38,7 @@ jobs:
     timeout-minutes: 20
 
     steps:
-      # The projects reference the sources of Routeables, checked out next to this repository (RouteablesRoot, ../Routeables by default).
+      # The samples compile the XAnimals view models of Routeables, checked out next to this repository (RouteablesRoot, ../Routeables by default).
       - name: Checkout Routeables.SignalR
         uses: actions/checkout@v7
         with:
@@ -81,7 +82,7 @@ jobs:
         run: dotnet test --project tests/Routeables.SignalR.Test.Angular/Routeables.SignalR.Test.Angular.csproj --no-build -c ${{ env.CONFIGURATION }}
         working-directory: Routeables.SignalR
 
-      - name: Pack (sources of Routeables)
+      - name: Pack
         run: |
           dotnet pack src/Routeables.Remote/Routeables.Remote.csproj --no-build -c ${{ env.CONFIGURATION }} -o ../artifacts
           dotnet pack src/Routeables.SignalR/Routeables.SignalR.csproj --no-build -c ${{ env.CONFIGURATION }} -o ../artifacts

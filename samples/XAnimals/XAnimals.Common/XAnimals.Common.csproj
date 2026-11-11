@@ -1,0 +1,27 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    XAnimals.Common of the Routeables repository (samples/Bases/XAnimals.Common): What the view models of the samples and the modules share (the bases of a view model, an animal, the icons).
+    Its sources are compiled here against the Routeables package that Routeables.SignalR depends on, not with the projects of Routeables
+    (they would bring a second copy of each Routeables assembly). RouteablesRoot says where Routeables is checked out; its revision must match
+    the package (ROUTEABLES_REF in the CI).
+  -->
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <IsPackable>false</IsPackable>
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+    <XAnimalsSources>$(RouteablesRoot)samples\Bases\XAnimals.Common\</XAnimalsSources>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Compile Include="$(XAnimalsSources)**\*.cs" Exclude="$(XAnimalsSources)bin\**;$(XAnimalsSources)obj\**" Link="%(RecursiveDir)%(Filename)%(Extension)" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Routeables" Version="$(RouteablesPackageVersion)" />
+  </ItemGroup>
+
+</Project>

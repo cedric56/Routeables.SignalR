@@ -96,6 +96,7 @@ The first version meant for production. It changes the protocol (2) and some def
 ### Build and distribution
 
 - Builds against the current Routeables (`GetEntries` / `IMenuEntry`); the CI pins the revision of Routeables (`ROUTEABLES_REF`).
+- Depends on the Routeables package (2.1.0) instead of its sources. The XAnimals view models of the samples are compiled against the same package (`samples/XAnimals`), and the generator of routes of Routeables runs only in `XAnimals.ViewModels`, as in Routeables.
 - The CounterServer sample is removed: the web samples show the library. The server of the samples is `samples/Server` (XAnimals.Server), shared by Angular, Vue, React and Flutter; it was `samples/Angular/XAnimals.AngularServer`.
 - A React web sample, beside Angular and Vue: the same application against the same server, each built and driven in Chrome by the CI (`tests/samples/smoke.mjs`).
 - `-p:RouteablesVersion=…` builds and packs against the Routeables packages; a release workflow publishes the NuGet and npm packages from a tag, after installing the NuGet package in an empty application.

@@ -64,19 +64,18 @@ await client.invoke('approveAsync', 42);   // resolves when the command has ende
 
 ## Build
 
-The projects reference the sources of Routeables (and Routeables.SignalR.Essentials those of Essentieables.Facades), so check the repositories out side by side:
+Routeables.SignalR depends on the **Routeables package** (`RouteablesPackageVersion` in [Directory.Build.props](Directory.Build.props), 2.1.0), and Routeables.SignalR.Essentials on the Essentieables.Facades package. The samples also need the **sources of the XAnimals view models** of Routeables (`samples/Bases`, `samples/Modules`), which are not packaged: [samples/XAnimals](samples/XAnimals) compiles them against the same package. So check Routeables out next to this repository, at the revision of that package:
 
 ```
 git clone https://github.com/cedric56/Routeables
-git clone https://github.com/cedric56/Essentieables
 git clone https://github.com/cedric56/Routeables.SignalR
 cd Routeables.SignalR
 dotnet build Routeables.SignalR.slnx
 ```
 
-Needs the .NET 10 SDK and Node.js 22. Routeables is expected in `../Routeables`; set `-p:RouteablesRoot=<path>\` (with the trailing separator) to use another place. Essentieables is expected in `../Essentieables` (`-p:EssentieablesRoot=<path>\`). The sample server also uses the view models of the XAnimals samples of Routeables (`samples/Bases`).
+Needs the .NET 10 SDK and Node.js 22. Routeables is expected in `../Routeables`; set `-p:RouteablesRoot=<path>\` (with the trailing separator) to use another place. Only the samples use it: the library and its tests build from the packages alone.
 
-The CI builds against one revision of Routeables (`ROUTEABLES_REF` in [.github/workflows/ci.yml](.github/workflows/ci.yml)), so that a change of Routeables never breaks this build by surprise: move it on purpose. To build against the published packages of Routeables instead of its sources, give their version: `dotnet build -p:RouteablesVersion=2.0.0` (the release does so: the NuGet package depends on packages only). The same goes for Essentieables.Facades: `ESSENTIEABLES_REF` in the CI, `-p:EssentieablesVersion=1.0.0` for its package.
+The CI checks Routeables out at the revision of the package (`ROUTEABLES_REF` in [.github/workflows/ci.yml](.github/workflows/ci.yml)). To move to another version of Routeables, move both together: `RouteablesPackageVersion` and `ROUTEABLES_REF` (a revision whose XAnimals sources build against that package). The projects of Routeables are never referenced directly: with the package, they would bring a second copy of each Routeables assembly (CS1704).
 
 ## Run the samples
 

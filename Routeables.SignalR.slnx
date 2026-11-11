@@ -16,6 +16,10 @@
   <Folder Name="/samples/Server/">
     <File Path="samples/Server/README.md" />
     <Project Path="samples/Server/XAnimals.Server.csproj" />
+    <File Path="samples/XAnimals/README.md" />
+    <Project Path="samples/XAnimals/XAnimals.Birds/XAnimals.Birds.csproj" />
+    <Project Path="samples/XAnimals/XAnimals.Common/XAnimals.Common.csproj" />
+    <Project Path="samples/XAnimals/XAnimals.ViewModels/XAnimals.ViewModels.csproj" />
   </Folder>
   <Folder Name="/samples/Vue/">
     <File Path="samples/Vue/README.md" />

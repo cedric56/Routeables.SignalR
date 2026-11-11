@@ -6,4 +6,15 @@
   <ItemGroup Condition="'$(IsPackable)' != 'false' And '$(OutputType)' == 'Library' And '$(PackageIcon)' != ''">
     <None Include="$(MSBuildThisFileDirectory)images/icon.png" Pack="true" PackagePath="" Visible="false" />
   </ItemGroup>
+
+  <!--
+    The Routeables package carries its generator of routes, which reaches every project that depends on it, directly or not. Here it runs only
+    where routes are declared for it, as in the Routeables repository (XAnimals.ViewModels sets UseRouteablesGenerator): elsewhere it would add
+    a RouteRegistration to the library, the server and the tests, which see one another's internals (CS0436), and register the routes twice.
+  -->
+  <Target Name="RemoveRouteablesGenerator" AfterTargets="ResolveLockFileAnalyzers" Condition="'$(UseRouteablesGenerator)' != 'true'">
+    <ItemGroup>
+      <Analyzer Remove="@(Analyzer)" Condition="'%(Filename)' == 'Routeables.Generated'" />
+    </ItemGroup>
+  </Target>
 </Project>

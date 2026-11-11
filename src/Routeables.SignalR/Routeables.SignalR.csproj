@@ -27,7 +27,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <PackageReference Include="Routeables" Version="2.1.0" />
+    <PackageReference Include="Routeables" Version="$(RouteablesPackageVersion)" />
   </ItemGroup>
 
 </Project>

@@ -7,8 +7,9 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <ProjectReference Include="$(RouteablesRoot)samples\Bases\XAnimals.Common\XAnimals.Common.csproj" />
-    <ProjectReference Include="$(RouteablesRoot)samples\Bases\XAnimals.ViewModels\XAnimals.ViewModels.csproj" />
+    <!-- The XAnimals view models of Routeables, compiled against the Routeables package (see samples/XAnimals). -->
+    <ProjectReference Include="..\XAnimals\XAnimals.Common\XAnimals.Common.csproj" />
+    <ProjectReference Include="..\XAnimals\XAnimals.ViewModels\XAnimals.ViewModels.csproj" />
     <ProjectReference Include="..\..\src\Routeables.SignalR\Routeables.SignalR.csproj" />
   </ItemGroup>
 

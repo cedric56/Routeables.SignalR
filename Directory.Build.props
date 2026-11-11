@@ -4,7 +4,13 @@
     <VersionPrefix>2.0.0</VersionPrefix>
     <Version Condition="'$(VersionSuffix)' == ''">$(VersionPrefix)</Version>
     <Version Condition="'$(VersionSuffix)' != ''">$(VersionPrefix)-$(VersionSuffix)</Version>
-    <!-- Where the Routeables repository is checked out: next to this one by default. The projects reference its sources. -->
+    <!-- The version of the Routeables package that Routeables.SignalR depends on, and that the samples are built against. -->
+    <RouteablesPackageVersion Condition="'$(RouteablesPackageVersion)' == '' And '$(RouteablesVersion)' != ''">$(RouteablesVersion)</RouteablesPackageVersion>
+    <RouteablesPackageVersion Condition="'$(RouteablesPackageVersion)' == ''">2.1.0</RouteablesPackageVersion>
+    <!--
+      Where the Routeables repository is checked out: next to this one by default. Only the samples use it, for the sources of the XAnimals view
+      models (samples/XAnimals); its revision must match RouteablesPackageVersion.
+    -->
     <RouteablesRoot Condition="'$(RouteablesRoot)' == ''">$(MSBuildThisFileDirectory)..\Routeables\</RouteablesRoot>
     <!--
       As a full path without "..": the projects of Routeables reference one another by their own relative paths, and NuGet in Visual Studio must see
