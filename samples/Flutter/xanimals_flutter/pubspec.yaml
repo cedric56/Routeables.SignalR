@@ -15,7 +15,8 @@ dependencies:
     path: ../../../clients/dart
   # The device APIs the server may call (lib/essentials.dart, the Essentials page): each one on the platforms it supports.
   battery_plus: ^7.1.2
-  connectivity_plus: ^7.3.2
+  # 7.3.2 needs dbus 0.8 (nm 0.6), battery_plus still dbus 0.7 (upower 0.7): move both together.
+  connectivity_plus: ">=7.0.0 <7.3.2"
   device_info_plus: ^13.2.0
   geolocator: ^14.0.2
   package_info_plus: ^10.2.2

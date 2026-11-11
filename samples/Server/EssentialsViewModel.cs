@@ -89,6 +89,13 @@ internal sealed class EssentialsCheck : INotifyPropertyChanged
 
     private async Task RunAsync()
     {
+        // A client that did not announce the service: a call would wait for it until EssentialsTimeout (30 s), then fail.
+        if (!Supported)
+        {
+            Status = "unsupported";
+            Result = $"This client does not offer '{Service}' (it announced no such service).";
+            return;
+        }
         Status = "running";
         try
         {
