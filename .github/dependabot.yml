@@ -15,13 +15,33 @@ updates:
   - package-ecosystem: npm
     directories:
       - /clients/typescript
-      - /samples/Angular/XAnimals.Angular
-      - /samples/Vue/XAnimals.Vue
       - /samples/React/XAnimals.React
       - /tests/samples
     schedule: { interval: weekly }
     groups:
       npm-minor: { update-types: [minor, patch] }
+
+  # Angular compiles with TypeScript itself: each version of Angular accepts a range of TypeScript (21: >=5.9 <6.0, a peer dependency that
+  # npm ci refuses to break). TypeScript moves with Angular, when Angular moves (ng update), never alone.
+  - package-ecosystem: npm
+    directory: /samples/Angular/XAnimals.Angular
+    schedule: { interval: weekly }
+    groups:
+      npm-minor: { update-types: [minor, patch] }
+    ignore:
+      - dependency-name: typescript
+        versions: ['>=6.0.0']
+
+  # vue-tsc drives the API of TypeScript in JavaScript, which TypeScript 7 (its native compiler) no longer has: TypeScript 7 waits for a vue-tsc
+  # that supports it.
+  - package-ecosystem: npm
+    directory: /samples/Vue/XAnimals.Vue
+    schedule: { interval: weekly }
+    groups:
+      npm-minor: { update-types: [minor, patch] }
+    ignore:
+      - dependency-name: typescript
+        versions: ['>=7.0.0']
 
   - package-ecosystem: pub
     directories: [/clients/dart, /samples/Flutter/xanimals_flutter]
