@@ -80,14 +80,19 @@ public sealed class RemoteSecureStorage : RemoteService, ISecureStorage
 
     private void Track(Task operation)
     {
+        // FlushAsync waits for the record of the outcome, not for the operation: two continuations of one task run in no given order, so
+        // waiting for the operation alone could look at the failures before this one is recorded.
+        var recorded = operation.ContinueWith(t =>
+        {
+            if (t.Exception is { } exception)
+                _errors.Enqueue(exception.InnerException ?? exception);
+        }, CancellationToken.None, TaskContinuationOptions.ExecuteSynchronously, TaskScheduler.Default);
         lock (_gate)
-            _pending.Add(operation);
-        _ = operation.ContinueWith(t =>
+            _pending.Add(recorded);
+        _ = recorded.ContinueWith(t =>
         {
             lock (_gate)
                 _pending.Remove(t);
-            if (t.Exception is { } exception)
-                _errors.Enqueue(exception.InnerException ?? exception);
         }, CancellationToken.None, TaskContinuationOptions.ExecuteSynchronously, TaskScheduler.Default);
     }
 

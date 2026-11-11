@@ -136,25 +136,29 @@ public sealed class RemotePreferences : IPreferences, IDisposable
     private void Change(Operation operation, object?[] args)
     {
         EnsureAvailable();
-        Task write;
         lock (_gate)
         {
             Apply(operation);
             _unacknowledged.Add(operation);
             // Sent in the order of the calls: the channel keeps it, and the client applies them one after the other.
-            write = _essentials.InvokeAsync(Service, operation.Kind, args, Write);
-            _pending.Add(write);
-        }
-        _ = write.ContinueWith(task =>
-        {
-            lock (_gate)
+            var write = _essentials.InvokeAsync(Service, operation.Kind, args, Write);
+
+            // What FlushAsync waits for is the write *and* the record of its outcome: two continuations of the same task run in no
+            // given order, so waiting for the write alone could look at the failures before this one is recorded.
+            var recorded = write.ContinueWith(task =>
             {
-                _pending.Remove(task);
-                _unacknowledged.Remove(operation);
-            }
-            if (task.Exception is { } exception)
-                _errors.Enqueue(exception.InnerException ?? exception);
-        }, CancellationToken.None, TaskContinuationOptions.ExecuteSynchronously, TaskScheduler.Default);
+                lock (_gate)
+                    _unacknowledged.Remove(operation);
+                if (task.Exception is { } exception)
+                    _errors.Enqueue(exception.InnerException ?? exception);
+            }, CancellationToken.None, TaskContinuationOptions.ExecuteSynchronously, TaskScheduler.Default);
+            _pending.Add(recorded);
+            _ = recorded.ContinueWith(task =>
+            {
+                lock (_gate)
+                    _pending.Remove(task);
+            }, CancellationToken.None, TaskContinuationOptions.ExecuteSynchronously, TaskScheduler.Default);
+        }
     }
 
     /// <summary>
@@ -175,7 +179,7 @@ public sealed class RemotePreferences : IPreferences, IDisposable
             // Collected below.
         }
 
-        // The continuations that record the failures run synchronously with the writes; they ran before WhenAll completed.
+        // The tasks waited for are the records of the outcomes: every failure of these writes is in _errors now.
         var errors = new List<Exception>();
         while (_errors.TryDequeue(out var error))
             errors.Add(error);
