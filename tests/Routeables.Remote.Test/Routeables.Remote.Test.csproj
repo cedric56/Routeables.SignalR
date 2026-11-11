@@ -22,10 +22,6 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\..\src\Routeables.Remote\Routeables.Remote.csproj" />
-  </ItemGroup>
-
-  <ItemGroup>
     <Using Include="Xunit" />
   </ItemGroup>
 
@@ -38,6 +34,9 @@
       <_Parameter1>RrpFixture</_Parameter1>
       <_Parameter2>$([MSBuild]::NormalizePath('$(MSBuildThisFileDirectory)../../clients/fixtures/remote-v1.json'))</_Parameter2>
     </AssemblyAttribute>
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\Routeables.Remote\Routeables.Remote.csproj" />
   </ItemGroup>
 
 </Project>

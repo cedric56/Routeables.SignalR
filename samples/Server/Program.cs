@@ -1,4 +1,5 @@
 ﻿using Routeables.SignalR;
+using Routeables.SignalR.Essentials;
 using XAnimals.Server;
 using XAnimals.ViewModels;
 
