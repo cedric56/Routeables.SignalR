@@ -6,7 +6,7 @@ namespace Routeables.Remote.Tests;
 
 /// <summary>
 /// clients/fixtures/remote-v1.json: a log written by this implementation, the documents it merges into, and what each one
-/// shows. The TypeScript and Dart clients merge the same log and must show the same: one protocol, three languages.
+/// shows. The TypeScript client merges the same log and must show the same: one protocol, two languages.
 /// </summary>
 public class WireFixtureTests
 {

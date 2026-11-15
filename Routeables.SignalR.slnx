@@ -45,19 +45,11 @@
     <File Path=".github/dependabot.yml" />
   </Folder>
   <Folder Name="/clients/">
-    <!-- routeables_client, the Dart client: built and tested by Flutter (flutter test), not by Visual Studio. -->
-    <File Path="clients/dart/README.md" />
-    <File Path="clients/dart/pubspec.yaml" />
     <File Path="clients/fixtures/remote-v1.json" />
     <Project Path="clients/typescript/Routeables.Client.esproj">
       <Build />
       <Deploy />
     </Project>
-  </Folder>
-  <Folder Name="/samples/">
-    <!-- The Flutter sample: opened by Visual Studio Code or Android Studio, run by Flutter. -->
-    <File Path="samples/Flutter/README.md" />
-    <File Path="samples/Flutter/xanimals_flutter/pubspec.yaml" />
   </Folder>
   <Folder Name="/src/">
     <Project Path="src/Routeables.Remote/Routeables.Remote.csproj" />

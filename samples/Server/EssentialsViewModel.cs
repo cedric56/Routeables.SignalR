@@ -138,8 +138,7 @@ internal sealed class EssentialsCheck : INotifyPropertyChanged
 
 /// <summary>
 /// The Essentials page: every .NET MAUI Essentials contract, tested from the server on the device of the user (Routeables.SignalR.Essentials).
-/// The same page runs in Angular, Vue and React (the browser, <c>browserEssentials()</c>) and in Flutter (the services of the Flutter sample):
-/// each client announces what it can do, and the page says what it got.
+/// The same page runs in Angular, Vue and React (the browser, <c>browserEssentials()</c>): each client announces what it can do, and the page says what it got.
 /// </summary>
 [RouteableState]
 internal sealed class EssentialsViewModel : INotifyPropertyChanged, IDisposable

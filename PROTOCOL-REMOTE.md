@@ -11,9 +11,8 @@ This document is normative. The implementations, and what checks them:
 | Merge, client replica, server, in-memory store | `src/Routeables.Remote` (.NET, no dependency, Native AOT) | `tests/Routeables.Remote.Test` |
 | SignalR hub (`MapRouteablesReplication`) | `src/Routeables.SignalR/Replication.cs` | `tests/e2e/replication.test.mjs` (real Kestrel and SignalR, the TypeScript replica) |
 | TypeScript replica, SignalR channel | `clients/typescript/src/remote*.ts` (`@routeables/client`) | `clients/typescript/test/remote.test.ts`, the e2e tests |
-| Dart replica, SignalR channel | `clients/dart/lib/src/remote*.dart` (`routeables_client`) | `clients/dart/test/remote_test.dart` |
 | Durable store (EF Core, MongoDB, Dommel, PostgreSQL) | `Queryeables.Replication` (Queryeables repository) | `ReplicationStoreContractTests` there |
-| One merge in three languages | `clients/fixtures/remote-v1.json`: a log written by .NET, and what each document must show | the three test suites |
+| One merge in two languages | `clients/fixtures/remote-v1.json`: a log written by .NET, and what each document must show | both test suites |
 
 ## 1. Scope, and what RRP is not
 
@@ -34,7 +33,7 @@ totally orders the history, so a client needs one cursor, not a version vector o
 
 | Name | Definition | Rule |
 |---|---|---|
-| `ReplicaId` | A GUID made by the client the first time it opens its storage; on the wire its text in lower case. | Bound to the first user that uses it on the server; never shared by two users or two devices. Replicas are **ordered by that text, ordinally**: the same order in .NET, TypeScript and Dart. |
+| `ReplicaId` | A GUID made by the client the first time it opens its storage; on the wire its text in lower case. | Bound to the first user that uses it on the server; never shared by two users or two devices. Replicas are **ordered by that text, ordinally**: the same order in .NET and TypeScript. |
 | `Dot` | `(ReplicaId, Seq)`, `Seq` = 1, 2, 3… with no gap. | Identifies a change for ever. Never reused, even for a change the server refused. |
 | `Hlc` | Hybrid logical clock `(Wall ms, Counter, ReplicaId)` (Kulkarni et al., 2014). | Total order: wall, then counter, then replica. Every replica observes the clock of the server at `Hello`, and the server observes every change it admits. The counter is a 32-bit integer from 0: when it is used up the clock moves to the next millisecond (it never wraps around), and a negative counter is refused and never followed. |
 | `OpStamp` | `(Hlc of the change, index of the operation in the change)`. | Orders two writes of one field, even inside one change. |
@@ -49,11 +48,11 @@ A document is a set of named fields. Values are opaque strings (JSON in practice
 |---|---|---|---|
 | Register (LWW) | `set {field, value}` | The greatest `OpStamp` wins. | A name, a status, a date: one value, the latest. |
 | Set (add-wins OR-Set) | `add {field, element}` / `remove {field, element, observed}` | An element is present while it keeps a tag. `add` gives the tag `(dot, index)`; `remove` deletes only the tags it **observed**. | A concurrent add the remover did not see survives. |
-| Counter (PN) | `increment {field, delta}` | Sum of the deltas, within ±(2^53 − 1) (`RemoteProtocol.MaxCounter`): what a number of JavaScript holds exactly, so that the three implementations add alike. The server refuses a change that would go beyond (`too-large`). | Stock, visits, votes. Exactly-once (§5) means a delta is never counted twice. |
+| Counter (PN) | `increment {field, delta}` | Sum of the deltas, within ±(2^53 − 1) (`RemoteProtocol.MaxCounter`): what a number of JavaScript holds exactly, so that both implementations add alike. The server refuses a change that would go beyond (`too-large`). | Stock, visits, votes. Exactly-once (§5) means a delta is never counted twice. |
 | Text (RGA) | `insert {field, after, text}` / `erase {field, spans}` | Each character has an identity `(dot, index, offset)`. An insertion goes right after its anchor `after` (the start when null), past the characters inserted there by later insertions; an erasure marks characters, by identity, as erased (they stay as tombstones). | Two people typing in one field both keep what they typed; text typed inside a passage erased concurrently survives; concurrent insertions at one place never interleave, the latest first. |
 | Existence | `restore` / `delete` | A register: the greatest `OpStamp` decides. | Deleting is a tombstone; fields are kept, so a later restore wins back the document. |
 
-Text positions count **UTF-16 code units**, as .NET, JavaScript and Dart do. `ReplaceText(field, value)` (the call a text
+Text positions count **UTF-16 code units**, as .NET and JavaScript do. `ReplaceText(field, value)` (the call a text
 box makes) sends the smallest edit (common start and end kept, never splitting a surrogate pair), so that concurrent edits
 elsewhere in the text survive. An insertion whose anchor is missing (its insertion was refused, the same on every replica)
 goes to the start.
@@ -204,7 +203,7 @@ Queryeables).
 
 `protocol` is an integer, separate from protocol 2 of the sessions. A server refuses another version with a message
 (`update the client`). Adding a field is compatible; adding an operation or changing a merge is a new version. Each client
-store has its own format (`ReplicaCodec` 2 in .NET, which still reads 1; `format: 1` JSON in TypeScript and Dart).
+store has its own format (`ReplicaCodec` 2 in .NET, which still reads 1; `format: 1` JSON in TypeScript).
 
 ## 9. Mapping
 

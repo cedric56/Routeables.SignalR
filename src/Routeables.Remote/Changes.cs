@@ -62,7 +62,7 @@ public sealed record EraseText(string Field, IReadOnlyList<TextSpan> Spans) : Fi
 /// <summary>
 /// The identity of one character of a text field: the insertion that made it (<see cref="Dot"/> and the rank
 /// <see cref="Index"/> of the operation in its change) and its rank in the inserted text (<see cref="Offset"/>, in UTF-16
-/// code units, as .NET, JavaScript and Dart count them).
+/// code units, as .NET and JavaScript count them).
 /// </summary>
 public readonly record struct TextId(Dot Dot, int Index, int Offset);
 

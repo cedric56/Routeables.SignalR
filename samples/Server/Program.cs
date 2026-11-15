@@ -16,8 +16,8 @@ var builder = WebApplication.CreateBuilder(new WebApplicationOptions { Args = ar
 builder.Services.AddRouteablesSignalR<MainViewModel>(services => services.AddAnimalsForAngular(), options => options.AddAnimalsExposure());
 
 // The dev servers of the web samples (ng serve, vite) run on their own port and proxy /routeables here (proxy.conf.json, vite.config.ts):
-// for them no CORS is needed. Flutter web calls the hub from its own address: the pages of this machine may (a sample, not a policy
-// for production). A mobile app sends no origin and needs none.
+// for them no CORS is needed. A page served from another address of this machine may call the hub too (a sample, not a policy
+// for production).
 builder.Services.AddCors(cors => cors.AddDefaultPolicy(policy => policy
     .SetIsOriginAllowed(origin => Uri.TryCreate(origin, UriKind.Absolute, out var uri) && uri.IsLoopback)
     .AllowAnyHeader()

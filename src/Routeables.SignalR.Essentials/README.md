@@ -121,4 +121,3 @@ that sets them itself; injection keeps working.
   and, if needed, ask once from a button of the page (`DeviceMotionEvent.requestPermission()`).
 - `IScreenshot` is a PNG chosen by the user (`getDisplayMedia`); the server does not convert it to JPEG.
 - `IEmail` cannot attach files through `mailto:`; `IAppActions` does not exist in a browser.
-- The Dart client does not announce Essentials yet: its view models see `FeatureNotSupportedException` and the default values.

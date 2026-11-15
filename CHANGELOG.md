@@ -39,9 +39,6 @@ The first version meant for production. It changes the protocol (2) and some def
   options `EssentialsTimeout` and `EssentialsMaxPendingCalls`. `IRouteableClient` has two more methods, with a default implementation.
 - **`@routeables/client`**: the `essentials` option, `browserEssentials()` (`localStorage`, `navigator.onLine`), and `EssentialsBridge`
   that only runs the methods and events a service lists.
-- **`routeables_client`** (Dart): the same protocol — the `essentials` parameter of `RouteablesClient`, `EssentialsService`,
-  `EssentialsError` and `EssentialsBridge`. The Flutter sample gives its services with Flutter plugins (`lib/essentials.dart`:
-  preferences, network, battery, device and app, display, location, sensors, clipboard, share, links).
 - **An Essentials page in the samples** (`/essentials`, every front end): about 35 tests the server runs on the device of the
   session with the MAUI contracts — what the client announced, what each test answered, the failures as the server sees them
   (not supported, refused, cancelled).
@@ -54,9 +51,8 @@ The first version meant for production. It changes the protocol (2) and some def
   read. See [PROTOCOL-REMOTE.md](PROTOCOL-REMOTE.md).
 - **`ReplicationHub`**: `services.AddRouteablesReplication(...)` and `app.MapRouteablesReplication()` serve it over SignalR, and
   tell the connected clients when the log of a collection grows (`LogAdvanced`).
-- **Clients**: `Replica` in `@routeables/client` (TypeScript, with `signalRReplicationChannel`) and in `routeables_client` (Dart,
-  with `SignalRReplicationChannel`). `clients/fixtures/remote-v1.json`, written by the .NET implementation, checks that the three
-  merge alike.
+- **Client**: `Replica` in `@routeables/client` (TypeScript, with `signalRReplicationChannel`). `clients/fixtures/remote-v1.json`,
+  written by the .NET implementation, checks that both merge alike.
 - **A durable server**: `IReplicationStore`; `Queryeables.Replication` stores the protocol in EF Core, MongoDB, Dommel or
   PostgreSQL and writes the merged documents to the application's entities.
 
@@ -98,7 +94,7 @@ The first version meant for production. It changes the protocol (2) and some def
   - the hybrid clock never wraps around: a used-up counter moves to the next millisecond, a negative counter is refused at
     `Push` and not followed at `Hello` (a client could send every other one before its own writes, a `Hello` alone was enough);
   - a pull that a compaction crosses answers `snapshotRequired` instead of skipping entries;
-  - a counter stays within ±(2^53 − 1), where .NET, TypeScript and Dart add alike; beyond, the change is refused `too-large`;
+  - a counter stays within ±(2^53 − 1), where .NET and TypeScript add alike; beyond, the change is refused `too-large`;
   - a connection follows at most `MaxCollectionsPerConnection` collections (256), and only those `IReplicationPolicy.CanFollow`
     allows (every user by default);
   - a snapshot no longer stops the writes while it reads the documents (it checks that no decision was written meanwhile), and
@@ -142,16 +138,11 @@ The first version meant for production. It changes the protocol (2) and some def
 - Closes a notification after its expiration (`expireToasts`, on by default): the samples no longer do it themselves.
 - `exports` in `package.json`: the public API is the root of the package.
 
-### Client for Dart and Flutter (`routeables_client`)
-
-- A port of `@routeables/client` to Dart, on the SignalR client for Dart (signalr_netcore): the same protocol, the same guarantees, the same tests (with the changes of the TypeScript client above). Not published on pub.dev yet.
-- A Flutter sample (web, desktop, mobile) against the sample server, which allows the pages of the machine (CORS) for Flutter web.
-
 ### Build and distribution
 
 - Builds against the current Routeables (`GetEntries` / `IMenuEntry`); the CI pins the revision of Routeables (`ROUTEABLES_REF`).
 - Depends on the Routeables package (2.1.0) instead of its sources. The XAnimals view models of the samples are compiled against the same package (`samples/XAnimals`), and the generator of routes of Routeables runs only in `XAnimals.ViewModels`, as in Routeables.
-- The CounterServer sample is removed: the web samples show the library. The server of the samples is `samples/Server` (XAnimals.Server), shared by Angular, Vue, React and Flutter; it was `samples/Angular/XAnimals.AngularServer`.
+- The CounterServer sample is removed: the web samples show the library. The server of the samples is `samples/Server` (XAnimals.Server), shared by Angular, Vue and React; it was `samples/Angular/XAnimals.AngularServer`.
 - A React web sample, beside Angular and Vue: the same application against the same server, each built and driven in Chrome by the CI (`tests/samples/smoke.mjs`).
 - `-p:RouteablesVersion=…` builds and packs against the Routeables packages; a release workflow publishes the NuGet and npm packages from a tag, after installing the NuGet package in an empty application.
 - `npm ci` with lockfiles; the npm package is packed and installed in an empty project in the CI.
@@ -159,7 +150,7 @@ The first version meant for production. It changes the protocol (2) and some def
 - The web samples and the TypeScript client open in Visual Studio (one `.esproj` each), with shared launch profiles that start the server and the apps (`Routeables.SignalR.slnLaunch`). Outside Visual Studio they run neither `npm install` nor their build.
 - The package is marked not trimmable; `AddRouteablesSignalR` carries `[RequiresUnreferencedCode]` and `[RequiresDynamicCode]`.
 - The release runs the tests of the server against the published packages of Routeables before it publishes, and refuses a tag that does not match `VersionPrefix` and `package.json`.
-- The Angular sample is driven in Chrome by the CI too; Flutter is pinned to a release line (3.47.x); Dependabot keeps the actions and the packages up to date. `global.json` no longer declares `Uno.Sdk`; an empty `package-lock.json` is removed.
+- The Angular sample is driven in Chrome by the CI too; Dependabot keeps the actions and the packages up to date. `global.json` no longer declares `Uno.Sdk`; an empty `package-lock.json` is removed.
 
 ### Breaking changes
 

@@ -1,5 +1,5 @@
 # Weekly updates of what this repository depends on. The GitHub Actions are kept on their latest tags; the samples and the clients on
-# their latest compatible versions. A major version (Angular, Flutter's packages) arrives as its own pull request, to be tried on purpose.
+# their latest compatible versions. A major version (Angular, for instance) arrives as its own pull request, to be tried on purpose.
 version: 2
 updates:
   - package-ecosystem: github-actions
@@ -43,6 +43,3 @@ updates:
       - dependency-name: typescript
         versions: ['>=7.0.0']
 
-  - package-ecosystem: pub
-    directories: [/clients/dart, /samples/Flutter/xanimals_flutter]
-    schedule: { interval: weekly }

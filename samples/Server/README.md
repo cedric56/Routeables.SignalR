@@ -1,9 +1,9 @@
 # XAnimals.Server
 
-The server of every sample: Angular, Vue, React and Flutter draw the same view models, and this server runs them. It is an ASP.NET Core application with Routeables.SignalR: one router, one set of regions and one set of view models per connection, on http://localhost:5090.
+The server of every sample: Angular, Vue and React draw the same view models, and this server runs them. It is an ASP.NET Core application with Routeables.SignalR: one router, one set of regions and one set of view models per connection, on http://localhost:5090.
 
 ```
-Angular · Vue · React · Flutter  ──SignalR (/routeables)──▶  XAnimals.Server
+Angular · Vue · React  ──SignalR (/routeables)──▶  XAnimals.Server
                                                              the view models of XAnimals.ViewModels (samples/XAnimals: the sources of Routeables,
                                                              compiled against the Routeables package)
 ```
@@ -14,7 +14,7 @@ Angular · Vue · React · Flutter  ──SignalR (/routeables)──▶  XAnima
 dotnet run --project samples/Server          # http://localhost:5090
 ```
 
-Then start one of the apps ([Angular](../Angular), [Vue](../Vue), [React](../React), [Flutter](../Flutter)), or several: each one has its own port and its own sessions. The address comes from `appsettings.json` (`Urls`), wherever the server is started from (Visual Studio, `dotnet run`, its exe); `--urls` or `ASPNETCORE_URLS` choose another one. A phone on the network needs `--urls http://0.0.0.0:5090`.
+Then start one of the apps ([Angular](../Angular), [Vue](../Vue), [React](../React)), or several: each one has its own port and its own sessions. The address comes from `appsettings.json` (`Urls`), wherever the server is started from (Visual Studio, `dotnet run`, its exe); `--urls` or `ASPNETCORE_URLS` choose another one. A phone on the network needs `--urls http://0.0.0.0:5090`.
 
 In Visual Studio, the launch profiles of `Routeables.SignalR.slnLaunch` start it with the apps (**Angular + server**, **Vue + server**, **React + server**, **All web apps + server**).
 
@@ -28,4 +28,4 @@ What crosses the network: the view models of the XAnimals libraries cannot carry
 
 The tests in [tests/Routeables.SignalR.Test.Angular](../../tests/Routeables.SignalR.Test.Angular) drive this server as an app does, without a browser; [tests/samples](../../tests/samples) drives each web app in Chrome against it.
 
-> **A sample, not a template for production.** This server accepts any connection, without authentication, and allows the pages of the machine (any `localhost` origin, with credentials) so that every web sample and Flutter web reach it. Do not copy its `Program.cs` as it is: protect the hub (`MapRouteables().RequireAuthorization()`), allow only your own origins, and go through the checklist of [SECURITY.md](../../SECURITY.md).
+> **A sample, not a template for production.** This server accepts any connection, without authentication, and allows the pages of the machine (any `localhost` origin, with credentials) so that every web sample reaches it. Do not copy its `Program.cs` as it is: protect the hub (`MapRouteables().RequireAuthorization()`), allow only your own origins, and go through the checklist of [SECURITY.md](../../SECURITY.md).

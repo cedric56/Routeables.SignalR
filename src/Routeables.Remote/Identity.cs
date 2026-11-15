@@ -9,7 +9,7 @@ namespace Routeables.Remote;
 /// </summary>
 /// <remarks>
 /// On the wire, its text in lower case ("4f1c2a9e-..."). Replicas are ordered as those texts are, ordinally: the order
-/// every client (.NET, TypeScript, Dart) uses to break ties between concurrent writes.
+/// every client (.NET, TypeScript) uses to break ties between concurrent writes.
 /// </remarks>
 [JsonConverter(typeof(ReplicaIdJsonConverter))]
 public readonly record struct ReplicaId(Guid Value) : IComparable<ReplicaId>

@@ -44,7 +44,7 @@ await client.invoke('approveAsync', 42);   // resolves when the command has ende
 - **Reconnection.** A session survives a dropped connection for 30 seconds and is resumed by its user: pages, state and the dialogs that wait.
 - **The device of each user.** `Routeables.SignalR.Essentials` gives the view models the .NET MAUI Essentials of the browser or app of their user (`IPreferences`, `IConnectivity`, `Preferences.Default`…), never of another one.
 - **Observability.** Logs, an activity per call, and metrics (`Routeables.SignalR`).
-- **Offline data.** The Routeables Remote Protocol ([PROTOCOL-REMOTE.md](PROTOCOL-REMOTE.md)): documents that the .NET, TypeScript and Dart clients write without the server, restart with, and merge when the network is back (fields, sets, counters, text typed by two people at once), the server deciding what is admitted and what each user reads.
+- **Offline data.** The Routeables Remote Protocol ([PROTOCOL-REMOTE.md](PROTOCOL-REMOTE.md)): documents that the .NET and TypeScript clients write without the server, restart with, and merge when the network is back (fields, sets, counters, text typed by two people at once), the server deciding what is admitted and what each user reads.
 
 ## What is in the repository
 
@@ -53,13 +53,11 @@ await client.invoke('approveAsync', 42);   // resolves when the command has ende
 | [src/Routeables.SignalR](src/Routeables.SignalR) | The server library (`AddRouteablesSignalR`, `MapRouteables`; `AddRouteablesReplication`, `MapRouteablesReplication`). |
 | [src/Routeables.SignalR.Essentials](src/Routeables.SignalR.Essentials) | The MAUI Essentials of each client, for the view models (`AddRouteablesEssentials`). |
 | [src/Routeables.Remote](src/Routeables.Remote) | The Routeables Remote Protocol: merge, client replica, server, stores. No dependency. |
-| [clients/fixtures](clients/fixtures) | A log written by the .NET implementation and what it merges into: the three clients must agree. |
+| [clients/fixtures](clients/fixtures) | A log written by the .NET implementation and what it merges into: both clients must agree. |
 | [clients/typescript](clients/typescript) | `@routeables/client`, the client; it does not depend on Angular or Vue. |
-| [clients/dart](clients/dart) | `routeables_client`, the client for Dart and Flutter, with the same protocol and the same guarantees. |
 | [samples/Server](samples/Server) | XAnimals.Server, the ASP.NET Core server every sample talks to. |
 | [samples/Angular](samples/Angular) | The Angular application. |
 | [samples/Vue](samples/Vue), [samples/React](samples/React) | The same application in Vue and React, against the same server. |
-| [samples/Flutter](samples/Flutter) | The same application in Flutter: web, desktop and mobile. |
 | [tests](tests) | The tests of the sessions, the hub, the security, the protocol, the reconnection and the sample server; [tests/e2e](tests/e2e) drives a real Kestrel and SignalR server from Node; [tests/samples](tests/samples) drives every web sample in Chrome. |
 
 ## Build
@@ -79,14 +77,13 @@ The CI checks Routeables out at the revision of the package (`ROUTEABLES_REF` in
 
 ## Run the samples
 
-Every web sample is the same application (the XAnimals pages, the menu, the regions, the dialogs, the notifications, the modal) drawn by another front end, against one server. Its **Essentials** page (`/essentials`) tests from the server the device APIs each front end gives (`browserEssentials()` on the web, Flutter plugins in the Flutter sample):
+Every web sample is the same application (the XAnimals pages, the menu, the regions, the dialogs, the notifications, the modal) drawn by another front end, against one server. Its **Essentials** page (`/essentials`) tests from the server the device APIs the browser gives (`browserEssentials()`):
 
 | Sample | Front end | Address |
 | --- | --- | --- |
 | [Angular](samples/Angular) | Angular 21 (signals) | http://localhost:4200 |
 | [Vue](samples/Vue) | Vue 3 | http://localhost:5173 |
 | [React](samples/React) | React 19 | http://localhost:5174 |
-| [Flutter](samples/Flutter) | Flutter (web, Windows, macOS, Linux, Android, iOS) | http://localhost:5179 on the web (`flutter run -d chrome --web-port 5179`) |
 
 ```
 dotnet run --project samples/Server          # the server, on http://localhost:5090
@@ -114,18 +111,14 @@ node --test tests/e2e/e2e.test.mjs tests/e2e/replication.test.mjs
 
 # A web sample in Chrome, against the server (started as above, and the app built and served by `npm run preview`)
 npm --prefix tests/samples ci && node tests/samples/smoke.mjs http://localhost:5174
-
-# The Dart client and the Flutter sample
-(cd clients/dart && flutter test)
-(cd samples/Flutter/xanimals_flutter && dart run tool/setup.dart && flutter test)
 ```
 
 ## Documentation
 
 - [src/Routeables.SignalR/README.md](src/Routeables.SignalR/README.md): the server — what crosses the network, authorization, the session, the messages, the limits, the options, deployment.
 - [src/Routeables.SignalR.Essentials/README.md](src/Routeables.SignalR.Essentials/README.md): the MAUI Essentials of the clients — what runs where, the facades, the protocol.
-- [clients/typescript/README.md](clients/typescript/README.md) and [clients/dart/README.md](clients/dart/README.md): the clients — order, answers, reconnection.
-- The README of each sample ([Angular](samples/Angular/README.md), [Vue](samples/Vue/README.md), [React](samples/React/README.md), [Flutter](samples/Flutter/README.md)).
+- [clients/typescript/README.md](clients/typescript/README.md): the client — order, answers, reconnection.
+- The README of each sample ([Angular](samples/Angular/README.md), [Vue](samples/Vue/README.md), [React](samples/React/README.md)).
 - [PROTOCOL-REMOTE.md](PROTOCOL-REMOTE.md): the Routeables Remote Protocol — merges, messages, guarantees, failures, limits.
 - [SECURITY.md](SECURITY.md): the security model and the checklist before production.
 - [VERSIONING.md](VERSIONING.md) and [CHANGELOG.md](CHANGELOG.md): versions, the protocol, releases.
