@@ -10,7 +10,7 @@
     "check": "vue-tsc --noEmit"
   },
   "dependencies": {
-    "@microsoft/signalr": "^10.0.0",
+    "@microsoft/signalr": "^11.0.0",
     "vue": "^3.5.0"
   },
   "devDependencies": {
