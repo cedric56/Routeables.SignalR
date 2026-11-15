@@ -88,6 +88,16 @@ public sealed class ReviewFixesTests
         return services.BuildServiceProvider();
     }
 
+    // Opens a page and waits for the end of the route change. On a cold runner it may outlast a short grace: it is then a call that goes on,
+    // which counts against MaxRunningCalls and still runs when the test goes on.
+    private static async Task OpenAsync(RouteableSession session, RecordingClient client, string route)
+    {
+        var opened = await session.GoToAsync(route, TestContext.Current.CancellationToken);
+        Assert.True(opened.Success, opened.Error);
+        if (opened.Pending)
+            Assert.True(await TestSchema.EventuallyAsync(() => client.Completed.Any(c => c.Operation == opened.Operation && c.Success)));
+    }
+
     // ---------------------------------------------------------------- 1: the argument of a command of the state
 
     [Fact]
@@ -165,7 +175,7 @@ public sealed class ReviewFixesTests
         await using var provider = Services(o => { o.MaxRunningCalls = 1; o.CommandGrace = TimeSpan.FromMilliseconds(50); });
         var client = new RecordingClient();
         await using var session = new RouteableSession(provider, client);
-        await session.GoToAsync("/stream", TestContext.Current.CancellationToken);
+        await OpenAsync(session, client, "/stream");
 
         var first = await session.InvokeAsync("slowAsync", [Json("400")]);
         Assert.True(first.Pending);
@@ -195,7 +205,7 @@ public sealed class ReviewFixesTests
         await using var provider = Services(o => o.CommandGrace = TimeSpan.FromMilliseconds(100));
         var client = new RecordingClient();
         await using var session = new RouteableSession(provider, client);
-        await session.GoToAsync("/blocking", TestContext.Current.CancellationToken);
+        await OpenAsync(session, client, "/blocking");
 
         var watch = Stopwatch.StartNew();
         var ack = await session.InvokeAsync("block", [Json("1500")]);
