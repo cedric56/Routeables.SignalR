@@ -1,4 +1,4 @@
-﻿using System.Diagnostics;
+using System.Diagnostics;
 using System.Security.Claims;
 using System.Security.Cryptography;
 using System.Text.Json;
@@ -40,6 +40,7 @@ public sealed class RouteableSession : IAsyncDisposable
     private readonly Dictionary<string, RouteableCompleted?> _operations = new(StringComparer.Ordinal);
     private readonly Queue<string> _ended = new();
     private long _nextOperation;
+    private int _runningCalls;   // the calls answered as pending that have not ended yet (RouteablesOptions.MaxRunningCalls)
     private int _disposed;
 
     // The calls that went on: null while they run, then their end, kept for the last ones to tell it again to a client that resumes the session.
@@ -333,16 +334,22 @@ public sealed class RouteableSession : IAsyncDisposable
         if (IsDisposed)
             return RouteableAck.Fail("The session is closed.", RouteableErrorCodes.NotFound);
 
+        // A call that may go on is refused while too many already do: their work and what they hold stay in memory until they end.
+        if (grace && Volatile.Read(ref _runningCalls) >= Options.MaxRunningCalls)
+            return RouteableAck.Fail($"At most {Options.MaxRunningCalls} calls can go on at once: wait for one of them to end.", RouteableErrorCodes.Limit);
+
         using var activity = RouteablesTelemetry.Source.StartActivity("Routeables " + method);
         activity?.SetTag("routeables.target", target);
         var started = Stopwatch.GetTimestamp();
         var invocation = new RouteableInvocation();
 
+        // A call with grace never runs on this thread: a command that is long before its first await would hold it, and the grace could not
+        // answer that it goes on. Without grace, the call runs here when the session is idle (no thread hop for what is quick).
         var running = Dispatcher.InvokeAsync(() =>
         {
             RouteableInvocation.Current = invocation;
             return work();
-        });
+        }, inline: !grace);
 
         RouteableAck ack;
         try
@@ -393,9 +400,11 @@ public sealed class RouteableSession : IAsyncDisposable
         var operation = "op" + Interlocked.Increment(ref _nextOperation).ToString(System.Globalization.CultureInfo.InvariantCulture);
         lock (_operations)
             _operations[operation] = null;
+        Interlocked.Increment(ref _runningCalls);
         _ = running.ContinueWith(async task =>
         {
             var ack = await Settle(task).ConfigureAwait(false);
+            Interlocked.Decrement(ref _runningCalls);
             if (IsDisposed)
                 return;
             Dispatcher.Post(_ =>
@@ -524,11 +533,16 @@ public sealed class RouteableSession : IAsyncDisposable
     }
 
     /// <summary>The connection dropped: the session keeps its view models and waits for the client.</summary>
+    /// <remarks>
+    /// Called by the registry, off the dispatcher. The outbound stream and the Essentials are safe from any thread and stop now; the connection
+    /// the calls read (their authorization) changes on the dispatcher, between two turns, in order with <see cref="AttachAsync"/>.
+    /// </remarks>
     internal void Detach()
     {
         Essentials.OnDetached();
         Outbound.Attach(null);
-        _connection.Attach(null, _connection.User);
+        var connection = _connection;
+        Dispatcher.Run(() => connection.Attach(null, connection.User));
     }
 
     /// <summary>The client came back on another connection: the state of every target and the dialogs that wait are sent again.</summary>

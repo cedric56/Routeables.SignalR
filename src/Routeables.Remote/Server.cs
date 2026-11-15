@@ -92,6 +92,15 @@ public sealed class ReplicationServerOptions
 
     /// <summary>How many decisions are remembered per replica, to answer a push sent again after a lost answer.</summary>
     public int RememberedAcksPerReplica { get; set; } = 1024;
+
+    /// <summary>
+    /// Whether the changes of different replicas are decided at the same time. Each change is decided (its replica and its documents read, the
+    /// rules of the policy) alongside the others, then written one at a time, in log order; a decision whose documents changed meanwhile (those
+    /// the rules read included) is made again, and after a few attempts made while no other decision is written. A replica still decides one
+    /// change at a time. Set it to <see langword="false"/> for a policy that cannot be called from several threads at once: the decisions are
+    /// then made one at a time, as in version 1. <see langword="true"/> by default.
+    /// </summary>
+    public bool ConcurrentAdmission { get; set; } = true;
 }
 
 /// <summary>
@@ -103,8 +112,16 @@ public sealed class ReplicationServer
 {
     private readonly IReplicationPolicy _policy;
     private readonly TimeProvider _time;
-    // One decision at a time: the order of admission is the order of the log, and a rule sees the state it decides on.
-    private readonly SemaphoreSlim _admission = new(1, 1);
+    // One write at a time: the order of the writes is the order of the log. A decision is checked under it before it is written: the documents
+    // it read did not change since (a rule saw the state it decides on), or it is made again.
+    private readonly SemaphoreSlim _commit = new(1, 1);
+    // One decision per replica at a time: its seq moves on in order, and its record does not change under a decision.
+    private readonly KeyedLocks<ReplicaId> _replicas = new();
+    // The writes counted, and, per stripe of documents, the count of the last write that changed one of them (under _commit).
+    private const int Stripes = 4096;
+    private const int MaxAdmissionAttempts = 4;
+    private readonly long[] _writtenAt = new long[Stripes];
+    private long _writes;
     private readonly SemaphoreSlim _snapshots;
 
     /// <param name="policy">
@@ -154,14 +171,14 @@ public sealed class ReplicationServer
     /// </summary>
     public async Task CompactAsync(long position, CancellationToken ct = default)
     {
-        await _admission.WaitAsync(ct);
+        await _commit.WaitAsync(ct);
         try
         {
             await Store.CompactAsync(position, ct);
         }
         finally
         {
-            _admission.Release();
+            _commit.Release();
         }
     }
 
@@ -209,17 +226,10 @@ public sealed class ReplicationServer
         if (request.Changes.Count > Options.MaxChangesPerPush)
             throw new ArgumentException($"At most {Options.MaxChangesPerPush} changes per push.", nameof(request));
 
+        // The changes of a push are decided in order; the pushes of other replicas are decided meanwhile (ConcurrentAdmission).
         var acks = new List<ChangeAck>(request.Changes.Count);
-        await _admission.WaitAsync(ct);
-        try
-        {
-            foreach (var change in request.Changes)
-                acks.Add(await AdmitAsync(user, change, ct));
-        }
-        finally
-        {
-            _admission.Release();
-        }
+        foreach (var change in request.Changes)
+            acks.Add(await AdmitAsync(user, change, ct));
         return new PushResult(acks);
     }
 
@@ -229,21 +239,76 @@ public sealed class ReplicationServer
         if (UserKey(user) is not { } owner)
             return new ChangeAck(change.Dot, AckStatus.Rejected, Code: RemoteErrorCodes.Unidentified,
                 Message: "An anonymous user, or one without an identifier, cannot write: sign in.");
+
+        using var replica = await _replicas.LockAsync(change.Dot.Replica, ct);
+        for (var attempt = 1; ; attempt++)
+        {
+            // The last attempt, or every one when decisions are not concurrent, is made while nothing else is written: it cannot be outdated.
+            var exclusive = !Options.ConcurrentAdmission || attempt >= MaxAdmissionAttempts;
+            var held = false;
+            try
+            {
+                if (exclusive)
+                {
+                    await _commit.WaitAsync(ct);
+                    held = true;
+                }
+                var seen = Volatile.Read(ref _writes);
+                var (final, decided) = await DecideAsync(user, owner, change, ct);
+                if (final is not null)
+                    return final;
+
+                if (!held)
+                {
+                    await _commit.WaitAsync(ct);
+                    held = true;
+                    if (Outdated(decided!.Read, seen))
+                        continue;   // a document it read was written meanwhile: decided again on what is stored now
+                }
+                return await WriteAsync(change, decided!, ct);
+            }
+            finally
+            {
+                if (held)
+                    _commit.Release();
+            }
+        }
+    }
+
+    // What a decision found, before it is written: the record of the replica, the answer, the documents it changes, and those it read.
+    private sealed record Decided(ReplicaRecord Record, Admission Admission, List<DocumentState> Changed, IReadOnlyCollection<DocumentId> Read);
+
+    private static int Stripe(DocumentId id) => (id.GetHashCode() & int.MaxValue) % Stripes;
+
+    // Under _commit: whether a document read after the write numbered seen was written since.
+    private bool Outdated(IReadOnlyCollection<DocumentId> read, long seen)
+    {
+        foreach (var id in read)
+            if (_writtenAt[Stripe(id)] > seen)
+                return true;
+        return false;
+    }
+
+    // Decides on a change, under the lock of its replica: either a final answer that writes nothing (a change sent again, out of order, or of
+    // a replica of another user), or a decision to write.
+    private async Task<(ChangeAck? Final, Decided? Decided)> DecideAsync(ClaimsPrincipal? user, string owner, Change change, CancellationToken ct)
+    {
         var record = await Store.FindReplicaAsync(change.Dot.Replica, ct) ?? new ReplicaRecord(change.Dot.Replica, owner, 0, []);
         if (record.User != owner)
-            return new ChangeAck(change.Dot, AckStatus.Rejected, Code: RemoteErrorCodes.ReplicaTaken, Message: "This replica belongs to another user.");
+            return (new ChangeAck(change.Dot, AckStatus.Rejected, Code: RemoteErrorCodes.ReplicaTaken, Message: "This replica belongs to another user."), null);
         if (change.Dot.Seq <= record.LastSeq)
         {
             var known = record.Acks.FirstOrDefault(a => a.Dot == change.Dot);
-            return known is null
+            return (known is null
                 ? new ChangeAck(change.Dot, AckStatus.Duplicate)
-                : known with { Status = known.Status == AckStatus.Accepted ? AckStatus.Duplicate : known.Status };
+                : known with { Status = known.Status == AckStatus.Accepted ? AckStatus.Duplicate : known.Status }, null);
         }
         if (change.Dot.Seq != record.LastSeq + 1)
-            return new ChangeAck(change.Dot, AckStatus.Rejected, Code: RemoteErrorCodes.OutOfOrder,
-                Message: $"The next change of this replica is {record.LastSeq + 1}.");
+            return (new ChangeAck(change.Dot, AckStatus.Rejected, Code: RemoteErrorCodes.OutOfOrder,
+                Message: $"The next change of this replica is {record.LastSeq + 1}."), null);
 
-        // The documents of the change, as stored now: what the rules see, and what the change is merged into.
+        // The documents of the change, as stored now: what the rules see, and what the change is merged into. Every document read is kept,
+        // to check before writing that none changed since.
         var documents = new Dictionary<DocumentId, DocumentState?>();
         async ValueTask<DocumentState?> Current(DocumentId id)
         {
@@ -256,9 +321,7 @@ public sealed class ReplicationServer
         if (decision.Accepted)
             decision = await _policy.AdmitAsync(user, change, Current, ct);
 
-        LogEntry? entry = null;
         var changed = new List<DocumentState>();
-        ChangeAck ack;
         if (decision.Accepted)
         {
             foreach (var id in change.Ops.Select(o => o.Document).Distinct())
@@ -280,6 +343,15 @@ public sealed class ReplicationServer
             if (!decision.Accepted)
                 changed.Clear();
         }
+        return (null, new Decided(record, decision, changed, documents.Keys));
+    }
+
+    // Under _commit: numbers the change when it was accepted, and writes the decision either way.
+    private async Task<ChangeAck> WriteAsync(Change change, Decided decided, CancellationToken ct)
+    {
+        var (record, decision, changed, _) = decided;
+        LogEntry? entry = null;
+        ChangeAck ack;
         if (decision.Accepted)
         {
             var head = await Store.HeadAsync(ct);
@@ -294,6 +366,12 @@ public sealed class ReplicationServer
         // Decided either way: the seq is used, and the next push goes on from the next one.
         var acks = record.Acks.Count < Options.RememberedAcksPerReplica ? [.. record.Acks, ack] : record.Acks.Skip(record.Acks.Count - Options.RememberedAcksPerReplica + 1).Append(ack).ToList();
         await Store.CommitAsync(new ReplicationCommit(record with { LastSeq = change.Dot.Seq, Acks = acks }, entry, changed), ct);
+
+        // The documents written are marked before the count moves on: a decision that read them after its count was taken is outdated.
+        var writes = _writes + 1;
+        foreach (var document in changed)
+            _writtenAt[Stripe(document.Id)] = writes;
+        Volatile.Write(ref _writes, writes);
 
         if (entry is not null)
         {
@@ -427,7 +505,7 @@ public sealed class ReplicationServer
                 if ((await Store.HeadAsync(ct)).Position == before.Position)
                     return Snapshot(user, documents, before.Position);
             }
-            await _admission.WaitAsync(ct);
+            await _commit.WaitAsync(ct);
             try
             {
                 var head = await Store.HeadAsync(ct);
@@ -435,7 +513,7 @@ public sealed class ReplicationServer
             }
             finally
             {
-                _admission.Release();
+                _commit.Release();
             }
         }
         finally
@@ -456,5 +534,62 @@ public sealed class ReplicationServer
         public Task<PullResult> PullAsync(PullRequest request, CancellationToken ct = default) => server.PullAsync(user, request, ct);
 
         public Task<SnapshotResult> SnapshotAsync(SnapshotRequest request, CancellationToken ct = default) => server.SnapshotAsync(user, request, ct);
+    }
+}
+
+/// <summary>A lock per key, created when first taken and dropped when nobody holds or waits for it.</summary>
+internal sealed class KeyedLocks<TKey> where TKey : notnull
+{
+    private readonly Dictionary<TKey, Entry> _entries = [];
+
+    private sealed class Entry
+    {
+        public readonly SemaphoreSlim Gate = new(1, 1);
+        public int Users;
+    }
+
+    public async Task<IDisposable> LockAsync(TKey key, CancellationToken ct)
+    {
+        Entry entry;
+        lock (_entries)
+        {
+            if (!_entries.TryGetValue(key, out entry!))
+                _entries[key] = entry = new Entry();
+            entry.Users++;
+        }
+        try
+        {
+            await entry.Gate.WaitAsync(ct);
+        }
+        catch
+        {
+            Leave(key, entry);
+            throw;
+        }
+        return new Releaser(this, key, entry);
+    }
+
+    private void Leave(TKey key, Entry entry)
+    {
+        lock (_entries)
+            if (--entry.Users == 0)
+                _entries.Remove(key);
+    }
+
+    private sealed class Releaser : IDisposable
+    {
+        private KeyedLocks<TKey>? _owner;
+        private readonly TKey _key;
+        private readonly Entry _entry;
+
+        public Releaser(KeyedLocks<TKey> owner, TKey key, Entry entry) => (_owner, _key, _entry) = (owner, key, entry);
+
+        public void Dispose()
+        {
+            if (Interlocked.Exchange(ref _owner, null) is not { } owner)
+                return;
+            _entry.Gate.Release();
+            owner.Leave(_key, _entry);
+        }
     }
 }

@@ -207,7 +207,9 @@ public sealed class RouteableCommandInvoker
                     return Outcome.Fail($"You may not call '{path}'.", RouteableErrorCodes.Unauthorized);
         }
 
-        var parameter = arguments.Count > 0 ? ToParameter(arguments[0]) : null;
+        object? parameter = null;
+        if (arguments.Count > 0 && !TryReadParameter(command, arguments[0], out parameter, out var expected))
+            return Outcome.Fail($"The argument of the command '{path}' is not a {expected.Name}.", RouteableErrorCodes.InvalidArgument);
         try
         {
             if (!command.CanExecute(parameter))
@@ -265,14 +267,73 @@ public sealed class RouteableCommandInvoker
         };
     }
 
-    private static object? ToParameter(JsonElement value) => value.ValueKind switch
+    // The type a command takes, found once per type: the parameter of its typed ExecuteAsync or Execute (RelayCommand<T>,
+    // AsyncRelayCommand<T>, Command<T>), or object when it only offers ICommand.Execute(object).
+    private static readonly System.Collections.Concurrent.ConcurrentDictionary<Type, Type> ParameterTypes = new();
+
+    internal static Type ParameterTypeOf(Type commandType) => ParameterTypes.GetOrAdd(commandType, static type =>
     {
-        JsonValueKind.String => value.GetString(),
-        JsonValueKind.Number => value.TryGetInt32(out var number) ? number : value.GetDouble(),
-        JsonValueKind.True => true,
-        JsonValueKind.False => false,
-        _ => null
-    };
+        foreach (var name in (string[])["ExecuteAsync", "Execute"])
+            foreach (var method in type.GetMethods(BindingFlags.Public | BindingFlags.Instance))
+                if (method.Name == name && !method.IsGenericMethodDefinition && method.GetParameters() is [var parameter]
+                    && parameter.ParameterType != typeof(object) && parameter.ParameterType != typeof(CancellationToken))
+                    return parameter.ParameterType;
+        return typeof(object);
+    });
+
+    /// <summary>
+    /// Reads the argument of a command of the state as the type the command takes: a <c>RelayCommand&lt;int&gt;</c> gets an <see cref="int"/>,
+    /// a <c>RelayCommand&lt;Order&gt;</c> an <c>Order</c>. A command that takes <see cref="object"/> gets the closest value (<see cref="int"/>,
+    /// <see cref="long"/>, <see cref="double"/>, text, boolean), or the <see cref="JsonElement"/> itself for an object or an array.
+    /// </summary>
+    private bool TryReadParameter(ICommand command, JsonElement value, out object? parameter, out Type expected)
+    {
+        expected = ParameterTypeOf(command.GetType());
+        if (expected == typeof(object))
+        {
+            parameter = Loose(value);
+            return true;
+        }
+
+        try
+        {
+            parameter = RouteableSchema.FromString(expected) is { } fromString && value.ValueKind == JsonValueKind.String
+                ? fromString.Invoke(null, BindingFlags.DoNotWrapExceptions, null, [value.GetString()], null)
+                : value.Deserialize(expected, _json);
+        }
+        catch (Exception exception) when (exception is JsonException or NotSupportedException or ArgumentException or InvalidOperationException or FormatException or OverflowException)
+        {
+            parameter = null;
+            return false;
+        }
+
+        // null for a value type that cannot hold it is not an argument the command can take.
+        return parameter is not null || !expected.IsValueType || Nullable.GetUnderlyingType(expected) is not null;
+    }
+
+    private static object? Loose(JsonElement value)
+    {
+        switch (value.ValueKind)
+        {
+            case JsonValueKind.String:
+                return value.GetString();
+            case JsonValueKind.Number:
+                // Each branch boxed on its own: a ternary that mixes int and double would make every number a double.
+                if (value.TryGetInt32(out var small))
+                    return small;
+                if (value.TryGetInt64(out var large))
+                    return large;
+                return value.GetDouble();
+            case JsonValueKind.True:
+                return true;
+            case JsonValueKind.False:
+                return false;
+            case JsonValueKind.Object or JsonValueKind.Array:
+                return value.Clone();   // kept as it was sent, rather than lost
+            default:
+                return null;
+        }
+    }
 
     private string? CheckArguments(IReadOnlyList<JsonElement> arguments)
     {

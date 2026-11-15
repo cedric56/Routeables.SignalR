@@ -24,7 +24,7 @@ public sealed record ReplicationCommit(ReplicaRecord Replica, LogEntry? Entry, I
 /// or in a database (Queryeables.Replication, over any IEntityStore: EF Core, MongoDB, Dommel...).
 /// </summary>
 /// <remarks>
-/// One server writes at a time (<see cref="ReplicationServer"/> serializes its decisions): a store needs no locking of
+/// One server writes at a time (<see cref="ReplicationServer"/> serializes its writes; its reads run alongside them): a store needs no locking of
 /// its own beyond the atomicity of <see cref="CommitAsync"/>. Several server processes over one database need a lock in
 /// the database around the decisions; version 1 does not provide it.
 /// </remarks>

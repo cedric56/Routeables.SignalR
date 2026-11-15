@@ -52,13 +52,13 @@ public class RouteablesHub(IServiceProvider services, RouteableSessions sessions
             return new RouteableWelcome(false, RouteableProtocol.Version, null, false,
                 $"The client speaks the protocol {hello.Protocol}, the server {RouteableProtocol.Version}: update @routeables/client.");
 
+        // The calls that arrive meanwhile (HubOptions.MaximumParallelInvocationsPerClient above 1) wait: they belong to the session that is
+        // resumed, not to the one the connection opened. They wait from before the session of the connection is read, so that none slips in between.
+        using var greeting = string.IsNullOrEmpty(hello.Resume) ? null : sessions.BeginGreeting(Context.ConnectionId);
         var current = Session;
         current.Greeted = true;   // a client that never says Hello is not waited for when its connection drops
         if (!string.IsNullOrEmpty(hello.Resume) && hello.Resume != current.Token)
         {
-            // The calls that arrive meanwhile (HubOptions.MaximumParallelInvocationsPerClient above 1) wait: they belong to the session
-            // that is resumed, not to the one the connection opened.
-            using var greeting = sessions.BeginGreeting(Context.ConnectionId);
             var context = Context;
             var resumed = await sessions.ResumeAsync(hello.Resume, Context.ConnectionId, Clients.Caller, Context.User, context.Abort).ConfigureAwait(false);
             if (resumed is not null)
@@ -72,8 +72,12 @@ public class RouteablesHub(IServiceProvider services, RouteableSessions sessions
     }
 
     /// <summary>Goes to a route, as the address bar of a browser would.</summary>
+    /// <remarks>
+    /// The route change lives as long as the session, not as the connection, as a command does: a connection that drops while a page asks
+    /// whether to leave, or while a slow guard runs, does not cancel it, and the client that resumes the session is told how it ended.
+    /// </remarks>
     public async Task<RouteableAck> GoTo(string route)
-        => await (await SessionAsync()).GoToAsync(route, Context.ConnectionAborted).ConfigureAwait(false);
+        => await (await SessionAsync()).GoToAsync(route).ConfigureAwait(false);
 
     /// <summary>
     /// Calls a command of the current view model. SignalR does not support optional parameters: the client always sends the
@@ -97,7 +101,7 @@ public class RouteablesHub(IServiceProvider services, RouteableSessions sessions
 
     /// <summary>Goes to a route in the router of a target (the main page is the empty target, a region its name).</summary>
     public async Task<RouteableAck> GoToIn(string target, string route)
-        => await (await SessionAsync()).GoToInAsync(target, route, Context.ConnectionAborted).ConfigureAwait(false);
+        => await (await SessionAsync()).GoToInAsync(target, route).ConfigureAwait(false);   // the session's lifetime, as GoTo
 
     /// <summary>Calls a command of the view model a target shows: a method that says so, or a command of its state by path.</summary>
     public async Task<RouteableAck> InvokeOn(string target, string command, JsonElement[]? arguments)

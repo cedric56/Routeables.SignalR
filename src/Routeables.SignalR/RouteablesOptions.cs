@@ -46,6 +46,13 @@ public sealed class RouteablesOptions
     /// </summary>
     public TimeSpan CommandGrace { get; set; } = TimeSpan.FromMilliseconds(800);
 
+    /// <summary>
+    /// How many calls of one session may go on at once once answered as pending (a long command, a route change that waits). Beyond, a new
+    /// call that could go on is refused with the code <c>limit</c> until one of them ends: a client cannot pile up slow calls without bound.
+    /// 64 by default.
+    /// </summary>
+    public int MaxRunningCalls { get; set; } = 64;
+
     /// <summary>How deep the state of a view model is read (objects inside objects). 4 by default.</summary>
     public int MaxDepth { get; set; } = 4;
 
@@ -129,6 +136,7 @@ public sealed class RouteablesOptions
         if (!Enum.IsDefined(Exposure))
             problems.Add($"Exposure is {(int)Exposure}: it is not a {nameof(RouteableExposure)}.");
         AtLeast(nameof(MaxTargets), MaxTargets, 0);
+        AtLeast(nameof(MaxRunningCalls), MaxRunningCalls, 1);
         AtLeast(nameof(MaxDepth), MaxDepth, 1);
         AtLeast(nameof(MaxCollectionItems), MaxCollectionItems, 1);
         AtLeast(nameof(MaxStateNodes), MaxStateNodes, 1);

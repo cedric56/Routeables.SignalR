@@ -27,18 +27,20 @@ internal sealed class Outbound(Func<string, long> generationOf, Action overflow,
     /// <summary>The client that receives the messages, or <see langword="null"/> while the connection is gone.</summary>
     public void Attach(IRouteableClient? client)
     {
-        List<Message> replay;
+        var start = false;
         lock (_gate)
         {
             _client = client;
             _versions.Clear();
             if (client is null)
                 return;
-            replay = [.. _detached];
-            _detached.Clear();
+            // The notifications that waited are queued in the same step as the client comes back: no message given meanwhile, from any
+            // thread, can pass in front of them.
+            while (_detached.TryDequeue(out var message))
+                start |= EnqueueLocked(message);
         }
-        foreach (var message in replay)
-            Enqueue(message);
+        if (start)
+            _ = PumpAsync();
     }
 
     public void Navigated(RouteableNavigated message)
@@ -88,48 +90,53 @@ internal sealed class Outbound(Func<string, long> generationOf, Action overflow,
 
     private void Enqueue(Message message)
     {
-        var start = false;
+        bool start;
         lock (_gate)
-        {
-            if (_disposed)
-                return;
-
-            if (_client is null)
-            {
-                // The state is sent again when the session is resumed; a dialog too (it is still waiting); the end of a call too, when the client
-                // says it waits for it (RouteableSession.TellEndsAsync): it is never dropped with the oldest notifications. The rest waits for the client.
-                if (message.Kind is Kind.Other)
-                {
-                    if (_detached.Count >= MaxDetachedMessages)
-                        _detached.Dequeue();
-                    _detached.Enqueue(message);
-                }
-                else
-                    RouteablesTelemetry.MessagesDropped.Add(1, new KeyValuePair<string, object?>("reason", "detached"));
-                return;
-            }
-
-            if (message.Kind == Kind.Changed && TryMerge(message))
-                return;
-
-            _queue.AddLast(message);
-            RouteablesTelemetry.OutboundDepth.Record(_queue.Count);
-            if (_queue.Count > maxPending)
-            {
-                _queue.Clear();
-                RouteablesTelemetry.Overflows.Add(1);
-                RouteablesTelemetry.MessagesDropped.Add(maxPending, new KeyValuePair<string, object?>("reason", "overflow"));
-                logger.LogWarning("More than {MaxPending} messages wait for the client: the connection is closed, the client resumes the session.", maxPending);
-                ThreadPool.UnsafeQueueUserWorkItem(static o => ((Action)o!)(), overflow, preferLocal: false);
-                return;
-            }
-
-            if (!_pumping)
-                start = _pumping = true;
-        }
-
+            start = EnqueueLocked(message);
         if (start)
             _ = PumpAsync();
+    }
+
+    // Under _gate: queues a message, and says whether the pump has to be started.
+    private bool EnqueueLocked(Message message)
+    {
+        if (_disposed)
+            return false;
+
+        if (_client is null)
+        {
+            // The state is sent again when the session is resumed; a dialog too (it is still waiting); the end of a call too, when the client
+            // says it waits for it (RouteableSession.TellEndsAsync): it is never dropped with the oldest notifications. The rest waits for the client.
+            if (message.Kind is Kind.Other)
+            {
+                if (_detached.Count >= MaxDetachedMessages)
+                    _detached.Dequeue();
+                _detached.Enqueue(message);
+            }
+            else
+                RouteablesTelemetry.MessagesDropped.Add(1, new KeyValuePair<string, object?>("reason", "detached"));
+            return false;
+        }
+
+        if (message.Kind == Kind.Changed && TryMerge(message))
+            return false;
+
+        _queue.AddLast(message);
+        RouteablesTelemetry.OutboundDepth.Record(_queue.Count);
+        if (_queue.Count > maxPending)
+        {
+            _queue.Clear();
+            RouteablesTelemetry.Overflows.Add(1);
+            RouteablesTelemetry.MessagesDropped.Add(maxPending, new KeyValuePair<string, object?>("reason", "overflow"));
+            logger.LogWarning("More than {MaxPending} messages wait for the client: the connection is closed, the client resumes the session.", maxPending);
+            ThreadPool.UnsafeQueueUserWorkItem(static o => ((Action)o!)(), overflow, preferLocal: false);
+            return false;
+        }
+
+        if (_pumping)
+            return false;
+        _pumping = true;
+        return true;
     }
 
     // Merges the patches of a change into the change of the same page that waits, when no message about that target was queued after it.

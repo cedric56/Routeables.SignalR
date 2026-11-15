@@ -57,7 +57,13 @@ internal sealed class SessionDispatcher : SynchronizationContext
     public override SynchronizationContext CreateCopy() => this;
 
     /// <summary>Runs <paramref name="work"/> on the session: now, on this thread, when the session is idle; after the work before it otherwise.</summary>
-    public Task<T> InvokeAsync<T>(Func<Task<T>> work)
+    public Task<T> InvokeAsync<T>(Func<Task<T>> work) => InvokeAsync(work, inline: true);
+
+    /// <summary>
+    /// Runs <paramref name="work"/> on the session, after the work before it. When <paramref name="inline"/> is <see langword="false"/>, an idle
+    /// session runs it on the thread pool rather than on this thread, so that the caller gets the task back before any of the work has run.
+    /// </summary>
+    public Task<T> InvokeAsync<T>(Func<Task<T>> work, bool inline)
     {
         if (CheckAccess())
             return work();
@@ -79,7 +85,7 @@ internal sealed class SessionDispatcher : SynchronizationContext
                 else if (t.IsFaulted) target.TrySetException(t.Exception!.InnerExceptions);
                 else target.TrySetResult(t.Result);
             }, completion, CancellationToken.None, TaskContinuationOptions.ExecuteSynchronously, TaskScheduler.Default);
-        }, null, ExecutionContext.Capture(), inline: true);
+        }, null, ExecutionContext.Capture(), inline);
         return completion.Task;
     }
 

@@ -4,6 +4,27 @@
 
 The first version meant for production. It changes the protocol (2) and some defaults: see "Breaking changes".
 
+### Fixes of the review of 15 November 2026
+
+- **The argument of a command of the state is read as the type the command takes.** A number became a `double` (a C# ternary that mixes
+  `int` and `double`): a `RelayCommand<int>` or `AsyncRelayCommand<int>` called by the client always failed, a large `long` lost digits,
+  and an object or an array arrived as `null`. The argument is now deserialized to the parameter of the typed `ExecuteAsync`/`Execute`
+  of the command (`RelayCommand<T>`, `AsyncRelayCommand<T>`); one that is not of that type is refused (`invalid-argument`). A command
+  that takes `object` gets an `int`, a `long`, a `double`, a text, a boolean, or the `JsonElement` of an object or an array.
+- **A route change lives as long as the session, not the connection** (`GoTo`, `GoToIn`), as a command does: a connection that drops
+  while a page asks whether to leave, or while a slow guard runs, no longer cancels it.
+- **`ReplicationServer` decides the changes of different replicas at the same time** (`ReplicationServerOptions.ConcurrentAdmission`,
+  true by default). The writes stay one at a time, in log order; a decision whose documents changed meanwhile (those the rules read
+  included) is made again, and in the end while nothing else is written. A replica still decides one change at a time. Set it to
+  false for a policy that cannot be called from several threads at once.
+- **`RouteablesOptions.MaxRunningCalls`** (64): the calls of a session that go on (answered as pending) are bounded; beyond, a new call
+  that may go on is refused with `limit` until one ends.
+- **A call with grace never runs on the thread of the hub**: a command long before its first `await` no longer delays its own answer
+  past `CommandGrace`.
+- **Concurrency**: the connection a session reads changes on its dispatcher when the connection drops; the notifications kept while
+  the client was away are queued in the same step as the client comes back (nothing can pass them); a `Hello` that resumes a session
+  holds the other calls of the connection from before it reads the session.
+
 ### The device of each user: Essentials
 
 - **`Routeables.SignalR.Essentials`**, a new package: `services.AddRouteablesEssentials()` gives the view models every .NET MAUI
