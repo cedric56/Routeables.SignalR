@@ -10,14 +10,14 @@
     "check": "vue-tsc --noEmit"
   },
   "dependencies": {
-    "@microsoft/signalr": "^10.0.0",
+    "@microsoft/signalr": "^11.0.0",
     "vue": "^3.5.0"
   },
   "devDependencies": {
     "@types/node": "^26.6.6",
-    "@vitejs/plugin-vue": "^6.0.0",
+    "@vitejs/plugin-vue": "^6.0.11",
     "typescript": "~6.0.3",
-    "vite": "^8.3.6",
+    "vite": "^8.3.8",
     "vue-tsc": "^3.0.0"
   }
 }
