@@ -11,7 +11,6 @@ This document is normative. The implementations, and what checks them:
 | Merge, client replica, server, in-memory store | `src/Routeables.Remote` (.NET, no dependency, Native AOT) | `tests/Routeables.Remote.Test` |
 | SignalR hub (`MapRouteablesReplication`) | `src/Routeables.SignalR/Replication.cs` | `tests/e2e/replication.test.mjs` (real Kestrel and SignalR, the TypeScript replica) |
 | TypeScript replica, SignalR channel | `clients/typescript/src/remote*.ts` (`@routeables/client`) | `clients/typescript/test/remote.test.ts`, the e2e tests |
-| Durable store (EF Core, MongoDB, Dommel, PostgreSQL) | `Queryeables.Replication` (Queryeables repository) | `ReplicationStoreContractTests` there |
 | One merge in two languages | `clients/fixtures/remote-v1.json`: a log written by .NET, and what each document must show | both test suites |
 
 ## 1. Scope, and what RRP is not
@@ -157,11 +156,9 @@ activity alone tells too much out of the groups of those who may not follow it; 
 ### 5.6 Storage of the server
 
 `IReplicationStore` keeps the head (position, horizon), the replicas, the documents and the log. `MemoryReplicationStore`
-is the default. `EntityReplicationStore` (Queryeables.Replication) writes them through any Queryeables store, and can
-write the merged documents to the application's own entities in the same transaction (`ReplicationProjection<T>`). A
-server process started again over the same store goes on where the previous one stopped (test:
-`A_server_restarted_over_its_store_goes_on_where_it_stopped`, and `Devices_converge_across_a_restart_of_the_server…` in
-Queryeables).
+is the default; a durable store is an implementation of the application, over its database, which can write the merged
+documents to its own entities in the same transaction. A server process started again over the same store goes on where
+the previous one stopped (test: `A_server_restarted_over_its_store_goes_on_where_it_stopped`).
 
 ## 6. Failures and their outcome
 
@@ -207,12 +204,12 @@ store has its own format (`ReplicaCodec` 2 in .NET, which still reads 1; `format
 
 ## 9. Mapping
 
-### 9.1 Queryeables
+### 9.1 An entity store
 
-* A Queryeables entity is a collection, its key the document key; scalar properties are registers, a collection of values
-  a set, a counter a counter, a long text a text field.
-* `EntityReplicationStore` keeps the protocol in the database; `ReplicationProjection<T>` writes each merged document to its
-  entity in the same transaction: the server's read model, queried as usual.
+* An entity type is a collection, its key the document key; scalar properties are registers, a collection of values a set,
+  a counter a counter, a long text a text field.
+* A durable `IReplicationStore` keeps the protocol in the database, and can write each merged document to its entity in the
+  same transaction: the server's read model, queried as usual.
 
 ### 9.2 Routeables.SignalR
 

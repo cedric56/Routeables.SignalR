@@ -3,7 +3,7 @@ using System.Text.Json.Serialization;
 namespace Routeables.Remote;
 
 /// <summary>
-/// A replicated document: one entity (Queryeables: <c>("Person", "4f1c...")</c>) or the state of one view model
+/// A replicated document: one entity (<c>("Person", "4f1c...")</c>) or the state of one view model
 /// (Routeables.SignalR: <c>("route:/orders", "session-key")</c>). <see cref="Collection"/> is what a client subscribes to
 /// and what the server authorizes; <see cref="Key"/> is chosen by the replica that creates the document (a Guid), so that
 /// it never changes once offline writes refer to it.
@@ -77,7 +77,7 @@ public sealed record DocumentOp(DocumentId Document, FieldOp Op);
 
 /// <summary>
 /// The unit of replication: what one replica did at once, stamped once. A change is admitted whole or refused whole, so
-/// that a parent and its children (a Queryeables graph) or the fields one command set (a view model) never arrive in
+/// that a parent and its children (an entity graph) or the fields one command set (a view model) never arrive in
 /// part.
 /// </summary>
 /// <param name="Dot">Its identity.</param>

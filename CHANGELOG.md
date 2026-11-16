@@ -53,8 +53,8 @@ The first version meant for production. It changes the protocol (2) and some def
   tell the connected clients when the log of a collection grows (`LogAdvanced`).
 - **Client**: `Replica` in `@routeables/client` (TypeScript, with `signalRReplicationChannel`). `clients/fixtures/remote-v1.json`,
   written by the .NET implementation, checks that both merge alike.
-- **A durable server**: `IReplicationStore`; `Queryeables.Replication` stores the protocol in EF Core, MongoDB, Dommel or
-  PostgreSQL and writes the merged documents to the application's entities.
+- **A durable server**: `IReplicationStore`, implemented by the application over its database (`MemoryReplicationStore` by
+  default). Queryeables no longer provides one: `Queryeables.Replication` is removed.
 
 ### Security
 

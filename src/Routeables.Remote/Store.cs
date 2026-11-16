@@ -21,7 +21,7 @@ public sealed record ReplicationCommit(ReplicaRecord Replica, LogEntry? Entry, I
 
 /// <summary>
 /// Where a server keeps the log, the merged documents and the replicas: in memory (<see cref="MemoryReplicationStore"/>)
-/// or in a database (Queryeables.Replication, over any IEntityStore: EF Core, MongoDB, Dommel...).
+/// or in a database, by an implementation of the application.
 /// </summary>
 /// <remarks>
 /// One server writes at a time (<see cref="ReplicationServer"/> serializes its writes; its reads run alongside them): a store needs no locking of

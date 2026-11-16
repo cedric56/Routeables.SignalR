@@ -64,7 +64,7 @@ public static class ReplicationExtensions
     /// <summary>
     /// Registers the <see cref="ReplicationServer"/> the hub serves, and the notification of the connected clients when its
     /// log grows. <paramref name="create"/> builds it: its policy (who may write and read what), its store (memory by
-    /// default; a database with Queryeables.Replication), its limits. There is no server by default: one without rules would let
+    /// default, or your own <c>IReplicationStore</c> over a database), its limits. There is no server by default: one without rules would let
     /// anyone read and write everything.
     /// </summary>
     public static IServiceCollection AddRouteablesReplication(this IServiceCollection services, Func<IServiceProvider, ReplicationServer> create)

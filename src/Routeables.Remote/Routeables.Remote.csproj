@@ -2,8 +2,8 @@
 
   <!--
     The Routeables Remote Protocol (PROTOCOL-REMOTE.md): replicated documents, their merge, a client replica that works offline,
-    and a server that decides. No package reference: Routeables.SignalR carries it over a hub, Queryeables.Replication stores it
-    in a database.
+    and a server that decides. No package reference: Routeables.SignalR carries it over a hub; an
+    IReplicationStore of the application keeps it in a database.
   -->
   <PropertyGroup>
     <TargetFramework>net10.0</TargetFramework>

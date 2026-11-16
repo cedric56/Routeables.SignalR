@@ -21,4 +21,5 @@ IReplicationChannel channel = server.Connect(user);         // in process; Route
 
 Fields: last-writer-wins registers, add-wins sets, counters, collaborative text (RGA), and the existence of the document.
 The SignalR hub is in `Routeables.SignalR` (`MapRouteablesReplication`); the TypeScript replica is in
-`@routeables/client`; a durable store over EF Core or MongoDB is `Queryeables.Replication`.
+`@routeables/client`; a durable store is an `IReplicationStore` of
+the application, over its database.

@@ -26,7 +26,7 @@ public readonly record struct Admission(bool Accepted, string? Code = null, stri
 }
 
 /// <summary>
-/// The rules of the application, on the server: which changes are admitted (Queryeables: access policies, row filters,
+/// The rules of the application, on the server: which changes are admitted (access policies, row filters,
 /// validation; Routeables.SignalR: settable properties, roles), and which documents a user may read.
 /// </summary>
 public interface IReplicationPolicy
