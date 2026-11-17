@@ -1,3 +1,5 @@
+using System.Collections.Immutable;
+
 namespace Routeables.Remote;
 
 /// <summary>The stamp of one operation: the stamp of its change, then its rank in the change.</summary>
@@ -23,9 +25,11 @@ public sealed class DocumentState
     private readonly Dictionary<string, Register> _registers = new(StringComparer.Ordinal);
     private readonly Dictionary<string, Dictionary<string, HashSet<ElementTag>>> _sets = new(StringComparer.Ordinal);
     private readonly Dictionary<string, long> _counters = new(StringComparer.Ordinal);
-    private readonly Dictionary<string, List<TextNode>> _texts = new(StringComparer.Ordinal);
-    // The identities of the characters of each text, built when an insertion first needs them: whether one is known costs nothing.
-    private readonly Dictionary<string, HashSet<TextId>> _textIds = new(StringComparer.Ordinal);
+    // In chunks shared with the clones until written (TextNodes): a clone costs the number of chunks, a keystroke copies one chunk.
+    private readonly Dictionary<string, TextNodes> _texts = new(StringComparer.Ordinal);
+    // The insertions of each text (their dot and rank) and how many characters each one made, built when an insertion first needs
+    // them: whether a character is known costs nothing. Immutable, so a clone shares it as it is.
+    private readonly Dictionary<string, ImmutableDictionary<(Dot Dot, int Index), int>> _insertions = new(StringComparer.Ordinal);
     // Where the last insertion of each text ended: typing anchors the next character there, found without a search.
     private readonly Dictionary<string, int> _lastInsert = new(StringComparer.Ordinal);
 
@@ -71,9 +75,10 @@ public sealed class DocumentState
         if (!_texts.TryGetValue(field, out var nodes))
             return string.Empty;
         var text = new System.Text.StringBuilder(nodes.Count);
-        foreach (var node in nodes)
-            if (!node.Erased)
-                text.Append(node.Value);
+        for (var c = 0; c < nodes.ChunkCount; c++)
+            foreach (var node in nodes.ChunkAt(c))
+                if (!node.Erased)
+                    text.Append(node.Value);
         return text.ToString();
     }
 
@@ -83,6 +88,29 @@ public sealed class DocumentState
     /// <summary>The identities of the characters of a text field that are not erased, in order: what an edit refers to.</summary>
     public IReadOnlyList<TextId> TextIds(string field)
         => _texts.TryGetValue(field, out var nodes) ? [.. nodes.Where(n => !n.Erased).Select(n => n.Id)] : [];
+
+    /// <summary>
+    /// How many characters of a text field are not erased, and the identities of those from <paramref name="start"/> on, at most
+    /// <paramref name="count"/>: what an edit refers to, read in one pass without copying the identities of the whole text.
+    /// </summary>
+    internal int VisibleIds(string field, int start, int count, List<TextId>? into)
+    {
+        if (!_texts.TryGetValue(field, out var nodes))
+            return 0;
+        var visible = 0;
+        for (var c = 0; c < nodes.ChunkCount; c++)
+        {
+            foreach (var node in nodes.ChunkAt(c))
+            {
+                if (node.Erased)
+                    continue;
+                if (into is not null && visible >= start && visible - start < count)
+                    into.Add(node.Id);
+                visible++;
+            }
+        }
+        return visible;
+    }
 
     internal void Apply(FieldOp op, OpStamp stamp, Dot dot)
     {
@@ -106,8 +134,8 @@ public sealed class DocumentState
                 Insert(insert, stamp, dot);
                 break;
             case EraseText erase:
-                if (_texts.TryGetValue(erase.Field, out var text))
-                    Erase(text, erase.Spans);
+                if (_texts.ContainsKey(erase.Field))
+                    Erase(erase.Field, erase.Spans);
                 break;
             case DeleteDocument or RestoreDocument:
                 if (ExistenceStamp is not { } current || stamp > current)
@@ -129,31 +157,46 @@ public sealed class DocumentState
         if (insert.Text.Length == 0)
             return;
         if (!_texts.TryGetValue(insert.Field, out var nodes))
-            _texts[insert.Field] = nodes = [];
-        if (!_textIds.TryGetValue(insert.Field, out var ids))
-            _textIds[insert.Field] = ids = [.. nodes.Select(n => n.Id)];
-        var first = new TextId(dot, stamp.Index, 0);
-        if (ids.Contains(first))
+            _texts[insert.Field] = nodes = new TextNodes();
+        var ids = Insertions(insert.Field, nodes);
+        if (ids.ContainsKey((dot, stamp.Index)))
             return;
         var at = 0;
-        if (insert.After is { } after && ids.Contains(after))
-            at = (_lastInsert.TryGetValue(insert.Field, out var last) && last < nodes.Count && nodes[last].Id == after
+        if (insert.After is { } after && ids.TryGetValue((after.Dot, after.Index), out var length) && after.Offset >= 0 && after.Offset < length)
+            at = (_lastInsert.TryGetValue(insert.Field, out var last) && last >= 0 && last < nodes.Count && nodes[last].Id == after
                 ? last
-                : nodes.FindIndex(n => n.Id == after)) + 1;
-        while (at < nodes.Count && nodes[at].IsAfter(stamp, 0))
-            at++;
+                : nodes.IndexOf(after)) + 1;
+        at = nodes.SkipAfter(at, stamp);
         var run = new TextNode[insert.Text.Length];
         for (var offset = 0; offset < run.Length; offset++)
             run[offset] = new TextNode(new TextId(dot, stamp.Index, offset), insert.Text[offset], stamp, false);
-        nodes.InsertRange(at, run);
-        foreach (var node in run)
-            ids.Add(node.Id);
+        nodes.Insert(at, run);
+        _insertions[insert.Field] = ids.Add((dot, stamp.Index), run.Length);
         _lastInsert[insert.Field] = at + run.Length - 1;
     }
 
-    // One pass over the text: the spans are looked up by the insertion they belong to.
-    private static void Erase(List<TextNode> nodes, IReadOnlyList<TextSpan> spans)
+    // The insertions of a text, built from its characters the first time they are needed.
+    private ImmutableDictionary<(Dot Dot, int Index), int> Insertions(string field, TextNodes nodes)
     {
+        if (_insertions.TryGetValue(field, out var ids))
+            return ids;
+        var builder = ImmutableDictionary.CreateBuilder<(Dot Dot, int Index), int>();
+        foreach (var node in nodes)
+        {
+            var key = (node.Id.Dot, node.Id.Index);
+            if (!builder.TryGetValue(key, out var length) || length <= node.Id.Offset)
+                builder[key] = node.Id.Offset + 1;
+        }
+        return _insertions[field] = builder.ToImmutable();
+    }
+
+    // One pass over the text: the spans are looked up by the insertion they belong to. Few insertions (a key pressed, a word
+    // erased) are compared directly, without hashing every character of the text.
+    private void Erase(string field, IReadOnlyList<TextSpan> spans)
+    {
+        if (spans.Count == 0)
+            return;
+        var nodes = _texts[field];
         var byInsertion = new Dictionary<(Dot, int), List<TextSpan>>();
         foreach (var span in spans)
         {
@@ -161,20 +204,32 @@ public sealed class DocumentState
                 byInsertion[(span.Dot, span.Index)] = list = [];
             list.Add(span);
         }
-        for (var i = 0; i < nodes.Count; i++)
+        var few = byInsertion.Count <= 8 ? byInsertion.Select(b => (b.Key.Item1, b.Key.Item2, b.Value)).ToArray() : null;
+        nodes.Erase(node =>
         {
-            var id = nodes[i].Id;
-            if (nodes[i].Erased || !byInsertion.TryGetValue((id.Dot, id.Index), out var list))
-                continue;
-            foreach (var span in list)
+            List<TextSpan>? found = null;
+            if (few is not null)
             {
-                if (id.Offset >= span.Offset && id.Offset < span.Offset + span.Length)
+                foreach (var (dot, index, list) in few)
                 {
-                    nodes[i] = nodes[i] with { Erased = true };
-                    break;
+                    if (index == node.Id.Index && dot == node.Id.Dot)
+                    {
+                        found = list;
+                        break;
+                    }
                 }
             }
-        }
+            else
+            {
+                byInsertion.TryGetValue((node.Id.Dot, node.Id.Index), out found);
+            }
+            if (found is null)
+                return false;
+            foreach (var span in found)
+                if (node.Id.Offset >= span.Offset && node.Id.Offset < span.Offset + span.Length)
+                    return true;
+            return false;
+        });
     }
 
     private HashSet<ElementTag> Set(string field, string element)
@@ -186,6 +241,10 @@ public sealed class DocumentState
         return tags;
     }
 
+    /// <summary>
+    /// A copy, independent of this state. Its texts are shared until one of the two changes them (copy on write): a clone costs the
+    /// number of fields and elements, not the length of the texts.
+    /// </summary>
     public DocumentState Clone()
     {
         var copy = new DocumentState(Id) { Exists = Exists, ExistenceStamp = ExistenceStamp };
@@ -196,7 +255,11 @@ public sealed class DocumentState
         foreach (var (name, value) in _counters)
             copy._counters[name] = value;
         foreach (var (name, nodes) in _texts)
-            copy._texts[name] = [.. nodes];
+            copy._texts[name] = nodes.Clone();
+        foreach (var (name, ids) in _insertions)
+            copy._insertions[name] = ids;
+        foreach (var (name, last) in _lastInsert)
+            copy._lastInsert[name] = last;
         return copy;
     }
 
@@ -211,21 +274,29 @@ public sealed class DocumentState
         [.. _texts.Select(t => new TextSnapshot(t.Key, Runs(t.Value)))]);
 
     // Consecutive characters of one insertion, alike erased or not, are stored as one run.
-    private static List<TextRun> Runs(List<TextNode> nodes)
+    private static List<TextRun> Runs(TextNodes nodes)
     {
         var runs = new List<TextRun>();
-        var i = 0;
-        while (i < nodes.Count)
+        var text = new System.Text.StringBuilder();
+        TextNode start = default;
+        var length = 0;
+        foreach (var node in nodes)
         {
-            var start = nodes[i];
-            var text = new System.Text.StringBuilder().Append(start.Value);
-            var j = i + 1;
-            while (j < nodes.Count && nodes[j].Id.Dot == start.Id.Dot && nodes[j].Id.Index == start.Id.Index
-                   && nodes[j].Id.Offset == start.Id.Offset + (j - i) && nodes[j].Erased == start.Erased)
-                text.Append(nodes[j++].Value);
-            runs.Add(new TextRun(start.Id, start.Stamp, text.ToString(), start.Erased));
-            i = j;
+            if (length > 0 && node.Id.Dot == start.Id.Dot && node.Id.Index == start.Id.Index && node.Id.Offset == start.Id.Offset + length
+                && node.Erased == start.Erased)
+            {
+                text.Append(node.Value);
+                length++;
+                continue;
+            }
+            if (length > 0)
+                runs.Add(new TextRun(start.Id, start.Stamp, text.ToString(), start.Erased));
+            start = node;
+            text.Clear().Append(node.Value);
+            length = 1;
         }
+        if (length > 0)
+            runs.Add(new TextRun(start.Id, start.Stamp, text.ToString(), start.Erased));
         return runs;
     }
 
@@ -241,7 +312,7 @@ public sealed class DocumentState
             state._counters[counter.Field] = counter.Value;
         foreach (var text in snapshot.Texts ?? [])
         {
-            var nodes = state._texts[text.Field] = [];
+            var nodes = state._texts[text.Field] = new TextNodes();
             foreach (var run in text.Runs)
                 for (var offset = 0; offset < run.Text.Length; offset++)
                     nodes.Add(new TextNode(run.Start with { Offset = run.Start.Offset + offset }, run.Text[offset], run.Stamp, run.Erased));
@@ -251,15 +322,197 @@ public sealed class DocumentState
 
     private readonly record struct Register(string? Value, OpStamp Stamp);
 
-    private readonly record struct TextNode(TextId Id, char Value, OpStamp Stamp, bool Erased)
+}
+
+/// <summary>One character of a text field, erased or not.</summary>
+internal readonly record struct TextNode(TextId Id, char Value, OpStamp Stamp, bool Erased)
+{
+    // Characters are ordered by the stamp of their insertion, then by their rank in it.
+    public bool IsAfter(OpStamp stamp, int offset)
     {
-        // Characters are ordered by the stamp of their insertion, then by their rank in it.
-        public bool IsAfter(OpStamp stamp, int offset)
+        var order = Stamp.CompareTo(stamp);
+        return order > 0 || order == 0 && Id.Offset > offset;
+    }
+}
+
+/// <summary>
+/// The characters of a text field, in order, in chunks of at most <see cref="MaxChunk"/>. A clone shares the chunks, and each side copies
+/// a chunk before it changes it (copy on write): cloning a document costs the number of chunks, a keystroke copies one chunk, and the
+/// cost of an edit no longer grows with the length of the text (audit of 17 November 2026, B2). Not safe for a write while another thread
+/// clones the same instance: a document has one owner at a time (a replica, a decision of the server, a store under its lock).
+/// </summary>
+internal sealed class TextNodes : IEnumerable<TextNode>
+{
+    internal const int MaxChunk = 1024;
+
+    private sealed class Chunk(List<TextNode> nodes)
+    {
+        public readonly List<TextNode> Nodes = nodes;
+        // Seen by more than one TextNodes: copied by whichever changes it first.
+        public volatile bool Shared;
+    }
+
+    private readonly List<Chunk> _chunks;
+
+    public TextNodes() => _chunks = [];
+
+    private TextNodes(List<Chunk> chunks, int count)
+    {
+        _chunks = chunks;
+        Count = count;
+    }
+
+    public int Count { get; private set; }
+
+    public int ChunkCount => _chunks.Count;
+
+    /// <summary>The characters of a chunk, to read them: never changed through it.</summary>
+    public List<TextNode> ChunkAt(int chunk) => _chunks[chunk].Nodes;
+
+    public TextNodes Clone()
+    {
+        foreach (var chunk in _chunks)
+            chunk.Shared = true;
+        return new TextNodes([.. _chunks], Count);
+    }
+
+    // The chunk of a position, and the position in it; the end of the last chunk for Count.
+    private (int Chunk, int Offset) Locate(int index)
+    {
+        for (var c = 0; c < _chunks.Count; c++)
         {
-            var order = Stamp.CompareTo(stamp);
-            return order > 0 || order == 0 && Id.Offset > offset;
+            var count = _chunks[c].Nodes.Count;
+            if (index < count)
+                return (c, index);
+            index -= count;
+        }
+        return _chunks.Count == 0 ? (-1, 0) : (_chunks.Count - 1, _chunks[^1].Nodes.Count);
+    }
+
+    public TextNode this[int index]
+    {
+        get
+        {
+            ArgumentOutOfRangeException.ThrowIfNegative(index);
+            ArgumentOutOfRangeException.ThrowIfGreaterThanOrEqual(index, Count);
+            var (chunk, offset) = Locate(index);
+            return _chunks[chunk].Nodes[offset];
         }
     }
+
+    private List<TextNode> Writable(int chunk)
+    {
+        var current = _chunks[chunk];
+        if (!current.Shared)
+            return current.Nodes;
+        var copy = new List<TextNode>(Math.Max(current.Nodes.Count + 16, MaxChunk / 2));
+        copy.AddRange(current.Nodes);
+        _chunks[chunk] = new Chunk(copy);
+        return copy;
+    }
+
+    /// <summary>Inserts characters at a position (0 to <see cref="Count"/>).</summary>
+    public void Insert(int at, TextNode[] run)
+    {
+        ArgumentOutOfRangeException.ThrowIfNegative(at);
+        ArgumentOutOfRangeException.ThrowIfGreaterThan(at, Count);
+        if (run.Length == 0)
+            return;
+        if (_chunks.Count == 0)
+            _chunks.Add(new Chunk(new List<TextNode>(Math.Min(MaxChunk, Math.Max(16, run.Length)))));
+        var (chunk, offset) = Locate(at);
+        var nodes = Writable(chunk);
+        nodes.InsertRange(offset, run);
+        Count += run.Length;
+        if (nodes.Count > MaxChunk)
+            Split(chunk);
+    }
+
+    /// <summary>Adds characters at the end (a text read from a snapshot).</summary>
+    public void Add(TextNode node)
+    {
+        if (_chunks.Count == 0 || _chunks[^1].Nodes.Count >= MaxChunk || _chunks[^1].Shared)
+            _chunks.Add(new Chunk(new List<TextNode>(MaxChunk)));
+        _chunks[^1].Nodes.Add(node);
+        Count++;
+    }
+
+    // A chunk grown beyond the limit becomes chunks of half of it: room for the next keystrokes in each.
+    private void Split(int chunk)
+    {
+        var nodes = _chunks[chunk].Nodes;
+        var pieces = new List<Chunk>();
+        for (var start = 0; start < nodes.Count; start += MaxChunk / 2)
+        {
+            var count = Math.Min(MaxChunk / 2, nodes.Count - start);
+            var piece = new List<TextNode>(MaxChunk);
+            piece.AddRange(nodes.GetRange(start, count));
+            pieces.Add(new Chunk(piece));
+        }
+        _chunks.RemoveAt(chunk);
+        _chunks.InsertRange(chunk, pieces);
+    }
+
+    /// <summary>The position of the first character from <paramref name="at"/> that is not inserted after <paramref name="stamp"/> (RGA).</summary>
+    public int SkipAfter(int at, OpStamp stamp)
+    {
+        if (at >= Count)
+            return at;
+        var (chunk, offset) = Locate(at);
+        for (var c = chunk; c < _chunks.Count; c++, offset = 0)
+        {
+            var nodes = _chunks[c].Nodes;
+            for (var i = offset; i < nodes.Count; i++, at++)
+                if (!nodes[i].IsAfter(stamp, 0))
+                    return at;
+        }
+        return at;
+    }
+
+    /// <summary>The position of a character, -1 when it is not there.</summary>
+    public int IndexOf(TextId id)
+    {
+        var index = 0;
+        foreach (var chunk in _chunks)
+        {
+            var nodes = chunk.Nodes;
+            for (var i = 0; i < nodes.Count; i++, index++)
+                if (nodes[i].Id == id)
+                    return index;
+        }
+        return -1;
+    }
+
+    /// <summary>Marks erased the characters not erased yet that <paramref name="erases"/> selects: only the chunks that hold one are copied.</summary>
+    public void Erase(Func<TextNode, bool> erases)
+    {
+        for (var c = 0; c < _chunks.Count; c++)
+        {
+            var nodes = _chunks[c].Nodes;
+            var writable = false;
+            for (var i = 0; i < nodes.Count; i++)
+            {
+                var node = nodes[i];
+                if (node.Erased || !erases(node))
+                    continue;
+                if (!writable)
+                {
+                    nodes = Writable(c);
+                    writable = true;
+                }
+                nodes[i] = node with { Erased = true };
+            }
+        }
+    }
+
+    public IEnumerator<TextNode> GetEnumerator()
+    {
+        foreach (var chunk in _chunks)
+            foreach (var node in chunk.Nodes)
+                yield return node;
+    }
+
+    System.Collections.IEnumerator System.Collections.IEnumerable.GetEnumerator() => GetEnumerator();
 }
 
 /// <summary>A document as data: what a snapshot carries, and what a replica stores.</summary>

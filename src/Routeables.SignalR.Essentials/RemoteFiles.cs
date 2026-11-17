@@ -262,8 +262,16 @@ public sealed class RemoteFileLinks
         return false;
     }
 
+    // Who the user is, as a session knows its user to resume it (RouteableSession.KeyOf): the scheme, the issuer and the identifier. Not the
+    // identifier alone: two schemes or two issuers may give the same "sub" to two people (audit of 17 November 2026, S3).
     internal static string? UserIdOf(ClaimsPrincipal user)
-        => (user.FindFirst(ClaimTypes.NameIdentifier) ?? user.FindFirst("sub"))?.Value;
+    {
+        var claim = user.FindFirst(ClaimTypes.NameIdentifier) ?? user.FindFirst("sub");
+        if (claim is null || string.IsNullOrWhiteSpace(claim.Value))
+            return null;
+        var scheme = user.Identity?.AuthenticationType ?? string.Empty;
+        return $"{scheme.Length}:{scheme}|{claim.Issuer.Length}:{claim.Issuer}|{claim.Value}";
+    }
 
     // ---------------------------------------------------------------- endpoint
 

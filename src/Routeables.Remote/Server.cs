@@ -85,6 +85,14 @@ public sealed class ReplicationServerOptions
     public int MaxTextLength { get; set; } = 1_000_000;
 
     /// <summary>
+    /// How many characters one change may make the server read, all its text operations together: an erasure reads the whole field, an
+    /// insertion whose anchor was not the last character typed searches it. A change of a thousand erasures on a long text would otherwise
+    /// hold the server for seconds (audit of 17 November 2026, S2). 20 000 000 by default: twenty erasures on a text of a million
+    /// characters, two hundred on one of a hundred thousand; a keystroke makes one or two.
+    /// </summary>
+    public long MaxTextWorkPerChange { get; set; } = 20_000_000;
+
+    /// <summary>
     /// How many snapshots are made at once. A snapshot does not stop the writes (it reads the documents between two of them), but each
     /// one reads whole collections. 4 by default.
     /// </summary>
@@ -215,7 +223,9 @@ public sealed class ReplicationServer
         // (ClockSkew) and stamped again by the client after it has fallen back to the clock of the server.
         if (hello.Clock.Wall <= LatestAllowedWall())
             Clock.Observe(hello.Clock);
-        return new RemoteWelcome(true, RemoteProtocol.Version, Clock.Last, record?.LastSeq ?? 0, Options.MaxChangesPerPush);
+        // A value of now, not the last one given: the client compares it with its own time (HybridClock.Calibrate), and a clock that
+        // gave nothing since the server started would say 1970.
+        return new RemoteWelcome(true, RemoteProtocol.Version, Clock.Next(), record?.LastSeq ?? 0, Options.MaxChangesPerPush);
     }
 
     private async Task<PushResult> PushAsync(ClaimsPrincipal? user, PushRequest request, CancellationToken ct)
@@ -322,11 +332,21 @@ public sealed class ReplicationServer
             decision = await _policy.AdmitAsync(user, change, Current, ct);
 
         var changed = new List<DocumentState>();
+        long work = 0;
         if (decision.Accepted)
         {
             foreach (var id in change.Ops.Select(o => o.Document).Distinct())
             {
                 var state = await Current(id) ?? new DocumentState(id);
+                foreach (var op in change.Ops)
+                    if (op.Document == id && op.Op is EraseText or InsertText { After: not null })
+                        work += state.TextSize(op.Op is EraseText erase ? erase.Field : ((InsertText)op.Op).Field) + 1;
+                if (work > Options.MaxTextWorkPerChange)
+                {
+                    decision = Admission.Reject(RemoteErrorCodes.TooLarge,
+                        $"The change edits its texts too many times for their length (MaxTextWorkPerChange): send the edits in several changes.");
+                    break;
+                }
                 for (var index = 0; index < change.Ops.Count; index++)
                 {
                     if (change.Ops[index].Document != id)

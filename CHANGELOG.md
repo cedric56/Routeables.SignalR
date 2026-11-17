@@ -4,6 +4,38 @@
 
 The first version meant for production. It changes the protocol (2) and some defaults: see "Breaking changes".
 
+### Fixes of the audit of 17 November 2026
+
+- **A device whose clock is ahead synchronizes** (B1). A clock more than `MaxClockSkew` (5 min) ahead was refused `clock-skew` at every
+  synchronization, for ever, while `SyncReport` said `pushed=2, rejected=0`. The welcome now carries a value of now of the server's clock;
+  the replica compares it with its own time (`HybridClock.Calibrate`, `Offset`) and, ahead by more than a minute, stamps by the time of the
+  server. Every change stamped by the old clock is stamped again in the same synchronization, in order, whatever the size of the
+  batches. `SyncReport` gains `Restamped`, `ClockSkew` (still refused: ask the user to set the time) and `ClockOffset`. .NET and TypeScript.
+- **`SyncReport.Pushed` counts the changes the server accepted**, no longer those it refused (B5).
+- **Typing in a long text no longer costs the size of the text** (B2). At 100 000 characters, a keystroke cost ~32 ms and ~130 MB
+  allocated on the client and ~30 ms on the server; it now costs ~3 ms and ~5 MB on the client and ~0.1 ms on the server, whatever the
+  length. A text is kept in chunks shared copy-on-write (`DocumentState.Clone` costs the number of chunks), the replica keeps what the
+  application sees instead of rebuilding it from every pending change at each read, the builders read only the characters they refer
+  to, and the stored state encodes the confirmed documents again only after a pull changed them. The TypeScript replica keeps its views
+  too, and clones without a round trip through a snapshot.
+- **`ReplicationServerOptions.MaxTextWorkPerChange`** (20 000 000): a change whose text operations would read more characters than that
+  is refused `too-large`; a thousand erasures on a long text no longer hold the server (S2).
+- **An object of the state that exposes nothing is told** (B3): with `Explicit` exposure (the default), an `Order` none of whose
+  properties is marked is still sent as `{}`, and a warning says so once per type in Development. The opening example of the README
+  marks its `Order`.
+- **Two properties sent under one name (`URL` and `Url`) are refused**, as two commands of one name are, instead of one of them vanishing (B6).
+- **Delays longer than a timer waits are refused at startup** (`CommandGrace`, `EssentialsTimeout`, `ReconnectGracePeriod`, at most
+  `RouteablesOptions.MaxDelay`, about 24.8 days), instead of failing at the first command or disconnection (B8).
+- **A call made inline on an idle session returns once it has run**: what it queued (its continuations, the changes it caused) goes on
+  on the thread pool instead of running on the thread of the hub first (B9).
+- **`RouteablesOptions.MinResendInterval`** (1 s): `Resync`, and `Watch` of a target already watched, send the full state at once, then
+  at most once per interval per target, a burst ending with one resend (S2).
+- **The links of Essentials files compare the scheme, the issuer and the identifier of the user**, as a session does to be resumed (S3).
+- **`RouteableSession.RunDetached`**, and the documentation of `RouteableSession.Running`: work started during a command keeps its
+  session for good, a singleton's timer included (S1).
+- **`@routeables/client`**: a patch or a text that inserts more than about a hundred thousand items no longer throws `RangeError` (B10).
+- **CI**: the actions are pinned by commit; the release publishes to NuGet and npm by Trusted Publishing, without long-lived secrets (S6).
+
 ### Fixes of the review of 15 November 2026
 
 - **The argument of a command of the state is read as the type the command takes.** A number became a `double` (a C# ternary that mixes

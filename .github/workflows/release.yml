@@ -3,8 +3,13 @@ name: Release
 # A tag v2.1.0 publishes Routeables.SignalR and Routeables.Remote 2.1.0 to NuGet and @routeables/client 2.1.0 to npm: the two packages always share their version
 # (see VERSIONING.md). The NuGet package depends on the published packages of Routeables (vars.ROUTEABLES_VERSION), not on its sources.
 #
-# Needs: the secret NUGET_API_KEY, the secret NPM_TOKEN, the variable ROUTEABLES_VERSION (the version of the Routeables packages) and the
-# variable ESSENTIEABLES_VERSION (the version of the Essentieables.Facades package, for Routeables.SignalR.Essentials).
+# Publishes without long-lived secrets (Trusted Publishing): NuGet and npm trust this workflow, in the environment "release", through the
+# OIDC token of the run. Set it up once: on nuget.org, a trusted publishing policy for this repository, workflow release.yml and environment
+# release; on npmjs.com, a trusted publisher for @routeables/client with the same workflow and environment.
+#
+# Needs: the variable NUGET_USER (the nuget.org account that owns the policy), the variable ROUTEABLES_VERSION (the version of the Routeables
+# packages) and the variable ESSENTIEABLES_VERSION (the version of the Essentieables.Facades package, for Routeables.SignalR.Essentials).
+# The actions are pinned by commit, not by tag: a tag can be moved.
 
 on:
   push:
@@ -12,7 +17,7 @@ on:
 
 permissions:
   contents: read
-  id-token: write   # npm provenance
+  id-token: write   # Trusted Publishing (NuGet, npm) and npm provenance
 
 env:
   DOTNET_NOLOGO: true
@@ -26,7 +31,7 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Version from the tag
         id: version
@@ -43,12 +48,12 @@ jobs:
           [ "${tag%%-*}" = "${npm%%-*}" ] || { echo "::error::The tag $tag does not match the version of @routeables/client ($npm)."; exit 1; }
 
       - name: Setup .NET
-        uses: actions/setup-dotnet@v6
+        uses: actions/setup-dotnet@0f4a354dd5547a28c70b7853dbd95d5b67886e73 # v6.1.0
         with:
           dotnet-version: 10.0.x
 
       - name: Setup Node
-        uses: actions/setup-node@v7
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: 22
           registry-url: https://registry.npmjs.org
@@ -88,11 +93,17 @@ jobs:
         run: npm version ${{ steps.version.outputs.value }} --no-git-tag-version --allow-same-version
         working-directory: clients/typescript
 
-      - name: Publish to NuGet
-        run: dotnet nuget push "artifacts/*.nupkg" --api-key "${{ secrets.NUGET_API_KEY }}" --source https://api.nuget.org/v3/index.json --skip-duplicate
+      # A key valid for an hour, given for the OIDC token of this run.
+      - name: Log in to NuGet (Trusted Publishing)
+        id: nuget
+        uses: NuGet/login@8d196754b4036150537f80ac539e15c2f1028841 # v1.2.0
+        with:
+          user: ${{ vars.NUGET_USER }}
 
-      - name: Publish to npm
-        run: npm publish --provenance --access public
+      - name: Publish to NuGet
+        run: dotnet nuget push "artifacts/*.nupkg" --api-key "${{ steps.nuget.outputs.NUGET_API_KEY }}" --source https://api.nuget.org/v3/index.json --skip-duplicate
+
+      # npm 11.5.1 or later publishes with the OIDC token of the run: no token is kept anywhere.
+      - name: Publish to npm (Trusted Publishing)
+        run: npm install -g npm@^11.5.1 && npm publish --provenance --access public
         working-directory: clients/typescript
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}

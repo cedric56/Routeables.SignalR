@@ -118,14 +118,18 @@ internal sealed class SessionDispatcher : SynchronizationContext
         }
 
         if (inline)
-            Drain();
+            Drain(until: callback);
         else
-            ThreadPool.UnsafeQueueUserWorkItem(static self => self.Drain(), this, preferLocal: false);
+            ThreadPool.UnsafeQueueUserWorkItem(static self => self.Drain(until: null), this, preferLocal: false);
     }
 
-    private void Drain()
+    // Runs the queue. With until (a call made inline on an idle session), stops after that work: what it queued meanwhile (its continuations,
+    // the changes it caused) goes on on the thread pool, and the caller (the thread of the hub) gets its task back without running the work of
+    // the whole queue first (audit of 17 November 2026, B9).
+    private void Drain(SendOrPostCallback? until)
     {
         var previous = Current;
+        var handedOff = false;
         SetSynchronizationContext(this);
         Volatile.Write(ref _thread, Environment.CurrentManagedThreadId);
         try
@@ -170,11 +174,30 @@ internal sealed class SessionDispatcher : SynchronizationContext
                 SetSynchronizationContext(this);
                 try { _endOfTurn(); }
                 catch (Exception exception) { _unhandled(exception); }
+
+                if (until is not null && ReferenceEquals(item.Callback, until))
+                {
+                    lock (_gate)
+                    {
+                        if (_queue.Count == 0)
+                        {
+                            _running = false;
+                            return;
+                        }
+                    }
+                    // Still running (_running stays set): the pool takes the rest, in order. This thread lets go of the session first, and
+                    // never touches _thread again: the pool may own it already.
+                    Volatile.Write(ref _thread, 0);
+                    handedOff = true;
+                    ThreadPool.UnsafeQueueUserWorkItem(static self => self.Drain(until: null), this, preferLocal: false);
+                    return;
+                }
             }
         }
         finally
         {
-            Volatile.Write(ref _thread, 0);
+            if (!handedOff)
+                Volatile.Write(ref _thread, 0);
             SetSynchronizationContext(previous);
         }
     }

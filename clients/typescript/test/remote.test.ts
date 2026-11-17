@@ -73,6 +73,9 @@ class TestServer {
 
   hello(hello: RemoteHello): RemoteWelcome {
     if (hello.clock.wall <= this.now() + 300_000 && compareHlc(hello.clock, this.clock) > 0) this.clock = { ...hello.clock, replica: this.clock.replica };
+    // As the server does: a value of now, not the last one given.
+    const now = this.now();
+    this.clock = now > this.clock.wall ? { wall: now, counter: 0, replica: this.clock.replica } : { ...this.clock, counter: this.clock.counter + 1 };
     return { success: hello.protocol === REMOTE_PROTOCOL, protocol: REMOTE_PROTOCOL, clock: this.clock, lastSeq: this.replicas.get(hello.replica)?.lastSeq ?? 0, maxChangesPerPush: 3 };
   }
 
@@ -242,6 +245,72 @@ describe('a replica', () => {
     assert.equal(server.find(note)!.text('body'), 'bcd');
     assert.equal(a.replica.find(note)!.text('body'), 'bcd');
     assert.equal(a.replica.rejected.length, 0);
+  });
+
+  // Audit of 17 November 2026, B1: a telephone ten minutes ahead never synchronized, and nothing said so.
+  it('synchronizes a device whose clock is ahead at the first attempt, every pending change in its order, and says so', async () => {
+    const server = new TestServer();
+    const a = await new Device(server, ['Note'], () => Date.now() + 10 * 60_000).start();
+    await a.replica.edit().create(note).commit();
+    for (let i = 0; i < 7; i++) await a.replica.edit().set(note, 'last', `"${i}"`).increment(note, 'count', 1).insertText(note, 'body', i, `${i}`).commit();
+
+    const report = await a.sync();     // three changes per push: three batches stamped again in this synchronization
+
+    assert.deepEqual([report.pushed, report.rejected, report.restamped, report.clockSkew], [8, 0, 8, false]);
+    assert.ok(report.clockOffset <= -9 * 60_000 && report.clockOffset >= -11 * 60_000);
+    assert.equal(a.replica.pendingCount, 0);
+    assert.equal(server.find(note)!.get('last'), '"6"');
+    assert.equal(server.find(note)!.counter('count'), 7);
+    assert.equal(server.find(note)!.text('body'), '0123456');
+
+    await a.replica.edit().set(note, 'last', '"7"').commit();     // stamped by the time of the server from now on
+    const next = await a.sync();
+    assert.deepEqual([next.pushed, next.restamped], [1, 0]);
+  });
+
+  it('says when the clock is still refused, and keeps the changes', async () => {
+    const server = new TestServer();
+    server.now = () => Date.now() - 3_600_000;     // the server refuses what is an hour ahead of it, and answers with that time
+    const welcome = server.hello.bind(server);
+    server.hello = hello => ({ ...welcome(hello), clock: { wall: 0, counter: 0, replica: '00000000-0000-0000-0000-000000000000' } });     // an old server: no time
+    const a = await new Device(server, ['Note']).start();
+    await a.replica.edit().create(note).commit();
+
+    const report = await a.sync();
+
+    assert.equal(report.clockSkew, true);
+    assert.equal(a.replica.pendingCount, 1);
+    assert.equal(a.replica.rejected.length, 0);
+  });
+
+  it('counts a refused change as rejected, not as pushed', async () => {
+    const { server, list: [a] } = await devices(1);
+    server.refuse = change => change.ops.some(o => o.op.op === 'set') ? RemoteErrorCodes.invalid : null;
+    await a!.replica.edit().create(ana).commit();
+    await a!.replica.edit().set(ana, 'name', '"Ana"').commit();
+    const report = await a!.sync();
+    assert.deepEqual([report.pushed, report.rejected], [1, 1]);
+  });
+
+  it('keeps what it shows apart from what it gives: a document read does not move with later changes', async () => {
+    const { list: [a] } = await devices(1);
+    await a!.replica.edit().create(note).insertText(note, 'body', 0, 'abc').commit();
+    const before = a!.replica.find(note)!;
+    await a!.replica.edit().insertText(note, 'body', 3, 'd').eraseText(note, 'body', 0, 1).commit();
+    assert.equal(before.text('body'), 'abc');
+    assert.equal(a!.replica.find(note)!.text('body'), 'bcd');
+    await assert.rejects(a!.replica.edit().eraseText(note, 'body', 2, 5).commit());     // a change that fails leaves nothing
+    assert.equal(a!.replica.find(note)!.text('body'), 'bcd');
+  });
+
+  it('inserts a text longer than a function call takes arguments', async () => {
+    const { server, list: [a] } = await devices(1);
+    const long = 'x'.repeat(200_000);
+    await a!.replica.edit().create(note).insertText(note, 'body', 0, 'ab').commit();
+    await a!.replica.edit().insertText(note, 'body', 1, long).commit();
+    await a!.sync();
+    assert.equal(server.find(note)!.text('body').length, 200_002);
+    assert.equal(a!.replica.find(note)!.text('body'), `a${long}b`);
   });
 
   it('merges concurrent typing in one text field', async () => {

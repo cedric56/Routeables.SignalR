@@ -43,6 +43,12 @@ public sealed class RouteableStateProjector
     /// <summary>The schema it follows.</summary>
     public RouteableSchema Schema => _schema;
 
+    /// <summary>
+    /// Told, once per type and per application, of an object inside a state sent empty because none of its properties is exposed
+    /// (<c>{"orders":[{}]}</c>): the session logs it in Development.
+    /// </summary>
+    internal Action<Type>? SentEmpty { get; set; }
+
     private RouteablesOptions Options => _schema.Options;
 
     /// <summary>The state of <paramref name="viewModel"/>.</summary>
@@ -218,6 +224,8 @@ public sealed class RouteableStateProjector
 
             var state = new Dictionary<string, object?>(StringComparer.Ordinal);
             var shape = _schema.Shape(type);
+            if (shape.HidesAll && SentEmpty is { } sentEmpty && _schema.FirstTimeEmpty(type))
+                sentEmpty(type);
             foreach (var member in shape.State)
             {
                 if (guard is not null && !guard(property, value, shape, member))

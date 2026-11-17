@@ -96,7 +96,7 @@ Over SignalR the hub methods are `Hello`, `Push`, `Pull`, `Snapshot`, each with 
 ```
 client                                           server
   ── Hello {replica, clock} ────────────────────▶  checks version and owner of the replica
-  ◀──────────── Welcome {clock, lastSeq} ───────   observes the clock if it is not too far ahead
+  ◀──────────── Welcome {clock, lastSeq} ───────   observes the clock if it is not too far ahead; answers with a value of now
   ── Push [changes with seq > lastSeq] ─────────▶  for each, in order: dedupe, limits, policy,
   ◀───────────────────────── PushResult acks ────   one transaction: entry, documents, replica
   ── Pull {since: cursor} ──────────────────────▶  entries after `since`, filtered for this user
@@ -170,7 +170,7 @@ the previous one stopped (test: `A_server_restarted_over_its_store_goes_on_where
 | Client restart | Same replica, cursor, pending, rejected, clock. | `A_restart_keeps_the_offline_changes…`, `A_text_survives_a_restart` |
 | Server restart | Same log, documents, replicas (store). | `A_server_restarted_over_its_store…` |
 | Log compacted | Snapshot, own changes counted once. | `A_replica_far_behind…`, `A_snapshot_keeps_the_erased_characters…` |
-| Device clock in the future (> 5 min) | Refused `clock-skew`; the server does not follow that clock; the client falls back to the server's clock and sends the same intent again under a new dot (once per sync). Later operations that refer to the old dot (an observed tag, a text anchor, an erased span) are renamed. | `A_clock_in_the_future…`, `A_clock_still_wrong…`, `…stamped_again…` |
+| Device clock in the future | At `Hello` the client compares its time with the clock of the welcome (a value of now): ahead by more than a minute, it stamps by the time of the server from then on (`HybridClock.Calibrate`, `Offset`). A change stamped before (offline) and refused `clock-skew` (> 5 min) makes the client fall back to the server's clock and send the same intent again under a new dot; every change of the sync stamped by the old clock goes the same way, in order, in that sync. Later operations that refer to an old dot (an observed tag, a text anchor, an erased span) are renamed. A change refused again once stamped again stays pending and the report says `ClockSkew`; `SyncReport` also gives `Restamped` and `ClockOffset`. | `A_clock_in_the_future…`, `A_device_ten_minutes_ahead…`, `Every_change_stamped_in_the_future…`, `Random_writes_texts_wrong_clocks…` |
 | Change refused by the rules | Removed from the view whole, kept in `Rejected`; never reaches another client. | `A_refused_change_disappears_exactly…`, `A_change_is_admitted_whole_or_not_at_all` |
 | Answer forgotten by the server and change not in the log | Client side: `lost`, moved to `Rejected`. | bounded by `RememberedAcksPerReplica` |
 | Random mix of the above | Same state everywhere, every write in the log once, no rejection. | `Random_writes_cuts_restarts…` (.NET, TypeScript), `Random_typing_on_three_devices_converges` |
@@ -189,7 +189,8 @@ the previous one stopped (test: `A_server_restarted_over_its_store_goes_on_where
   server**. A client offline cannot write a document of another user by pretending it is new. Validation belongs here.
 * **Reading** (`CanRead`) filters the log and the snapshot per operation.
 * **Limits**: changes per push, operations per change, value, text and key length, characters of a text field
-  (`MaxTextLength`, 1 000 000 with the erased ones), collections per pull and per connection, clock skew, counters and
+  (`MaxTextLength`, 1 000 000 with the erased ones), characters read by the text operations of one change
+  (`MaxTextWorkPerChange`, 20 000 000), collections per pull and per connection, clock skew, counters and
   increments (±(2^53 − 1)), stamp counters (from 0); refused as `too-large`, `invalid`, `clock-skew`. A change that lacks what
   it must hold (its operations, a document, a field, a text, a list) is refused `invalid` with a reason, never a failure of the
   server.
@@ -225,4 +226,7 @@ store has its own format (`ReplicaCodec` 2 in .NET, which still reads 1; `format
 * Visibility is decided with the state of the document now; a document that becomes visible later is received complete
   only through a snapshot.
 * Text tombstones are never collected; a field edited for years grows with every character ever typed.
-* The client stores rewrite their whole state at each step; a large replica would want an append-only store.
+* The client stores rewrite their whole state at each step; a large replica would want an append-only store. The .NET replica
+  encodes the confirmed documents again only after a pull changed them, and a text is kept in chunks shared copy-on-write
+  between the confirmed state, the view and the server's decisions: an edit copies one chunk, not the text. Reading a whole
+  text (`Text`, what a text box shows) and writing the stored state remain linear in the size of the replica.

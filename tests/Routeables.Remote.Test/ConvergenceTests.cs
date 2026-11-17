@@ -9,7 +9,8 @@ public class ConvergenceTests
         => state is null ? "∅"
             : $"{(state.Exists ? "+" : "-")} " + string.Join(" ", state.RegisterNames.Order(StringComparer.Ordinal).Select(f => $"{f}={state.Get(f)}"))
               + " | " + string.Join(" ", state.SetNames.Order(StringComparer.Ordinal).Select(f => $"{f}=[{string.Join(",", state.Elements(f))}]"))
-              + " | " + string.Join(" ", state.CounterNames.Order(StringComparer.Ordinal).Select(f => $"{f}={state.Counter(f)}"));
+              + " | " + string.Join(" ", state.CounterNames.Order(StringComparer.Ordinal).Select(f => $"{f}={state.Counter(f)}"))
+              + " | " + string.Join(" ", state.TextNames.Order(StringComparer.Ordinal).Select(f => $"{f}={state.Text(f)}"));
 
     [Fact]
     public async Task Two_devices_offline_converge_and_a_concurrent_addition_survives_a_removal()
@@ -208,5 +209,122 @@ public class ConvergenceTests
         Assert.Equal(server.Log.Select(e => e.Change.Dot).Distinct().Count(), server.Log.Count);    // no change logged twice
         Assert.Equal(commits, server.Log.Count);                                                    // and none lost
         Assert.All(devices, d => Assert.Empty(d.Replica.Rejected));
+    }
+
+    [Fact]
+    public async Task Random_writes_texts_wrong_clocks_and_compactions_always_converge()
+    {
+        for (var seed = 1; seed <= 30; seed++)
+            await RunWithClocksAsync(seed);
+    }
+
+    // Audit of 17 November 2026: the fuzzing that found B1. Devices whose clocks are ahead (beyond the tolerance of the server) or behind,
+    // set right or wrong again along the way, write texts too, and the server compacts its log.
+    public static async Task RunWithClocksAsync(int seed, int steps = 300)
+    {
+        var random = new Random(seed);
+        var serverTime = new ManualTime(DateTimeOffset.UnixEpoch.AddDays(20_000));
+        var server = new ReplicationServer(AllowAllReplicationPolicy.Instance, new ReplicationServerOptions { MaxChangesPerPush = 8 }, serverTime);
+        TimeSpan[] skews = [TimeSpan.Zero, TimeSpan.FromMinutes(10), TimeSpan.FromHours(3), TimeSpan.FromHours(-1), TimeSpan.FromSeconds(30)];
+        var devices = new List<(Device Device, ManualTime Time, TimeSpan Skew)>();
+        for (var i = 0; i < 4; i++)
+        {
+            var skew = skews[random.Next(skews.Length)];
+            var time = new ManualTime(serverTime.Now + skew);
+            devices.Add((await Device.StartAsync($"D{i}", server, time: time), time, skew));
+        }
+        var documents = Enumerable.Range(0, 3).Select(i => new DocumentId("Person", $"p{i}")).ToArray();
+        long increments = 0;
+
+        for (var step = 0; step < steps; step++)
+        {
+            var elapsed = TimeSpan.FromMilliseconds(random.Next(0, 2000));
+            serverTime.Now += elapsed;
+            for (var i = 0; i < devices.Count; i++)
+                devices[i].Time.Now = serverTime.Now + devices[i].Skew;
+            var index = random.Next(devices.Count);
+            var (device, _, _) = devices[index];
+            var document = documents[random.Next(documents.Length)];
+            switch (random.Next(14))
+            {
+                case 0:
+                    device.Network.Down = !device.Network.Down;
+                    break;
+                case 1:
+                    device.Network.LoseNextPushAnswer = true;
+                    await device.TrySyncAsync();
+                    break;
+                case 2:
+                case 3:
+                    await device.TrySyncAsync();
+                    break;
+                case 4:
+                    await device.RestartAsync();
+                    break;
+                case 5:
+                    devices[index] = devices[index] with { Skew = skews[random.Next(skews.Length)] };     // the clock is set, right or wrong
+                    break;
+                case 6:
+                    await server.CompactAsync(server.Position - random.Next(0, 5));
+                    break;
+                case 7:
+                    await device.Replica.Edit().Increment(document, "count", 1).CommitAsync();
+                    increments++;
+                    break;
+                case 8:
+                    await device.Replica.Edit().AddElement(document, "tags", $"t{random.Next(3)}").CommitAsync();
+                    break;
+                case 9:
+                    await device.Replica.Edit().RemoveElement(document, "tags", $"t{random.Next(3)}").CommitAsync();
+                    break;
+                case 10:
+                    await device.Replica.Edit().Create(document).Set(document, "name", $"n{random.Next(100)}").CommitAsync();
+                    break;
+                case 11:
+                {
+                    var text = device.Replica.Find(document)?.Text("notes") ?? "";
+                    var at = random.Next(text.Length + 1);
+                    await device.Replica.Edit().InsertText(document, "notes", at, ((char)('a' + random.Next(26))).ToString()).CommitAsync();
+                    break;
+                }
+                case 12:
+                {
+                    var text = device.Replica.Find(document)?.Text("notes") ?? "";
+                    if (text.Length > 0)
+                    {
+                        var at = random.Next(text.Length);
+                        await device.Replica.Edit().EraseText(document, "notes", at, Math.Min(text.Length - at, random.Next(1, 4))).CommitAsync();
+                    }
+                    break;
+                }
+                default:
+                {
+                    var text = device.Replica.Find(document)?.Text("notes") ?? "";
+                    var at = random.Next(text.Length + 1);
+                    await device.Replica.Edit().ReplaceText(document, "notes", text[..at] + "xy" + text[at..]).CommitAsync();
+                    break;
+                }
+            }
+        }
+
+        foreach (var (device, _, _) in devices)
+        {
+            device.Network.Down = false;
+            device.Network.LoseNextPushAnswer = device.Network.LoseNextPullAnswer = false;
+        }
+        for (var round = 0; round < 2; round++)
+            foreach (var (device, _, _) in devices)
+                Assert.False((await device.SyncAsync()).ClockSkew);
+
+        foreach (var document in documents)
+        {
+            var expected = Fingerprint(server.Find(document));
+            Assert.All(devices, d => Assert.Equal(expected, Fingerprint(d.Device.Replica.Find(document))));
+        }
+        Assert.All(devices, d => Assert.Equal(0, d.Device.Replica.PendingCount));
+        Assert.All(devices, d => Assert.Empty(d.Device.Replica.Rejected));
+        Assert.Equal(increments, documents.Sum(d => server.Find(d)?.Counter("count") ?? 0));
+        // No change ahead of the server by more than its tolerance entered the log.
+        Assert.True(server.Clock.Last.Wall <= serverTime.Now.Add(server.Options.MaxClockSkew).ToUnixTimeMilliseconds());
     }
 }

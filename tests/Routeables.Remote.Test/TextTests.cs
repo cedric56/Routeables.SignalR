@@ -206,4 +206,68 @@ public class TextTests
             Assert.All(devices, d => Assert.Equal(expected, d.Replica.Find(Note)!.Text("body")));
         }
     }
+
+    // Audit of 17 November 2026, B2: a text is kept in chunks shared between clones. Edits across their boundaries, and clones taken
+    // between edits, must read as a plain string would.
+    [Fact]
+    public void A_long_text_edited_across_its_chunks_reads_as_a_string_and_its_clones_do_not_move()
+    {
+        var random = new Random(7);
+        var replica = ReplicaId.New();
+        var state = new DocumentState(Note);
+        var expected = new System.Text.StringBuilder();
+        var clones = new List<(DocumentState State, string Text)>();
+        var seq = 0;
+        for (var step = 0; step < 3000; step++)
+        {
+            var stamp = new OpStamp(new Hlc(1000 + step, 0, replica), 0);
+            var dot = new Dot(replica, ++seq);
+            var ids = state.TextIds("body");
+            if (ids.Count > 0 && random.Next(4) == 0)
+            {
+                var at = random.Next(ids.Count);
+                var length = Math.Min(ids.Count - at, random.Next(1, 300));
+                state.Apply(new EraseText("body", ChangeBuilder.Spans(ids.Skip(at).Take(length))), stamp, dot);
+                expected.Remove(at, length);
+            }
+            else
+            {
+                var at = random.Next(ids.Count + 1);
+                var text = new string((char)('a' + step % 26), random.Next(1, step % 50 == 0 ? 3000 : 20));
+                state.Apply(new InsertText("body", at == 0 ? null : ids[at - 1], text), stamp, dot);
+                expected.Insert(at, text);
+            }
+            if (step % 97 == 0)
+                clones.Add((state.Clone(), expected.ToString()));
+        }
+
+        Assert.Equal(expected.ToString(), state.Text("body"));
+        Assert.All(clones, c => Assert.Equal(c.Text, c.State.Text("body")));
+        Assert.Equal(expected.ToString(), DocumentState.FromSnapshot(state.ToSnapshot()).Text("body"));
+    }
+
+    // S2: a change of many erasures on a long text is refused before it holds the server.
+    [Fact]
+    public async Task A_change_that_would_read_a_long_text_too_many_times_is_refused()
+    {
+        var server = new ReplicationServer(AllowAllReplicationPolicy.Instance, new ReplicationServerOptions { MaxTextWorkPerChange = 100_000 });
+        var a = await Device.StartAsync("A", server, collections: ["Note"]);
+        await a.Replica.Edit().Create(Note).InsertText(Note, "body", 0, new string('x', 10_000)).CommitAsync();
+        await a.SyncAsync();
+
+        var change = a.Replica.Edit();
+        for (var i = 0; i < 20; i++)
+            change.EraseText(Note, "body", 0, 1);
+        await change.CommitAsync();
+        var report = await a.SyncAsync();
+
+        Assert.Equal(1, report.Rejected);
+        Assert.Equal(RemoteErrorCodes.TooLarge, Assert.Single(a.Replica.Rejected).Code);
+        Assert.Equal(10_000, server.Find(Note)!.Text("body").Length);
+        Assert.Equal(10_000, a.Replica.Find(Note)!.Text("body").Length);     // its effect is gone
+
+        await a.Replica.Edit().EraseText(Note, "body", 0, 1).CommitAsync();    // a keystroke still goes through
+        Assert.Equal(0, (await a.SyncAsync()).Rejected);
+    }
 }
+

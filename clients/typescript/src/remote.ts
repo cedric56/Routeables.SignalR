@@ -48,14 +48,40 @@ const after = (wall: number, counter: number): { wall: number; counter: number }
 
 /** A hybrid logical clock (Kulkarni et al.): never goes back, and moves past every value it observes. */
 export class HybridClock {
-  private value: Hlc;
+  /** How far ahead of the server the device's clock may be before it is corrected (`calibrate`): one minute. */
+  static readonly calibrationThreshold = 60_000;
 
-  constructor(readonly replica: ReplicaId, private readonly now: () => number = Date.now, last?: Hlc) {
+  private value: Hlc;
+  // Added to the time of the device: zero, or negative when its clock was found ahead of the server's.
+  private correction = 0;
+
+  constructor(readonly replica: ReplicaId, private readonly deviceNow: () => number = Date.now, last?: Hlc) {
     this.value = last ?? { wall: 0, counter: 0, replica };
   }
 
   get last(): Hlc {
     return this.value;
+  }
+
+  /** What is added to the time of the device to stamp, in milliseconds: 0, or negative when the device is ahead of the server. */
+  get offset(): number {
+    return this.correction;
+  }
+
+  private now(): number {
+    return this.deviceNow() + this.correction;
+  }
+
+  /**
+   * Compares the time of the device with `server`, the clock of the server just received: ahead by more than
+   * `calibrationThreshold` (or at all, with `force`, after a clock-skew refusal), the next values are stamped by the time of the
+   * server. Only a clock ahead is corrected. Returns whether a correction is in effect.
+   */
+  calibrate(server: Hlc, force = false): boolean {
+    if (!(server.wall > 0)) return this.correction !== 0;
+    const ahead = this.deviceNow() - server.wall;
+    this.correction = ahead > (force ? 0 : HybridClock.calibrationThreshold) ? -ahead : 0;
+    return this.correction !== 0;
   }
 
   next(): Hlc {
@@ -237,9 +263,12 @@ export class DocumentState {
       case 'erase': {
         const nodes = this.texts.get(op.field);
         if (nodes) {
-          for (const node of nodes) {
+          // Nodes are never changed in place: a clone shares them.
+          for (let i = 0; i < nodes.length; i++) {
+            const node = nodes[i]!;
+            if (node.erased) continue;
             const { dot: d, index, offset } = node.id;
-            if (op.spans.some(s => sameDot(s.dot, d) && s.index === index && offset >= s.offset && offset < s.offset + s.length)) node.erased = true;
+            if (op.spans.some(s => sameDot(s.dot, d) && s.index === index && offset >= s.offset && offset < s.offset + s.length)) nodes[i] = { ...node, erased: true };
           }
         }
         break;
@@ -275,7 +304,7 @@ export class DocumentState {
     }
     const run: TextNode[] = [];
     for (let offset = 0; offset < text.length; offset++) run.push({ id: { dot, index: stamp.index, offset }, value: text[offset]!, stamp, erased: false });
-    nodes.splice(at, 0, ...run);
+    insertAll(nodes, at, run);
   }
 
   private tags(field: string, element: string): Map<string, ElementTag> {
@@ -286,8 +315,16 @@ export class DocumentState {
     return tags;
   }
 
+  /** An independent copy. The characters (never changed in place) are shared; the lists that hold them are copied. */
   clone(): DocumentState {
-    return DocumentState.fromSnapshot(this.toSnapshot());
+    const copy = new DocumentState(this.id);
+    copy.exists = this.exists;
+    copy.existenceStamp = this.existenceStamp;
+    for (const [field, register] of this.registers) copy.registers.set(field, register);
+    for (const [field, set] of this.sets) copy.sets.set(field, new Map([...set].map(([element, tags]) => [element, new Map(tags)])));
+    for (const [field, value] of this.counters) copy.counters.set(field, value);
+    for (const [field, nodes] of this.texts) copy.texts.set(field, nodes.slice());
+    return copy;
   }
 
   toSnapshot(): DocumentSnapshot {
@@ -322,6 +359,20 @@ export class DocumentState {
     }
     return state;
   }
+}
+
+/**
+ * Inserts `items` into `array` at `at`. Not `splice(at, 0, ...items)`: spreading more than about a hundred thousand arguments throws
+ * a RangeError (a long text pasted, a large collection).
+ */
+function insertAll<T>(array: T[], at: number, items: readonly T[]): void {
+  if (items.length <= 8192) {
+    array.splice(at, 0, ...items);
+    return;
+  }
+  const tail = array.splice(at);
+  for (const item of items) array.push(item);
+  for (const item of tail) array.push(item);
 }
 
 function runs(nodes: TextNode[]): TextRun[] {
@@ -413,7 +464,16 @@ export function webReplicaStorage(key: string, storage: Pick<Storage, 'getItem' 
   };
 }
 
-export interface SyncReport { pushed: number; rejected: number; pulled: number; snapshot: boolean }
+/**
+ * The outcome of a synchronization. `pushed`: changes the server accepted; `rejected`: refused (in `rejected` of the replica);
+ * `restamped`: refused as stamped in the future and stamped again by the clock of the server, not a decision on them;
+ * `clockSkew`: the device's clock is still refused, the changes stay pending (ask the user to set the time);
+ * `clockOffset`: the correction applied to the time of the device, in milliseconds (0, or negative when it is ahead).
+ */
+export interface SyncReport {
+  pushed: number; rejected: number; pulled: number; snapshot: boolean;
+  restamped: number; clockSkew: boolean; clockOffset: number;
+}
 
 interface Pending { change: Change; position: number }
 
@@ -452,6 +512,9 @@ export class Replica {
   private cursorValue = 0;
   private readonly listeners = new Set<(documents: DocumentId[]) => void>();
   private queue: Promise<unknown> = Promise.resolve();
+  // What the application sees of each document read so far, moved on by each local change and dropped for the documents a
+  // synchronization changes: a keystroke does not rebuild the document from the confirmed state and every pending change.
+  private readonly views = new Map<string, DocumentState | undefined>();
 
   private constructor(readonly id: ReplicaId, private readonly storage: ReplicaStorage, readonly clock: HybridClock) {}
 
@@ -490,7 +553,7 @@ export class Replica {
 
   /** The document as the application sees it. */
   find(id: DocumentId): DocumentState | undefined {
-    return this.view(id);
+    return this.view(id)?.clone();
   }
 
   /** The documents of a collection, deleted ones excepted. */
@@ -498,10 +561,16 @@ export class Replica {
     const keys = new Map<string, DocumentId>();
     for (const d of this.confirmed.all) if (d.id.collection === collection) keys.set(docKey(d.id), d.id);
     for (const p of this.pending) for (const o of p.change.ops) if (o.document.collection === collection) keys.set(docKey(o.document), o.document);
-    return [...keys.values()].map(id => this.view(id)).filter((d): d is DocumentState => !!d && d.exists);
+    return [...keys.values()].map(id => this.view(id)).filter((d): d is DocumentState => !!d && d.exists).map(d => d.clone());
+  }
+
+  private forget(change: Change): void {
+    for (const o of change.ops) this.views.delete(docKey(o.document));
   }
 
   private view(id: DocumentId): DocumentState | undefined {
+    const key = docKey(id);
+    if (this.views.has(key)) return this.views.get(key);
     let state = this.confirmed.find(id)?.clone();
     for (const p of this.pending) {
       p.change.ops.forEach((op, index) => {
@@ -510,6 +579,7 @@ export class Replica {
         state.apply(op.op, { stamp: p.change.stamp, index }, p.change.dot);
       });
     }
+    this.views.set(key, state);
     return state;
   }
 
@@ -528,15 +598,25 @@ export class Replica {
       return working.get(docKey(id));
     };
     const ops: DocumentOp[] = [];
-    for (const { document, build } of entries) {
-      for (const op of build(current)) {
-        let state = current(document);
-        if (!state) working.set(docKey(document), state = new DocumentState(document));
-        state.apply(op, { stamp, index: ops.length }, dot);
-        ops.push({ document, op });
+    try {
+      for (const { document, build } of entries) {
+        for (const op of build(current)) {
+          let state = current(document);
+          if (!state) {
+            state = new DocumentState(document);
+            working.set(docKey(document), state);
+            this.views.set(docKey(document), state);
+          }
+          state.apply(op, { stamp, index: ops.length }, dot);
+          ops.push({ document, op });
+        }
       }
+      if (ops.length === 0) throw new Error('The change does nothing.');
+    } catch (error) {
+      // Built over the views themselves: those a failed change touched are seen anew.
+      for (const key of working.keys()) this.views.delete(key);
+      throw error;
     }
-    if (ops.length === 0) throw new Error('The change does nothing.');
     this.nextSeq++;
     const change: Change = { dot, stamp, ops };
     this.pending.push({ change, position: 0 });
@@ -558,54 +638,67 @@ export class Replica {
   private async syncNow(channel: ReplicationChannel): Promise<SyncReport> {
     const welcome = await channel.hello({ protocol: REMOTE_PROTOCOL, replica: this.id, clock: this.clock.last });
     if (!welcome.success) throw new Error(welcome.error ?? 'The server refused the replica.');
+    // A device whose clock is ahead stamps by the time of the server from now on (audit of 17 November 2026, B1).
+    this.clock.calibrate(welcome.clock);
     this.clock.observe(welcome.clock);
-    const { pushed, rejected } = await this.push(channel, welcome);
+    const push = await this.push(channel, welcome);
     const { pulled, snapshot } = await this.pull(channel);
-    return { pushed, rejected, pulled, snapshot };
+    return { pushed: push.accepted, rejected: push.refused, pulled, snapshot, restamped: push.restamped, clockSkew: push.clockSkew, clockOffset: this.clock.offset };
   }
 
-  private async push(channel: ReplicationChannel, welcome: RemoteWelcome): Promise<{ pushed: number; rejected: number }> {
-    let pushed = 0;
+  private async push(channel: ReplicationChannel, welcome: RemoteWelcome): Promise<{ accepted: number; refused: number; restamped: number; clockSkew: boolean }> {
+    let accepted = 0;
     let refused = 0;
-    let fellBack = false;
+    let restamped = 0;
+    // The changes stamped again in this synchronization: one of them refused again means the clock is still wrong.
+    const stampedAgain = new Set<string>();
     for (;;) {
       const batch = this.pending.filter(p => p.position === 0).map(p => p.change).slice(0, Math.max(1, welcome.maxChangesPerPush));
-      if (batch.length === 0) return { pushed, rejected: refused };
+      if (batch.length === 0) return { accepted, refused, restamped, clockSkew: false };
       const result = await channel.push({ changes: batch });
       const restamp: Change[] = [];
       const touched: DocumentId[] = [];
+      let skewAgain = false;
       for (const ack of result.acks) {
         const index = this.pending.findIndex(p => sameDot(p.change.dot, ack.dot));
         if (index < 0) continue;
-        pushed++;
         const entry = this.pending[index]!;
         if (ack.status === AckStatus.accepted || ack.status === AckStatus.duplicate) {
+          accepted++;
           entry.position = ack.position > 0 ? ack.position : UNKNOWN;
         } else if (ack.code === RemoteErrorCodes.clockSkew) {
+          if (stampedAgain.has(`${ack.dot.replica}:${ack.dot.seq}`)) skewAgain = true;
           restamp.push(entry.change);
           this.pending.splice(index, 1);
         } else {
           refused++;
           this.rejectedChanges.push({ change: entry.change, code: ack.code ?? null, message: ack.message ?? null });
           this.pending.splice(index, 1);
+          this.forget(entry.change);
           touched.push(...entry.change.ops.map(o => o.document));
         }
       }
-      if (restamp.length > 0) this.clock.fallBack(welcome.clock);
+      if (restamp.length > 0) {
+        this.clock.calibrate(welcome.clock, true);
+        this.clock.fallBack(welcome.clock);
+      }
       const renamed = new Map<string, Dot>();
       for (const change of restamp) {
         const dot: Dot = { replica: this.id, seq: this.nextSeq++ };
         renamed.set(`${change.dot.replica}:${change.dot.seq}`, dot);
+        stampedAgain.add(`${dot.replica}:${dot.seq}`);
         this.pending.push({ change: { ...change, dot, stamp: this.clock.next() }, position: 0 });
       }
-      if (renamed.size > 0) for (const p of this.pending) p.change = rename(p.change, renamed);
+      if (renamed.size > 0) {
+        for (const p of this.pending) p.change = rename(p.change, renamed);
+        this.views.clear();
+      }
+      restamped += restamp.length;
       await this.save();
       if (touched.length > 0) this.notify(touched);
-      if (result.acks.length < batch.length) return { pushed, rejected: refused };
-      if (restamp.length > 0) {
-        if (fellBack) return { pushed, rejected: refused };
-        fellBack = true;
-      }
+      if (result.acks.length < batch.length) return { accepted, refused, restamped, clockSkew: false };
+      // What is still stamped by the old clock goes in the next batches, stamped again in turn in this synchronization.
+      if (skewAgain) return { accepted, refused, restamped, clockSkew: true };
     }
   }
 
@@ -623,6 +716,7 @@ export class Replica {
       if (result.snapshotRequired) {
         const full = await channel.snapshot({ collections });
         for (const d of this.confirmed.all) touched.set(docKey(d.id), d.id);
+        this.views.clear();
         this.confirmed.replace(full.documents, new Set(collections));
         for (const d of full.documents) touched.set(docKey(d.id), d.id);
         this.pending = this.pending.filter(p => !(p.position > 0 && p.position <= full.position));
@@ -636,13 +730,16 @@ export class Replica {
         if (this.confirmed.apply(entry.change)) pulled++;
         this.pending = this.pending.filter(p => !sameDot(p.change.dot, entry.change.dot));
         for (const o of entry.change.ops) touched.set(docKey(o.document), o.document);
+        this.forget(entry.change);
       }
+      for (const p of this.pending) if (p.position > 0 && p.position <= result.position) this.forget(p.change);
       this.pending = this.pending.filter(p => !(p.position > 0 && p.position <= result.position));
       this.cursorValue = since = result.position;
       if (!result.more) {
         for (const lost of this.pending.filter(p => p.position === UNKNOWN)) {
           this.rejectedChanges.push({ change: lost.change, code: RemoteErrorCodes.lost, message: 'The server decided on this change before, and its answer is lost: it is not in the log.' });
           for (const o of lost.change.ops) touched.set(docKey(o.document), o.document);
+          this.forget(lost.change);
         }
         this.pending = this.pending.filter(p => p.position !== UNKNOWN);
       }

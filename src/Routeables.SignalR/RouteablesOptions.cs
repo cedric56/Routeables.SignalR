@@ -87,6 +87,14 @@ public sealed class RouteablesOptions
     public TimeSpan ReconnectGracePeriod { get; set; } = TimeSpan.FromSeconds(30);
 
     /// <summary>
+    /// How often a client may have the full state of one target sent again (<c>Resync</c>, or <c>Watch</c> of a target it watches already): the
+    /// first time at once, then at most once per interval, the asks of a burst making one resend at its end. Each resend reads the whole state
+    /// (up to <see cref="MaxStateNodes"/>): a client asking in a loop would otherwise hold the server. <see cref="TimeSpan.Zero"/> sends every
+    /// time. One second by default.
+    /// </summary>
+    public TimeSpan MinResendInterval { get; set; } = TimeSpan.FromSeconds(1);
+
+    /// <summary>
     /// How many sessions may wait for their client at once, on this server. Beyond, the one that waits for the longest is disposed: a client
     /// that opens and drops connections in a loop cannot fill the memory. Only a session whose client said <c>Hello</c> waits. 10 000 by default.
     /// </summary>
@@ -120,6 +128,9 @@ public sealed class RouteablesOptions
     /// </summary>
     public bool RequireAuthenticatedUser { get; set; }
 
+    /// <summary>The longest delay an option may give: what a timer of .NET waits at most (<see cref="int.MaxValue"/> milliseconds, about 24.8 days).</summary>
+    public static TimeSpan MaxDelay { get; } = TimeSpan.FromMilliseconds(int.MaxValue);
+
     /// <summary>
     /// What is wrong with these options: a limit that is not positive, a duration that is negative, limits that contradict each other.
     /// <c>AddRouteablesSignalR</c> refuses them (<see cref="InvalidOperationException"/>), so that the application does not start with them.
@@ -151,12 +162,22 @@ public sealed class RouteablesOptions
             problems.Add($"MaxDepth is {MaxDepth}: it must be 64 or less (a state is read recursively).");
         if (MaxStateNodes >= 1 && MaxCollectionItems > MaxStateNodes)
             problems.Add($"MaxCollectionItems ({MaxCollectionItems}) is larger than MaxStateNodes ({MaxStateNodes}): a collection that fits would still not be sent.");
+        // The delays end up in Task.Delay, CancelAfter and Timer.Change, which refuse more than int.MaxValue milliseconds (about 24.8
+        // days): beyond, a session would fail at its first command or disconnection rather than at startup.
         if (CommandGrace < TimeSpan.Zero || CommandGrace == Timeout.InfiniteTimeSpan)
             problems.Add($"CommandGrace is {CommandGrace}: it must be zero or more, and finite.");
+        else if (CommandGrace > MaxDelay)
+            problems.Add($"CommandGrace is {CommandGrace}: it must be {MaxDelay} or less.");
         if (EssentialsTimeout <= TimeSpan.Zero || EssentialsTimeout == Timeout.InfiniteTimeSpan)
             problems.Add($"EssentialsTimeout is {EssentialsTimeout}: it must be more than zero, and finite (interactive calls have their own).");
+        else if (EssentialsTimeout > MaxDelay)
+            problems.Add($"EssentialsTimeout is {EssentialsTimeout}: it must be {MaxDelay} or less.");
+        if (MinResendInterval < TimeSpan.Zero || MinResendInterval > MaxDelay)
+            problems.Add($"MinResendInterval is {MinResendInterval}: it must be zero or more, and {MaxDelay} or less.");
         if (ReconnectGracePeriod < TimeSpan.Zero || ReconnectGracePeriod == Timeout.InfiniteTimeSpan)
             problems.Add($"ReconnectGracePeriod is {ReconnectGracePeriod}: it must be zero or more, and finite.");
+        else if (ReconnectGracePeriod > MaxDelay)
+            problems.Add($"ReconnectGracePeriod is {ReconnectGracePeriod}: it must be {MaxDelay} or less.");
         return problems;
     }
 

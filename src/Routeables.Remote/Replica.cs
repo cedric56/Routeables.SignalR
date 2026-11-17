@@ -26,11 +26,24 @@ public sealed class MemoryReplicaStorage : IReplicaStorage
 }
 
 /// <summary>The outcome of a synchronization.</summary>
-/// <param name="Pushed">Changes the server decided on.</param>
-/// <param name="Rejected">Of them, refused.</param>
+/// <param name="Pushed">Changes the server accepted (now, or before when an answer was lost).</param>
+/// <param name="Rejected">Changes the server refused: in <see cref="Replica.Rejected"/>.</param>
 /// <param name="Pulled">Changes received.</param>
 /// <param name="Snapshot">Whether the documents were replaced by a snapshot (the cursor was too old).</param>
-public sealed record SyncReport(int Pushed, int Rejected, int Pulled, bool Snapshot);
+/// <param name="Restamped">
+/// Changes the server refused as stamped in the future (<see cref="RemoteErrorCodes.ClockSkew"/>) and that were stamped again, by the
+/// clock of the server, to be pushed at once: not a decision on them.
+/// </param>
+/// <param name="ClockSkew">
+/// Whether the device's clock is still refused: changes stamped again were refused again. They stay pending, and the application should
+/// ask the user to set the time of the device.
+/// </param>
+/// <param name="ClockOffset">
+/// The correction applied to the time of the device to stamp (<see cref="HybridClock.Offset"/>): <see cref="TimeSpan.Zero"/>, or negative
+/// when its clock is ahead of the server's. Worth showing beyond a few minutes.
+/// </param>
+public sealed record SyncReport(int Pushed, int Rejected, int Pulled, bool Snapshot, int Restamped = 0, bool ClockSkew = false,
+    TimeSpan ClockOffset = default);
 
 /// <summary>
 /// The client side of the protocol: a replica that writes offline at once, and converges with the server when it
@@ -52,6 +65,12 @@ public sealed class Replica
     private readonly List<Pending> _pending = [];
     private readonly List<RejectedChange> _rejected = [];
     private readonly HashSet<string> _collections = new(StringComparer.Ordinal);
+    // What the application sees of each document read so far (confirmed, then pending), kept up to date by each change of this
+    // replica, and dropped for the documents a synchronization changes: a keystroke applies its operations once, it does not
+    // rebuild the document from the confirmed state and every pending change.
+    private readonly Dictionary<DocumentId, DocumentState?> _views = [];
+    // The confirmed documents as stored (ReplicaCodec.Confirmed): written again only when a synchronization changed them.
+    private byte[]? _confirmedBytes;
     private long _nextSeq = 1;
     private long _cursor;
 
@@ -142,7 +161,7 @@ public sealed class Replica
     public DocumentState? Find(DocumentId id)
     {
         lock (_gate)
-            return View(id);
+            return View(id)?.Clone();
     }
 
     /// <summary>The documents of a collection the application sees, deleted ones excepted.</summary>
@@ -154,12 +173,15 @@ public sealed class Replica
                 .Concat(_pending.SelectMany(p => p.Change.Ops.Select(o => o.Document)))
                 .Where(id => id.Collection == collection)
                 .Distinct();
-            return [.. ids.Select(View).Where(d => d is { Exists: true })!];
+            return [.. ids.Select(View).Where(d => d is { Exists: true }).Select(d => d!.Clone())];
         }
     }
 
+    // Under _gate. The document as seen (the state kept for it, never given out: Find and All give clones of it).
     private DocumentState? View(DocumentId id)
     {
+        if (_views.TryGetValue(id, out var kept))
+            return kept;
         var state = _confirmed.Find(id)?.Clone();
         foreach (var pending in _pending)
         {
@@ -172,7 +194,20 @@ public sealed class Replica
                 state.Apply(ops[index].Op, new OpStamp(pending.Change.Stamp, index), pending.Change.Dot);
             }
         }
-        return state;
+        return _views[id] = state;
+    }
+
+    // Under _gate: the documents whose confirmed state or pending changes changed are seen anew at the next read.
+    private void Forget(IEnumerable<DocumentId> documents)
+    {
+        foreach (var id in documents)
+            _views.Remove(id);
+    }
+
+    private void Forget(Change change)
+    {
+        foreach (var op in change.Ops)
+            _views.Remove(op.Document);
     }
 
     /// <summary>Starts a change: operations collected, then <see cref="ChangeBuilder.CommitAsync"/> stores them as one change.</summary>
@@ -186,6 +221,8 @@ public sealed class Replica
         {
             // Operations that depend on what the replica sees (a removal observes the additions, an insertion its anchor)
             // are built now, under the lock, each one seeing the operations of this change before it.
+            // Built over the views themselves, which this change moves on: a change that fails to build (a position out of the text)
+            // drops the views it touched, seen anew from the confirmed state and the pending changes.
             var dot = new Dot(Id, _nextSeq);
             var stamp = Clock.Next();
             var working = new Dictionary<DocumentId, DocumentState?>();
@@ -196,17 +233,25 @@ public sealed class Replica
                 return state;
             }
             var built = new List<DocumentOp>(ops.Count);
-            foreach (var (document, build) in ops)
+            try
             {
-                foreach (var op in build(Current).ToList())
+                foreach (var (document, build) in ops)
                 {
-                    var state = Current(document) ?? (working[document] = new DocumentState(document));
-                    state.Apply(op, new OpStamp(stamp, built.Count), dot);
-                    built.Add(new DocumentOp(document, op));
+                    foreach (var op in build(Current).ToList())
+                    {
+                        var state = Current(document) ?? (working[document] = _views[document] = new DocumentState(document));
+                        state.Apply(op, new OpStamp(stamp, built.Count), dot);
+                        built.Add(new DocumentOp(document, op));
+                    }
                 }
+                if (built.Count == 0)
+                    throw new InvalidOperationException("The change does nothing.");
             }
-            if (built.Count == 0)
-                throw new InvalidOperationException("The change does nothing.");
+            catch
+            {
+                Forget(working.Keys);
+                throw;
+            }
             _nextSeq++;
             change = new Change(dot, stamp, built);
             _pending.Add(new Pending(change, 0));
@@ -226,17 +271,23 @@ public sealed class Replica
         var welcome = await channel.HelloAsync(new RemoteHello(RemoteProtocol.Version, Id, Clock.Last), ct);
         if (!welcome.Success)
             throw new InvalidOperationException(welcome.Error ?? "The server refused the replica.");
+        // A device whose clock is ahead stamps by the time of the server from now on: its changes are not refused as stamped in the
+        // future, sync after sync, while nothing tells the user.
+        Clock.Calibrate(welcome.Clock);
         Clock.Observe(welcome.Clock);
 
-        var (pushed, rejected) = await PushAsync(channel, welcome, ct);
+        var push = await PushAsync(channel, welcome, ct);
         var (pulled, snapshot) = await PullAsync(channel, ct);
-        return new SyncReport(pushed, rejected, pulled, snapshot);
+        return new SyncReport(push.Accepted, push.Refused, pulled, snapshot, push.Restamped, push.ClockSkew, Clock.Offset);
     }
 
-    private async Task<(int Pushed, int Rejected)> PushAsync(IReplicationChannel channel, RemoteWelcome welcome, CancellationToken ct)
+    private readonly record struct PushOutcome(int Accepted, int Refused, int Restamped, bool ClockSkew);
+
+    private async Task<PushOutcome> PushAsync(IReplicationChannel channel, RemoteWelcome welcome, CancellationToken ct)
     {
-        int pushed = 0, refused = 0;
-        var fellBack = false;
+        int accepted = 0, refused = 0, restamped = 0;
+        // The changes stamped again in this synchronization: one of them refused again means the clock is still wrong.
+        var stampedAgain = new HashSet<Dot>();
         while (true)
         {
             List<Change> batch;
@@ -246,10 +297,12 @@ public sealed class Replica
                 batch = [.. _pending.Where(p => p.Position == 0).Select(p => p.Change).Take(Math.Max(1, welcome.MaxChangesPerPush))];
             }
             if (batch.Count == 0)
-                return (pushed, refused);
+                return new(accepted, refused, restamped, false);
 
             var result = await channel.PushAsync(new PushRequest(batch), ct);
             var restamp = new List<Change>();
+            var skewAgain = false;
+            List<DocumentId> touched = [];
             lock (_gate)
             {
                 foreach (var ack in result.Acks)
@@ -257,27 +310,34 @@ public sealed class Replica
                     var index = _pending.FindIndex(p => p.Change.Dot == ack.Dot);
                     if (index < 0)
                         continue;
-                    pushed++;
                     switch (ack.Status)
                     {
                         case AckStatus.Accepted or AckStatus.Duplicate:
                             // Accepted: it stays pending (and seen) until a pull brings it back from the log, at that position.
+                            accepted++;
                             _pending[index] = _pending[index] with { Position = ack.Position > 0 ? ack.Position : long.MaxValue };
                             break;
                         case AckStatus.Rejected when ack.Code == RemoteErrorCodes.ClockSkew:
                             // Not a decision on the intent: the same operations again, stamped by a corrected clock.
+                            skewAgain |= stampedAgain.Contains(ack.Dot);
                             restamp.Add(_pending[index].Change);
                             _pending.RemoveAt(index);
                             break;
                         case AckStatus.Rejected:
                             refused++;
                             _rejected.Add(new RejectedChange(_pending[index].Change, ack.Code, ack.Message));
+                            Forget(_pending[index].Change);
+                            touched.AddRange(_pending[index].Change.Ops.Select(o => o.Document));
                             _pending.RemoveAt(index);
                             break;
                     }
                 }
                 if (restamp.Count > 0)
+                {
+                    // The server says the clock is ahead, whatever the threshold: stamped by its time from now on.
+                    Clock.Calibrate(welcome.Clock, force: true);
                     Clock.FallBack(welcome.Clock);
+                }
                 // The same intent, a new dot (the server used up the old one), in the same order. A later removal that
                 // observed an element added by the old dot now observes it under the new one.
                 var renamed = new Dictionary<Dot, Dot>();
@@ -285,21 +345,27 @@ public sealed class Replica
                 {
                     var dot = new Dot(Id, _nextSeq++);
                     renamed[change.Dot] = dot;
+                    stampedAgain.Add(dot);
                     _pending.Add(new Pending(change with { Dot = dot, Stamp = Clock.Next() }, 0));
                 }
-                for (var i = 0; i < _pending.Count && renamed.Count > 0; i++)
-                    _pending[i] = _pending[i] with { Change = Rename(_pending[i].Change, renamed) };
+                if (renamed.Count > 0)
+                {
+                    for (var i = 0; i < _pending.Count; i++)
+                        _pending[i] = _pending[i] with { Change = Rename(_pending[i].Change, renamed) };
+                    _views.Clear();     // the characters and tags seen carry the old dots
+                }
+                restamped += restamp.Count;
             }
             await SaveAsync(ct);
+            if (touched.Count > 0)
+                Changed?.Invoke([.. touched.Distinct()]);
             if (result.Acks.Count < batch.Count)
-                return (pushed, refused);     // the server stopped: the rest is for the next synchronization
-            if (restamp.Count > 0)
-            {
-                // Once per synchronization: when the device's time is still wrong, the next synchronization tries again.
-                if (fellBack)
-                    return (pushed, refused);
-                fellBack = true;
-            }
+                return new(accepted, refused, restamped, false);     // the server stopped: the rest is for the next synchronization
+            // The changes still stamped in the future by the old clock go in the next batches and are stamped again in turn, every one
+            // of them in this synchronization. A change refused again after it was stamped again: the time of the device is still
+            // wrong, they stay pending, and the report says so.
+            if (skewAgain)
+                return new(accepted, refused, restamped, true);
         }
     }
 
@@ -345,6 +411,8 @@ public sealed class Replica
                 lock (_gate)
                 {
                     touched.UnionWith(_confirmed.Documents.Select(d => d.Id));
+                    _views.Clear();
+                    _confirmedBytes = null;
                     _confirmed.Replace(full.Documents, collections.ToHashSet(StringComparer.Ordinal));
                     touched.UnionWith(full.Documents.Select(d => d.Id));
                     // What the snapshot includes is no longer pending: applying it again would count it twice.
@@ -361,12 +429,18 @@ public sealed class Replica
                 foreach (var entry in result.Entries)
                 {
                     if (_confirmed.Apply(entry.Change))
+                    {
                         pulled++;
+                        _confirmedBytes = null;
+                    }
                     _pending.RemoveAll(p => p.Change.Dot == entry.Change.Dot);
                     touched.UnionWith(entry.Change.Ops.Select(o => o.Document));
+                    Forget(entry.Change);
                 }
                 // An own change accepted at or before this position is in the log: pulled above, or not readable by this user
                 // (another collection, a row filter). Either way it is no longer pending.
+                foreach (var done in _pending.Where(p => p.Position > 0 && p.Position <= result.Position))
+                    Forget(done.Change);
                 _pending.RemoveAll(p => p.Position > 0 && p.Position <= result.Position);
                 _cursor = since = result.Position;
                 if (!result.More)
@@ -378,6 +452,7 @@ public sealed class Replica
                         _rejected.Add(new RejectedChange(lost.Change, RemoteErrorCodes.Lost,
                             "The server decided on this change before, and its answer is lost: it is not in the log."));
                         _pending.Remove(lost);
+                        Forget(lost.Change);
                         touched.UnionWith(lost.Change.Ops.Select(o => o.Document));
                     }
                 }
@@ -405,10 +480,11 @@ public sealed class Replica
         byte[] state;
         lock (_gate)
         {
+            // The confirmed documents are encoded again only after a synchronization changed them; a keystroke writes its change.
+            _confirmedBytes ??= ReplicaCodec.Confirmed([.. _confirmed.Documents.Select(d => d.ToSnapshot())], [.. _confirmed.Applied]);
             state = ReplicaCodec.Write(new ReplicaCodec.StoredReplica(
-                Id, Clock.Last, _nextSeq, _cursor, [.. _collections],
-                [.. _confirmed.Documents.Select(d => d.ToSnapshot())], [.. _confirmed.Applied],
-                [.. _pending.Select(p => (p.Change, p.Position))], [.. _rejected]));
+                Id, Clock.Last, _nextSeq, _cursor, [.. _collections], [], [],
+                [.. _pending.Select(p => (p.Change, p.Position))], [.. _rejected]), _confirmedBytes);
         }
         return _storage.WriteAsync(state, ct).AsTask();
     }
@@ -463,10 +539,11 @@ public sealed class ChangeBuilder
         ArgumentOutOfRangeException.ThrowIfNegative(position);
         return Add(document, view =>
         {
-            var ids = view(document)?.TextIds(field) ?? [];
-            if (position > ids.Count)
-                throw new ArgumentOutOfRangeException(nameof(position), $"The text has {ids.Count} characters.");
-            return text.Length == 0 ? [] : [new InsertText(field, position == 0 ? null : ids[position - 1], text)];
+            var anchor = new List<TextId>(1);
+            var length = view(document)?.VisibleIds(field, position - 1, position == 0 ? 0 : 1, anchor) ?? 0;
+            if (position > length)
+                throw new ArgumentOutOfRangeException(nameof(position), $"The text has {length} characters.");
+            return text.Length == 0 ? [] : [new InsertText(field, position == 0 ? null : anchor[0], text)];
         });
     }
 
@@ -477,10 +554,11 @@ public sealed class ChangeBuilder
         ArgumentOutOfRangeException.ThrowIfNegative(length);
         return Add(document, view =>
         {
-            var ids = view(document)?.TextIds(field) ?? [];
-            if (position + length > ids.Count)
-                throw new ArgumentOutOfRangeException(nameof(length), $"The text has {ids.Count} characters.");
-            return length == 0 ? [] : [new EraseText(field, Spans(ids.Skip(position).Take(length)))];
+            var erased = new List<TextId>(Math.Min(length, 1024));
+            var count = view(document)?.VisibleIds(field, position, length, erased) ?? 0;
+            if ((long)position + length > count)
+                throw new ArgumentOutOfRangeException(nameof(length), $"The text has {count} characters.");
+            return length == 0 ? [] : [new EraseText(field, Spans(erased))];
         });
     }
 
@@ -535,15 +613,18 @@ internal static class TextEdit
             end++;
         if (end > 0 && char.IsLowSurrogate(current[^end]))
             end--;
-        var ids = state?.TextIds(field) ?? [];
         var erased = current.Length - start - end;
         var inserted = text.Substring(start, text.Length - start - end);
+        // Only the identities the edit refers to: the character before it and those it erases, read in one pass.
+        var ids = new List<TextId>(erased + 1);
+        var from = start == 0 ? 0 : start - 1;
+        state?.VisibleIds(field, from, start - from + erased, ids);
         var ops = new List<FieldOp>(2);
         if (erased > 0)
-            ops.Add(new EraseText(field, ChangeBuilder.Spans(ids.Skip(start).Take(erased))));
+            ops.Add(new EraseText(field, ChangeBuilder.Spans(ids.Skip(start - from))));
         // After the last character kept before the edit: the erased characters stay in the field as tombstones, after it.
         if (inserted.Length > 0)
-            ops.Add(new InsertText(field, start == 0 ? null : ids[start - 1], inserted));
+            ops.Add(new InsertText(field, start == 0 ? null : ids[0], inserted));
         return ops;
     }
 }

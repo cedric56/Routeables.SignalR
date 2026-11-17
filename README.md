@@ -22,6 +22,9 @@ public sealed class OrdersViewModel : INotifyPropertyChanged
     [RouteableCommand, Authorize(Roles = "manager")]     // what the browser may call, and who
     public Task ApproveAsync(int id) => ...;
 }
+
+[RouteableState]                                         // an object inside the state says it too:
+public sealed record Order(int Id, string Customer, decimal Total);   // unmarked, it would be sent as {}
 ```
 
 ```ts
@@ -37,7 +40,7 @@ await client.invoke('approveAsync', 42);   // resolves when the command has ende
 
 ## What it gives
 
-- **Nothing leaves the server unless it says so.** Properties are sent when marked `[RouteableState]`, set when marked `Settable`, called when marked `[RouteableCommand]`.
+- **Nothing leaves the server unless it says so.** Properties are sent when marked `[RouteableState]`, set when marked `Settable`, called when marked `[RouteableCommand]`. That holds for the objects inside a state too (the `Order` of a list): an object none of whose properties is marked is sent empty, and a warning says so in Development.
 - **Authorization at every call**, with ASP.NET Core's policies: `[Authorize]` on view models and commands, `[RouteableAuthorize]` on properties, a route guard for pages.
 - **An ordered, consistent state.** One dispatcher per session (a view model is never used by two threads at once), one stream per target (generations and versions), patches instead of whole states, changes merged for slow clients.
 - **Dialogs, notifications and modals** that a view model awaits as on a desktop, without blocking the connection.

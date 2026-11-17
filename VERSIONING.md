@@ -30,6 +30,6 @@ Routeables.SignalR depends on the published packages of [Routeables](https://git
 1. Set `RouteablesPackageVersion` and the repository variable `ROUTEABLES_VERSION` to the version of the Routeables packages to depend on, and move `ROUTEABLES_REF` to the revision of that version.
 2. Write the changes in [CHANGELOG.md](CHANGELOG.md).
 3. Set `VersionPrefix` in [Directory.Build.props](Directory.Build.props) and `version` in [clients/typescript/package.json](clients/typescript/package.json) to the new version.
-4. Tag `vX.Y.Z` and push the tag: [the release workflow](.github/workflows/release.yml) packs against the Routeables packages, installs the NuGet package in an empty application, tests the client, and publishes both packages (secrets `NUGET_API_KEY` and `NPM_TOKEN`).
+4. Tag `vX.Y.Z` and push the tag: [the release workflow](.github/workflows/release.yml) packs against the Routeables packages, installs the NuGet package in an empty application, tests the client, and publishes both packages by Trusted Publishing (no long-lived secret: a nuget.org policy and an npm trusted publisher for this workflow, and the variable `NUGET_USER`).
 
 A preview is a tag with a suffix (`v2.1.0-preview.1`).

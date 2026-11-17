@@ -1,4 +1,4 @@
-# Weekly updates of what this repository depends on. The GitHub Actions are kept on their latest tags; the samples and the clients on
+# Weekly updates of what this repository depends on. The GitHub Actions are pinned by commit, and Dependabot moves the commit and its version comment; the samples and the clients on
 # their latest compatible versions. A major version (Angular, for instance) arrives as its own pull request, to be tried on purpose.
 version: 2
 updates:

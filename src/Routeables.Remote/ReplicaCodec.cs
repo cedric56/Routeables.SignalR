@@ -22,9 +22,27 @@ public static class ReplicaCodec
         IReadOnlyList<(Change Change, long Position)> Pending,
         IReadOnlyList<RejectedChange> Rejected);
 
-    internal static byte[] Write(StoredReplica replica)
+    internal static byte[] Write(StoredReplica replica) => Write(replica, Confirmed(replica.Documents, replica.Applied));
+
+    /// <summary>
+    /// The confirmed documents and what was applied to them, as they are written in a stored replica: kept by a replica between two
+    /// writes, since they change only with a pull, while every keystroke writes the pending changes.
+    /// </summary>
+    internal static byte[] Confirmed(IReadOnlyList<DocumentSnapshot> documents, IReadOnlyList<Dot> applied)
     {
         using var stream = new MemoryStream();
+        using (var w = new BinaryWriter(stream, Encoding.UTF8, leaveOpen: true))
+        {
+            WriteList(w, documents, d => WriteDocument(w, d));
+            WriteList(w, applied, d => WriteDot(w, d));
+        }
+        return stream.ToArray();
+    }
+
+    /// <summary>A stored replica whose documents and applied dots are <paramref name="confirmed"/> (<see cref="Confirmed"/>), not those of <paramref name="replica"/>.</summary>
+    internal static byte[] Write(StoredReplica replica, byte[] confirmed)
+    {
+        using var stream = new MemoryStream(confirmed.Length + 256);
         using (var w = new BinaryWriter(stream, Encoding.UTF8, leaveOpen: true))
         {
             w.Write(Version);
@@ -33,8 +51,7 @@ public static class ReplicaCodec
             w.Write(replica.NextSeq);
             w.Write(replica.Cursor);
             WriteList(w, replica.Collections, w.Write);
-            WriteList(w, replica.Documents, d => WriteDocument(w, d));
-            WriteList(w, replica.Applied, d => WriteDot(w, d));
+            w.Write(confirmed);
             WriteList(w, replica.Pending, p =>
             {
                 WriteChange(w, p.Change);

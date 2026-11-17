@@ -505,8 +505,13 @@ export function apply(state: Record<string, unknown>, patch: Patch): Record<stri
 function update(node: unknown, path: readonly (string | number)[], depth: number, patch: Patch): unknown {
   if (depth === path.length) {
     if (patch.op === 'set') return patch.value;
-    const array = Array.isArray(node) ? [...node] : [];
-    array.splice(patch.index ?? 0, patch.remove ?? 0, ...((patch.value as unknown[] | undefined) ?? []));
+    // Built, not spliced with spread arguments: `splice(i, n, ...values)` throws a RangeError beyond about a hundred thousand values.
+    const source = Array.isArray(node) ? node : [];
+    const index = Math.min(Math.max(patch.index ?? 0, 0), source.length);
+    const values = (patch.value as unknown[] | undefined) ?? [];
+    const array = source.slice(0, index);
+    for (const value of values) array.push(value);
+    for (let i = index + Math.max(patch.remove ?? 0, 0); i < source.length; i++) array.push(source[i]);
     return array;
   }
   const key = path[depth]!;

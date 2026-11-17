@@ -19,6 +19,7 @@ public sealed class RouteableSchema
 {
     private readonly ConcurrentDictionary<Type, TypeShape> _shapes = new();
     private readonly ConcurrentDictionary<Type, bool> _mayHoldCommands = new();
+    private readonly ConcurrentDictionary<Type, byte> _reportedEmpty = new();
 
     /// <summary>Creates the schema of the given options.</summary>
     public RouteableSchema(RouteablesOptions options)
@@ -44,6 +45,9 @@ public sealed class RouteableSchema
         => Shape(type).Commands.ToDictionary(c => c.Key, c => c.Value.Method, StringComparer.Ordinal);
 
     internal TypeShape Shape(Type type) => _shapes.GetOrAdd(type, static (t, schema) => schema.Read(t), this);
+
+    /// <summary>Whether <paramref name="type"/> is told for the first time to be sent empty (<see cref="TypeShape.HidesAll"/>): once per application.</summary>
+    internal bool FirstTimeEmpty(Type type) => _reportedEmpty.TryAdd(type, 0);
 
     /// <summary>Whether a value of this type may hold a command once projected: its items can then not be moved without being sent again.</summary>
     internal bool MayHoldCommands(Type type) => MayHoldCommands(type, 0);
@@ -97,11 +101,13 @@ public sealed class RouteableSchema
         var classAnonymous = type.GetCustomAttributes(inherit: true).OfType<IAllowAnonymous>().Any();
 
         var state = new List<StateMember>();
-        var names = new HashSet<string>(StringComparer.Ordinal);
+        var names = new Dictionary<string, PropertyInfo>(StringComparer.Ordinal);
+        var sendable = false;
         foreach (var property in type.GetProperties(BindingFlags.Public | BindingFlags.Instance))
         {
             if (!IsSendableProperty(property))
                 continue;
+            sendable = true;
 
             var marked = Attribute.GetCustomAttribute(property, typeof(RouteableStateAttribute), inherit: true) as RouteableStateAttribute;
             bool readable, settable;
@@ -120,8 +126,17 @@ public sealed class RouteableSchema
                 continue;
 
             var name = ClientName(property.Name);
-            if (!names.Add(name))
-                continue;   // a property hidden by "new": the most derived one is listed first
+            if (names.TryGetValue(name, out var first))
+            {
+                if (first.Name == property.Name)
+                    continue;   // a property hidden by "new": the most derived one is listed first
+                // Two properties that differ by case (URL and Url): one would be dropped without a word, as two commands of one name
+                // are refused.
+                throw new InvalidOperationException(
+                    $"{type.FullName} has two properties sent as '{name}' ({first.DeclaringType?.Name}.{first.Name} and " +
+                    $"{property.DeclaringType?.Name}.{property.Name}): the client would see one of them. Rename one, or leave it out ([JsonIgnore]).");
+            }
+            names[name] = property;
 
             settable &= property.SetMethod is { IsPublic: true, IsStatic: false } && !typeof(ICommand).IsAssignableFrom(property.PropertyType);
             state.Add(new StateMember(
@@ -158,7 +173,12 @@ public sealed class RouteableSchema
             commands[commandName] = command;
         }
 
-        return new TypeShape(type, [.. state], state.ToDictionary(m => m.Name, StringComparer.Ordinal), commands, classAuthorize, classAnonymous);
+        // Sent empty although it has properties to send: none is exposed (Explicit). Said in Development (RouteableStateProjector).
+        var hidesAll = Options.Exposure != RouteableExposure.Public && state.Count == 0 && commands.Count == 0 && sendable;
+        return new TypeShape(type, [.. state], state.ToDictionary(m => m.Name, StringComparer.Ordinal), commands, classAuthorize, classAnonymous)
+        {
+            HidesAll = hidesAll,
+        };
     }
 
     // Whether "derived" hides "hidden" with "new": same name, same parameters, declared in a class that derives from the other's.
@@ -238,4 +258,8 @@ internal sealed record TypeShape(
     IReadOnlyDictionary<string, StateMember> ByName,
     IReadOnlyDictionary<string, CommandMember> Commands,
     IAuthorizeData[] Authorize,
-    bool AllowAnonymous);
+    bool AllowAnonymous)
+{
+    /// <summary>The type has properties a client could hold, and exposes none of them: an object of it is sent as <c>{}</c>.</summary>
+    public bool HidesAll { get; init; }
+}

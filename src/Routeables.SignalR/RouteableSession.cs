@@ -33,6 +33,8 @@ public sealed class RouteableSession : IAsyncDisposable
     private readonly RouteableConnection _connection;
     private readonly IReadOnlyDictionary<string, Type> _registered;
     private readonly Dictionary<string, WatchedTarget> _targets = new(StringComparer.Ordinal);
+    // When the client last had the full state of a target sent again, and whether a resend waits (MinResendInterval). On the dispatcher.
+    private readonly Dictionary<string, (long At, bool Scheduled)> _resends = new(StringComparer.Ordinal);
     private readonly HashSet<WatchedTarget> _pendingTargets = [];
     private readonly CancellationTokenSource _lifetime = new();
     private readonly ILogger _logger;
@@ -66,6 +68,13 @@ public sealed class RouteableSession : IAsyncDisposable
         var detailed = Options.DetailedErrors ?? provider.GetService<IHostEnvironment>()?.IsDevelopment() ?? false;
         _invoker = new RouteableCommandInvoker(Schema, detailed);
         _logger = provider.GetService<ILoggerFactory>()?.CreateLogger<RouteableSession>() ?? NullLogger<RouteableSession>.Instance;
+        if (detailed)
+        {
+            var logger = _logger;
+            Projector.SentEmpty = type => logger.LogWarning(
+                "An object of {Type} is sent as {{}}: none of its properties is exposed (RouteableExposure.Explicit). Mark the type or its " +
+                "properties [RouteableState], or list it in RouteablesOptions.ExposeTypes.", type.FullName);
+        }
 
         _connection = provider.GetService<RouteableConnection>() ?? new RouteableConnection();
         _connection.Attach(connectionId, user);
@@ -104,8 +113,25 @@ public sealed class RouteableSession : IAsyncDisposable
     /// (<c>Task.Run</c>, <c>ConfigureAwait(false)</c>). <see langword="null"/> elsewhere (a hosted service, a timer created at startup). The
     /// Essentials facades (<c>Preferences.Default</c>…) use it to reach the client of the user, never another one.
     /// </summary>
+    /// <remarks>
+    /// It flows with the execution context: what a command starts keeps its session for good, even work that outlives the command and serves
+    /// everyone. A singleton created during a command that starts a timer or a loop, a cache that refreshes itself, a fire-and-forget task:
+    /// in them, <c>Preferences.Default</c> is still the device of the user whose command created them, for every user. Start such work with
+    /// <see cref="RunDetached"/> (or under <see cref="ExecutionContext.SuppressFlow"/>), and pass it what it needs of a user explicitly.
+    /// </remarks>
     public static RouteableSession? Running
         => SynchronizationContext.Current is SessionDispatcher { Session: { } session } ? session : AmbientSession.Value;
+
+    /// <summary>
+    /// Starts <paramref name="work"/> on the thread pool outside of any session: neither it nor what it starts (a timer, a loop of a singleton)
+    /// has a <see cref="Running"/> session, wherever it is called from. For work that is not the user's, started during a command.
+    /// </summary>
+    public static Task RunDetached(Func<Task> work)
+    {
+        ArgumentNullException.ThrowIfNull(work);
+        using (ExecutionContext.SuppressFlow())
+            return Task.Run(work);
+    }
 
     internal static RouteableSession? Ambient
     {
@@ -160,7 +186,7 @@ public sealed class RouteableSession : IAsyncDisposable
         if (_targets.TryGetValue(target, out var watched))
         {
             // Asked again (a client that reconnected, a component that came back): the state is sent again.
-            watched.Resend();
+            ResendAsked(target, watched);
             return RouteableAck.Ok;
         }
 
@@ -188,7 +214,10 @@ public sealed class RouteableSession : IAsyncDisposable
     public Task<RouteableAck> UnwatchAsync(string target) => CallAsync("Unwatch", target, () =>
     {
         if (!string.IsNullOrEmpty(target) && target != RouteableTargets.Modal && RemoveTarget(target, out var watched))
+        {
             watched.Dispose();
+            _resends.Remove(target);
+        }
         return Task.FromResult(RouteableAck.Ok);
     }, grace: false);
 
@@ -197,9 +226,38 @@ public sealed class RouteableSession : IAsyncDisposable
     {
         if (!_targets.TryGetValue(target ?? string.Empty, out var watched))
             return Task.FromResult(RouteableAck.Fail($"'{target}' is not watched.", RouteableErrorCodes.NotFound));
-        watched.Resend();
+        ResendAsked(target ?? string.Empty, watched);
         return Task.FromResult(RouteableAck.Ok);
     }, grace: false);
+
+    // On the dispatcher. A full state the client asks again is sent at once, then at most once per MinResendInterval: the asks of a burst make
+    // one resend at its end (audit of 17 November 2026, S2: each resend reads the whole state).
+    private void ResendAsked(string name, WatchedTarget watched)
+    {
+        var interval = (long)Options.MinResendInterval.TotalMilliseconds;
+        var now = Environment.TickCount64;
+        if (interval <= 0 || !_resends.TryGetValue(name, out var last) || now - last.At >= interval)
+        {
+            _resends[name] = (now, false);
+            watched.Resend();
+            return;
+        }
+        if (last.Scheduled)
+            return;
+        _resends[name] = (last.At, true);
+        _ = Task.Delay(TimeSpan.FromMilliseconds(last.At + interval - now)).ContinueWith(_ => Dispatcher.Run(() =>
+        {
+            if (_targets.TryGetValue(name, out var current) && ReferenceEquals(current, watched))
+            {
+                _resends[name] = (Environment.TickCount64, false);
+                watched.Resend();
+            }
+            else
+            {
+                _resends.Remove(name);
+            }
+        }), CancellationToken.None, TaskContinuationOptions.None, TaskScheduler.Default);
+    }
 
     private IRouter? FindRouter(string target, out string? error)
     {

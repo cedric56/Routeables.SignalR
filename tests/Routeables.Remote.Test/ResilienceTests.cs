@@ -169,7 +169,7 @@ public class ResilienceTests
     }
 
     [Fact]
-    public async Task A_clock_still_wrong_keeps_the_change_pending_and_does_not_carry_the_server_into_its_future()
+    public async Task A_clock_still_wrong_is_corrected_by_the_time_of_the_server_and_does_not_carry_the_server_into_its_future()
     {
         var serverTime = new ManualTime(DateTimeOffset.UnixEpoch.AddDays(20_000));
         var deviceTime = new ManualTime(serverTime.Now.AddDays(3));
@@ -177,12 +177,99 @@ public class ResilienceTests
         var a = await Device.StartAsync("A", server, time: deviceTime);
         await a.Replica.Edit().Create(Ana).Set(Ana, "name", "\"Ana\"").CommitAsync();
 
-        await a.SyncAsync();                         // returns: no endless loop
+        var report = await a.SyncAsync();            // the clock of the device is still three days ahead
 
-        Assert.Equal(1, a.Replica.PendingCount);     // the intent is kept for the next synchronization
+        Assert.Equal("\"Ana\"", server.Find(Ana)!.Get("name"));
+        Assert.Equal(0, a.Replica.PendingCount);
         Assert.Empty(a.Replica.Rejected);
-        Assert.Null(server.Find(Ana));
+        Assert.Equal((1, 0, 1, false), (report.Pushed, report.Rejected, report.Restamped, report.ClockSkew));
+        Assert.True(report.ClockOffset <= -TimeSpan.FromDays(3) + TimeSpan.FromSeconds(1));
         Assert.True(server.Clock.Last.Wall < deviceTime.Now.ToUnixTimeMilliseconds() - 1000);
+
+        // The next changes are stamped by the time of the server: accepted at once, nothing stamped again.
+        await a.Replica.Edit().Set(Ana, "name", "\"Anna\"").CommitAsync();
+        report = await a.SyncAsync();
+        Assert.Equal((1, 0, 0), (report.Pushed, report.Rejected, report.Restamped));
+        Assert.Equal("\"Anna\"", server.Find(Ana)!.Get("name"));
+    }
+
+    // Audit of 17 November 2026, B1: a telephone 10 minutes ahead never synchronized, and every report said pushed=2, rejected=0.
+    [Fact]
+    public async Task A_device_ten_minutes_ahead_synchronizes_at_the_first_attempt_and_says_so()
+    {
+        var serverTime = new ManualTime(DateTimeOffset.UnixEpoch.AddDays(20_000));
+        var deviceTime = new ManualTime(serverTime.Now.AddMinutes(10));
+        var server = new ReplicationServer(AllowAllReplicationPolicy.Instance, time: serverTime);
+        var a = await Device.StartAsync("A", server, time: deviceTime);
+        await a.Replica.Edit().Create(Ana).Set(Ana, "name", "\"Ana\"").CommitAsync();
+
+        var report = await a.SyncAsync();
+
+        Assert.Equal((1, 0, 1, false), (report.Pushed, report.Rejected, report.Restamped, report.ClockSkew));
+        Assert.Equal(TimeSpan.FromMinutes(-10), report.ClockOffset);
+        Assert.Equal(0, a.Replica.PendingCount);
+        Assert.Equal("\"Ana\"", server.Find(Ana)!.Get("name"));
+    }
+
+    [Fact]
+    public async Task Every_change_stamped_in_the_future_is_stamped_again_in_one_synchronization_in_its_order()
+    {
+        var serverTime = new ManualTime(DateTimeOffset.UnixEpoch.AddDays(20_000));
+        var deviceTime = new ManualTime(serverTime.Now.AddHours(1));
+        var server = new ReplicationServer(AllowAllReplicationPolicy.Instance, new ReplicationServerOptions { MaxChangesPerPush = 4 }, serverTime);
+        var a = await Device.StartAsync("A", server, time: deviceTime);
+        await a.Replica.Edit().Create(Ana).CommitAsync();
+        for (var i = 0; i < 10; i++)
+        {
+            await a.Replica.Edit().Set(Ana, "name", $"\"{i}\"").Increment(Ana, "visits", 1).InsertText(Ana, "notes", i, $"{i}").CommitAsync();
+            deviceTime.Now = deviceTime.Now.AddSeconds(1);
+        }
+
+        var report = await a.SyncAsync();
+
+        Assert.Equal((11, 0, 11, false), (report.Pushed, report.Rejected, report.Restamped, report.ClockSkew));
+        Assert.Equal(0, a.Replica.PendingCount);
+        var stored = server.Find(Ana)!;
+        Assert.Equal("\"9\"", stored.Get("name"));      // the last write still wins
+        Assert.Equal(10, stored.Counter("visits"));
+        Assert.Equal("0123456789", stored.Text("notes"));
+    }
+
+    [Fact]
+    public async Task A_device_whose_clock_is_right_is_not_corrected()
+    {
+        var serverTime = new ManualTime(DateTimeOffset.UnixEpoch.AddDays(20_000));
+        var deviceTime = new ManualTime(serverTime.Now.AddSeconds(20));     // within a round trip and the threshold
+        var server = new ReplicationServer(AllowAllReplicationPolicy.Instance, time: serverTime);
+        var a = await Device.StartAsync("A", server, time: deviceTime);
+        await a.Replica.Edit().Create(Ana).CommitAsync();
+
+        var report = await a.SyncAsync();
+
+        Assert.Equal((1, 0, TimeSpan.Zero), (report.Pushed, report.Restamped, report.ClockOffset));
+    }
+
+    // B5: a refused change was counted as pushed.
+    [Fact]
+    public async Task A_refused_change_is_not_counted_as_pushed()
+    {
+        var server = new ReplicationServer(new RefuseNames());
+        var a = await Device.StartAsync("A", server);
+        await a.Replica.Edit().Create(Ana).CommitAsync();
+        await a.Replica.Edit().Set(Ana, "name", "\"Ana\"").CommitAsync();
+
+        var report = await a.SyncAsync();
+
+        Assert.Equal((1, 1), (report.Pushed, report.Rejected));
+    }
+
+    private sealed class RefuseNames : IReplicationPolicy
+    {
+        public ValueTask<Admission> AdmitAsync(System.Security.Claims.ClaimsPrincipal? user, Change change,
+            Func<DocumentId, ValueTask<DocumentState?>> current, CancellationToken ct)
+            => ValueTask.FromResult(change.Ops.Any(o => o.Op is SetField { Field: "name" }) ? Admission.Reject(RemoteErrorCodes.Invalid, "No names.") : Admission.Accept);
+
+        public bool CanRead(System.Security.Claims.ClaimsPrincipal? user, DocumentId document, DocumentState? state) => true;
     }
 
     [Fact]

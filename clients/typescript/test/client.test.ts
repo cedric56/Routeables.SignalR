@@ -180,6 +180,15 @@ describe('patches', () => {
     assert.deepEqual(next['words'], ['first', 'a', 'x', 'y', 'c']);
     assert.deepEqual(state.words, ['a', 'b', 'c']);
   });
+
+  // Audit of 17 November 2026, B10: splice(i, n, ...values) threw a RangeError beyond about a hundred thousand values.
+  it('inserts more items than a function call takes arguments', () => {
+    const many = Array.from({ length: 300_000 }, (_, i) => i);
+    const next = apply({ items: ['a', 'b'] }, { op: 'splice', path: ['items'], index: 1, remove: 0, value: many });
+    const items = next['items'] as unknown[];
+    assert.equal(items.length, 300_002);
+    assert.deepEqual([items[0], items[1], items[300_000], items[300_001]], ['a', 0, 299_999, 'b']);
+  });
 });
 
 describe('what the user does', () => {

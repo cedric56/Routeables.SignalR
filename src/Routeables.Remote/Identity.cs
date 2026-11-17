@@ -89,6 +89,14 @@ public sealed class HybridClock
     private readonly TimeProvider _time;
     private readonly object _gate = new();
     private Hlc _last;
+    // Added to the time of the device, in milliseconds: zero, or negative when the device's clock was found ahead of the server's.
+    private long _offset;
+
+    /// <summary>
+    /// How far ahead of the server the device's clock may be before it is corrected (<see cref="Calibrate"/>): beyond the delay of a
+    /// round trip, well within the tolerance of a server (<c>MaxClockSkew</c>, 5 minutes by default). One minute.
+    /// </summary>
+    public static TimeSpan CalibrationThreshold { get; } = TimeSpan.FromMinutes(1);
 
     public HybridClock(ReplicaId replica, TimeProvider? time = null, Hlc? last = null)
     {
@@ -109,7 +117,40 @@ public sealed class HybridClock
         }
     }
 
-    private long WallNow => _time.GetUtcNow().ToUnixTimeMilliseconds();
+    private long DeviceNow => _time.GetUtcNow().ToUnixTimeMilliseconds();
+
+    private long WallNow => DeviceNow + _offset;
+
+    /// <summary>
+    /// What is added to the time of the device to stamp: <see cref="TimeSpan.Zero"/>, or a negative correction when the device's
+    /// clock was found ahead of the server's (<see cref="Calibrate"/>).
+    /// </summary>
+    public TimeSpan Offset
+    {
+        get
+        {
+            lock (_gate)
+                return TimeSpan.FromMilliseconds(_offset);
+        }
+    }
+
+    /// <summary>
+    /// Compares the time of the device with <paramref name="server"/>, the clock of the server just received: when the device is ahead
+    /// by more than <see cref="CalibrationThreshold"/> (or at all, with <paramref name="force"/>, after the server refused a change as
+    /// stamped in the future), the next values are stamped by the time of the server, measured through the device's own clock. Only a
+    /// clock ahead is corrected: one behind is harmless, the clock follows the values it observes. Returns whether a correction is in effect.
+    /// </summary>
+    public bool Calibrate(Hlc server, bool force = false)
+    {
+        if (server.Wall <= 0)
+            return Offset != TimeSpan.Zero;     // a server that gave no time
+        lock (_gate)
+        {
+            var ahead = DeviceNow - server.Wall;
+            _offset = ahead > (force ? 0 : (long)CalibrationThreshold.TotalMilliseconds) ? -ahead : 0;
+            return _offset != 0;
+        }
+    }
 
     /// <summary>
     /// The value right after (<paramref name="wall"/>, <paramref name="counter"/>): the next counter, or the next millisecond when the counter

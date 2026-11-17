@@ -82,6 +82,11 @@ models of that session receive by injection. A session runs on its dispatcher (a
 `await` that came back) and in what that work starts (`Task.Run`, `ConfigureAwait(false)`). Outside of a session (a hosted service, a
 timer created at startup) the facades throw `InvalidOperationException`: there is no user to ask.
 
+The session flows with the execution context, **for good**: work that a command starts and that outlives it keeps that session. A
+singleton created during a command that starts a timer or a loop, a cache that refreshes itself, a fire-and-forget task: in them,
+`Preferences.Default` is still the device of the user whose command created them — for every user. Start such work with
+`RouteableSession.RunDetached(...)` (or under `ExecutionContext.SuppressFlow()`), and give it what it needs of a user explicitly.
+
 The forwarding facades are those of [Essentieables.Facades](https://github.com/cedric56/Essentieables/tree/master/src/Essentieables.Facades):
 `RemoteFacades.Install` registers the Routeables session resolver there. A Blazor Server app using Essentieables registers its circuit the
 same way, so both hosts can share a process: each call goes to the session that runs, whichever host owns it, and Essentieables' extended
