@@ -220,7 +220,7 @@ public class ConvergenceTests
 
     // Audit of 17 November 2026: the fuzzing that found B1. Devices whose clocks are ahead (beyond the tolerance of the server) or behind,
     // set right or wrong again along the way, write texts too, and the server compacts its log.
-    public static async Task RunWithClocksAsync(int seed, int steps = 300)
+    internal static async Task RunWithClocksAsync(int seed, int steps = 300)
     {
         var random = new Random(seed);
         var serverTime = new ManualTime(DateTimeOffset.UnixEpoch.AddDays(20_000));
